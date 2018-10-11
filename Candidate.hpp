@@ -1,4 +1,5 @@
 #include <iostream>
+#include "asgard.hpp"
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
@@ -13,11 +14,10 @@ class Candidate {
 				int filterwidth, ngiant;
 				long unsigned i0,i1;
 				double tsamp, width;
-				std::vector<Candidate> matches;
-
+				CandidateList matches;
 		Candidate(std::string line, double ts) {
 				std::vector<std::string> b;
-				boost::split(b, line, boost::is_any_of(" ");
+				boost::split(b, line, boost::is_any_of(" "));
 				if(b.size() != 9) throw BadCandidateException;
 				//
 				sn = std::atof(b[0]);
@@ -40,6 +40,7 @@ class Candidate {
 				ret << "Wd: " << filterwidth << std::endl;
 				ret << "SN: " << sn << std::endl;
 				ret << "DM: " << dm << std::endl;
+				return ret;
 		}
 		
 		bool Overlap(Candidate other, float ddm, float dwi) {
@@ -57,59 +58,53 @@ class Candidate {
 		}
 };
 
-class CandGroups {
-		private:
-				std::vector<Candidate> cg;
-				double tsamp;
-				bool coincided;
-		public:
-				CandGroups(std::vector<fs::directory_entry> list, double ts) {
-						tsamp = ts;
-						for(std::vector<fs::directory_entry>::iterator il : list) {
-								std::string line;
-								fs::ifstream ifs(il.path());	
-								while(getline(ifs, line))	cg.push_back(Candidate(line),ts);
-						}
-						coincided = false;
-				}
-				
 
-				void Coincidence(float ddm, float dwi) {
-						// Coincide all the candidates
-						//
-						std::vector<long unsigned int> end_times;
-						std::for_each(cg.begin(),cg.end(), [](Candidate x)
-										{ end_times.push_back(x.i1) } );
-						std::sort(end_times.begin(), end_times.end());
-						std::sort(cg.begin(), cg.end(), [](const Candidate x, const Candidate y) 
-										{ return x.i1 < y.i1 } ); 
-						for(auto i : end_times){ 
-								*i *= ts;
+CandidateList ReadCandidates(DEList cl, double ts) {
+		CandidateList ret;
+		std::string line;
+		if(ts == 0.0) ts = TSAMP;
+		for(DEList::iterator il : cl) {
+				fs::ifstream(il.path());
+				while(std::getline(ifs,line)) ret.push_back(Candidate(line),ts);
+		}
+		return ret;
+}
+
+
+void Coincidence(CandidateList& cg, float ddm, float dwi) {
+		// Coincide all the candidates
+		std::vector<timeslice> end_times;
+		std::for_each(cg.begin(),cg.end(), [](Candidate x)
+						{ end_times.push_back(x.i1) } );
+		std::sort(end_times.begin(), end_times.end());
+		std::sort(cg.begin(), cg.end(), [](const Candidate x, const Candidate y) 
+						{ return x.i1 < y.i1 } ); 
+		for(auto i : end_times){ 
+				*i *= ts;
+		}
+		//
+		CandidateList pcands, tcands;
+		CandidateList::iterator it0, it1;
+		float tslice = 1;
+		timeslice nslice = (end_times[end_times.size()-1]/tslice) + 1;
+		it0 = cg.begin(); // initilizing
+		for(timeslice i = 0; i < nslice; i++) {
+				it1 = std::lower_bound(cg.begin(), cg.end(),tslice*(i+1)/ts, [](Candidate x, float ts) { return x.i1 < ts } );
+				std::copy(it0, it1, tcands.begin());
+				//
+				for(cc : tcands) {
+						for(dd : tcands) {
+								if((*cc).Overlap(*dd, ddm, dwi))
+										(*cc).match_append(*dd);
 						}
-						//
-						std::vector<Candidate> pcands, tcands;
-						std::vector<Candidate>::iterator it0, it1;
-						float tslice = 1;
-						long unsigned int nslice = (end_times[end_times.size()-1]/tslice) + 1;
-						it0 = cg.begin(); // initilizing
-						for(long unsigned int i = 0; i < nslice; i++) {
-								it1 = std::lower_bound(cg.begin(), cg.end(),tslice*(i+1)/ts, [](Candidate x, float ts) { return x.i1 < ts } );
-								std::copy(it0, it1, tcands.begin());
-								//
-								for(cc : tcands) {
-										for(dd : tcands) {
-												if((*cc).Overlap(*dd, ddm, dwi))
-														(*cc).match_append(*dd);
-										}
-										for(dd: pcands) {
-												if((*cc).Overlap(*dd, ddm, dwi))
-														(*cc).match_append(*dd);
-										}
-								}
-								pcands = tcands;
-								it0 = it1;
+						for(dd: pcands) {
+								if((*cc).Overlap(*dd, ddm, dwi))
+										(*cc).match_append(*dd);
 						}
-						coincided = true;
 				}
-				bool isCoincided() { return coincided; }
-};
+				pcands = tcands;
+				it0 = it1;
+		}
+		coincided = true;
+}
+
