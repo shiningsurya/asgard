@@ -39,24 +39,25 @@ std::ostream& operator<< (std::ostream& os, const Filterbank& fb) {
 class FilterbankReader {
 		public:
 				FilterbankReader() {
-						r = new char[36];
-						nbytes = 0;
+						r = new char[80];
 				}
 				~FilterbankReader() {
 						delete[] r;
 				}
 				int Read(Filterbank& fb, std::string ifile) {
-						inputfile.open(ifile,std::ifstream::binary);
+						totalbytes = 0;
+						inputfile = fopen(ifile.c_str(),"rb");
 						fb.filename = ifile;
-						if(!inputfile.is_open()) {
-								std::cerr << "Unable to read file" << std::endl;
+						filename = ifile;
+						if(!inputfile) {
+								std::cerr << "Unable to open file" << std::endl;
 								return 1;				
 						}
 						if(!read_header(fb)) {
 								std::cerr << "Unable to read header of FIL: " << ifile << std::endl;
 								return 1;
 						}
-						inputfile.close();
+						fclose(inputfile);
 						return 0;
 				}
 		private:
@@ -66,31 +67,36 @@ class FilterbankReader {
 				int telescope_id, data_type, nchan, nbits, nifs, barycentric; /* these two added Aug 20, 2004 DRL */
 				double tstart,tsamp,fch1,foff,src_raj,src_dej;
 				////////////////// lvalue rvalue shit
-				std::ifstream inputfile;
+				FILE* inputfile;
 				std::string filename;
 				char *r;
-				int nbytes;
+				int totalbytes;
 				int ifread(int size) {
-						inputfile.read(r, size);
-						std::cout << "In ifread :: r: " << std::to_string(size) << std::endl;
-						return std::atoi(r);
+						int ret;
+						fread(&ret, sizeof(int), 1, inputfile);
+						//inputfile.read(&r[0], size);
+						//std::cout << "In ifread :: r: " << std::to_string(ret) << std::endl;
+						//return std::atoi(r);
+						return ret;
 				}
 				std::string sfread(int size) {
-						inputfile.read(r, size);
-						return std::string(r);
+						fread(r, size, 1, inputfile);
+						return std::string(r,r+size);
 				}
 				double dfread(int size) {
-						inputfile.read(r, size);
-						return std::stod(std::string(r));
+						double ret;
+						fread(&ret, sizeof(double), 1, inputfile);
+						return ret; 
 				}
 				std::string get_string() {
 						int nchar;
 						nchar = ifread(sizeof(int));
-						nbytes = sizeof(int);
-						std::cout << "In get_string :: nchar: " << std::to_string(nchar) << std::endl;
-						if (inputfile.eof()) return std::string(""); 
+						totalbytes += sizeof(int);
+						//std::cout << "In get_string :: nchar: " << std::to_string(nchar) << std::endl;
+						if (feof(inputfile)) return std::string(""); 
 						if (nchar > 80 || nchar < 1) return std::string("");
-						nbytes += nchar;
+						//std::cout << "In get_string 2 :: nchar: " << std::to_string(nchar) << std::endl;
+						totalbytes += nchar;
 						return sfread(nchar); 
 						//str[nchar]='\0';
 				}
@@ -100,29 +106,25 @@ class FilterbankReader {
 						return one == two;
 				}
 				int read_header(Filterbank& f) {
-						inputfile.seekg(0, inputfile.beg);
 						std::string str, message;
-						int itmp,nbytes,totalbytes,expecting_rawdatafile=0,expecting_source_name=0; 
-						int expecting_frequency_table=0,channel_index;
+						int expecting_source_name=0; 
 						/* try to read in the first line of the header */
 						str = get_string();
 						if (str != std::string("HEADER_START")) {
 								/* the data file is not in standard format, rewind and return */
 								//rewind(inputfile);
-								std::cout << "what you are coming here?\n" << str.length() << std::endl;
-								inputfile.seekg(0, inputfile.beg);
+								//std::cout << "what you are coming here?\n" << str.length() << std::endl;
+								rewind(inputfile);
 								return 0;
 						}
-						/* store total number of bytes read so far */
-						totalbytes=nbytes;
-
 						/* loop over and read remaining header lines until HEADER_END reached */
 						while (1) {
 								str = get_string();
 								if (strings_equal(str,"HEADER_END")) break;
-								totalbytes+=nbytes;
+								//totalbytes+=str.length();
 								if (strings_equal(str,"source_name")) {
 										expecting_source_name=1;
+										//totalbytes+=str.length();
 								} else if (strings_equal(str,"src_raj")) {
 										f.src_raj = dfread(sizeof(f.src_raj));
 										totalbytes+=sizeof(f.src_raj);
@@ -188,19 +190,22 @@ class FilterbankReader {
 										//fprintf(stderr,"ERROR: %s\n",message);
 										std::cerr << "ERROR in FilterbankReader " << message << std::endl;
 										std::cerr << "While reading " << filename << std::endl;  
-										//exit(1);
+										exit(1);
 								} 
-								if (totalbytes != inputfile.gcount()) {
-										std::cerr << "ERROR: Header bytes does not equal file position" << std::endl;
+								if (totalbytes != ftell(inputfile)) {
+										std::cerr << "ERROR: Header bytes does not equal file position while reading" << std::endl;
+										std::cerr << "Totalbytes was: " << std::to_string(totalbytes) << std::endl;
+										std::cerr << "ftell was: " << std::to_string(ftell(inputfile)) << std::endl;
 										std::cerr << "String was: " + str << std::endl;
 										//fprintf(stderr,"       header: %d file: %d\n",totalbytes,ftell(inputfile));
-										//exit(1);
+										exit(1);
 								}
 						} 
 						/* add on last header string */
-						totalbytes+=nbytes;
-						if (totalbytes != inputfile.gcount()) {
-								std::cerr << "ERROR: Header bytes does not equal file position" << std::endl;
+						if (totalbytes != ftell(inputfile)) {
+								std::cerr << "ERROR: Header bytes does not equal file position after reading" << std::endl;
+								std::cerr << "Totalbytes was: " << std::to_string(totalbytes) << std::endl;
+								std::cerr << "ftell was: " << std::to_string(ftell(inputfile)) << std::endl;
 								std::cerr << "String was: " + str << std::endl;
 								//exit(1);
 						}
