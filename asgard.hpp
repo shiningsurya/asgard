@@ -7,7 +7,7 @@
 #include <boost/filesystem.hpp>
 
 // Definitions
-#define TSAMP 
+#define TSAMP  
 
 // namespace
 namespace fs = boost::filesystem;

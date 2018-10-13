@@ -1,10 +1,7 @@
 #include <iostream>
 #include "asgard.hpp"
 #include <boost/algorithm/string.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
-
-fs = namespace boost::filesystem;
 
 class Candidate {
 		public:

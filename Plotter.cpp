@@ -1,7 +1,6 @@
 #include <iostream>
 #include "cpgplot.h"
-
-typedef unsigned long int slicetype;
+#include "asgard.h"
 
 
 class Waterfall {
