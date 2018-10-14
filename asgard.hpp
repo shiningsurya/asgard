@@ -1,5 +1,6 @@
 // I define my types and classes here
 // includes
+#include<iostream>
 #include <algorithm>
 #include <string>
 #include <map>

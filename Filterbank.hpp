@@ -7,31 +7,94 @@
  * and put it here after C++-izing the code
  */
 #include <iostream>
-#include <fstream>
+#include <boost/iostreams/device/mapped_file.hpp>
+#define HI2BITS 192
+#define UPMED2BITS 48
+#define LOMED2BITS 12
+#define LO2BITS 3
+namespace bios = boost::iostreams;
+//#include <fstream>
+typedef long unsigned int timeslice;
 class Filterbank {
 		public:
+				Filterbank() {
+						mmap = false;
+				}
+				~Filterbank() {
+						if(mmap) fbdata.close();
+				}
 				std::string filename; // <-- this is mine
-				std::string rawdatafile, source_name;
-				int machine_id, telescope_id, data_type, nchans, nbits, nifs, scan_number,
-					barycentric,pulsarcentric; /* these two added Aug 20, 2004 DRL */
-				double tstart,mjdobs,tsamp,fch1,foff,refdm,az_start,za_start,src_raj,src_dej;
-				double gal_l,gal_b,header_tobs,raw_fch1,raw_foff;
-				int nbeams, ibeam;
-				/* added 20 December 2000    JMC */
-				double srcl,srcb;
-				double ast0, lst0;
-				long wapp_scan_number;
-				std::string project, culprits;
-				double analog_power[2];
-				/* added frequency table for use with non-contiguous data */
-				double frequency_table[4096]; /* note limited number of channels */
-				long int npuls; /* added for binary pulse profile format */
+				std::string source_name;
+				int telescope_id, data_type, nchans, nbits, nifs, barycentric; /* these two added Aug 20, 2004 DRL */
+				double duration, tstart,tsamp,fch1,foff,src_raj,src_dej;
+				int headersize;
+				long int datasize, totalsamp;
 				// printing
 				friend std::ostream& operator<< (std::ostream& os, const Filterbank& fb);
+				// Read data
+				/*
+				 *void Unpack(float** fbf, double ttstart, double tduration) {
+				 *        timeslice tts = ttstart/tsamp;
+				 *        timeslice ttd = tduration/tsamp;
+				 *        Unpack(fbf, tts, ttd);
+				 *}
+				 */
+				void Unpack(float* fbf, timeslice nstart, timeslice nsamp) {
+						if(!mmap) OneTimeMMap(); 
+						// unpack td slice starting from ts
+						if(nstart + nsamp > totalsamp) {
+								std::cerr << "Asking to unpack more than what is there\n";
+								nsamp = totalsamp - nstart;
+								std::cerr << "Changing nsamp accordingly\n";
+						}
+						int ichan = 0;
+						int ii = 0;
+						timeslice b0 = (nstart * b_per_spectrum) + headersize;
+						timeslice b1 = (nsamp * b_per_spectrum) + b0;
+						dd = fbdata.data(); // <-- this is data
+						for(timeslice it = b0; it < b1; it++) {
+								if(ichan > nchans) {
+										std::cerr << "Fatal error in reading Fil\n" << std::endl;
+										exit(1);
+								}
+								if(ichan == nchans) {
+										ichan = 0;
+										ii++;
+								}
+								dc = dd[it]; // read one character
+								// one character has 4 samples
+								fbf[ii++] = (float) (dc & LO2BITS); 
+								fbf[ii++] = (float) ((dc & LOMED2BITS) >> 2); 
+								fbf[ii++] = (float) ((dc & UPMED2BITS) >> 4); 
+								fbf[ii++] = (float) ((dc & HI2BITS) >> 6); 
+						}
+						// return is 2d array of size td * nchans
+				}
+		private:
+				bool mmap;
+				const char *dd; 
+				char dc;
+				bios::mapped_file_source fbdata;
+				int b_per_spectrum;
+				void OneTimeMMap() {
+						fbdata.open(filename);		
+						b_per_spectrum = (nbits * nchans * nifs)/8;
+						totalsamp = datasize/(long int)b_per_spectrum;
+						duration = totalsamp * tsamp;
+						mmap = true;
+				}
 };
 std::ostream& operator<< (std::ostream& os, const Filterbank& fb) {
 		os << "Filename: " << fb.filename << std::endl;
 		os << "Source Name: " << fb.source_name << std::endl;
+		os << "Header size: " << fb.headersize << std::endl;
+		os << "Num-chan: " << fb.nchans << std::endl;
+		os << "Tstart: " << fb.tstart << std::endl;
+		os << "Tsamp: " << fb.tsamp << std::endl;
+		os << "Nbits: " << fb.nbits << std::endl;
+		os << "Nifs: " << fb.nifs << std::endl;
+		os << "Nsamples: " << fb.totalsamp << std::endl;
+		os << "Duration:(s) " << fb.duration << std::endl;
 		return os;
 }
 
@@ -53,7 +116,8 @@ class FilterbankReader {
 								std::cerr << "Unable to open file" << std::endl;
 								return 1;				
 						}
-						if(!read_header(fb)) {
+						fb.headersize = read_header(fb);
+						if(!fb.headersize) {
 								std::cerr << "Unable to read header of FIL: " << ifile << std::endl;
 								return 1;
 						}
@@ -209,6 +273,11 @@ class FilterbankReader {
 								std::cerr << "String was: " + str << std::endl;
 								//exit(1);
 						}
+						/*
+						 *find total size of the file
+						 */
+						fseek(inputfile, 0L, SEEK_END);
+						f.datasize = ftell(inputfile) - totalbytes;
 						/* return total number of bytes read */
 						return totalbytes;
 				}

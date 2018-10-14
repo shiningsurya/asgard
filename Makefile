@@ -6,4 +6,4 @@ all: AnalyzeFB.cpp
 plot: Plotter.cpp
 	g++ Plotter.cpp -std=c++11 -o plot -lpgplot -lcpgplot
 test: Test*.cpp Filterbank.hpp
-	g++ TestFilterbank.cpp -std=c++11 -o testfb
+	g++ TestFilterbank.cpp -g -std=c++11 -o testfb -lboost_system -lboost_iostreams
