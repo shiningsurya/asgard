@@ -35,3 +35,6 @@
 test
 del10
 testfb
+testcd
+*.ps
+plot

@@ -1,7 +1,4 @@
-#include <iostream>
 #include "cpgplot.h"
-#include "asgard.h"
-
 
 class Waterfall {
 		private:
@@ -11,7 +8,7 @@ class Waterfall {
 				float charh;
 				
 		public:
-				Waterfall(std::string fn, int NANT, slicetype nslice,std::string basename){
+				Waterfall(std::string fn, int NANT, timeslice nslice,std::string basename){
 						numslice = nslice; // number of pgplot pages
 						nant = NANT; // Number of antennas
 						filename = fn; // output plot file name
@@ -20,7 +17,7 @@ class Waterfall {
 						//
 						charh = .65; // pgplot char height
 				}
-				void Plot(slicetype slice) {
+				void Plot(timeslice slice) {
 						//if(dat.size() != nant) {
 								//std::cout << "Input data doesn't contain all the antennas?" <<std::endl;
 						//}
@@ -89,8 +86,10 @@ class CandPlot {
 				std::string filename;
 				// vector of candidates needs to be here for
 				// scatter plot
+				int count;
 		public:
 				CandPlot(std::string fn) {
+						count = 0;
 						filename = fn;	
 						cpgbeg(0,filename.c_str(),1,1); // beginning of another journey
 						cpgsch(.65); // character height
@@ -101,6 +100,7 @@ class CandPlot {
 						cpgend();
 				}
 				void CP() {
+						if(count != 0) cpgpage();
 						// this function plots what is one page
 						//////////////////////////////////////////////////
 						//////////////////////////////////////////////////
@@ -131,15 +131,7 @@ class CandPlot {
 						cpglab("", "DM (pc/cc)", "Scatter");
 						cpgmtxt("T",1.5,1.0,0.0,"EAXX");
 						//////////////////////////////////////////////////
+						count++;
 				}
 };
 
-
-
-int main() {
-		//Waterfall wf(std::string("wut.ps/cps"),16/1,10,std::string("base"));
-		//wf.Plot(1);
-		CandPlot cd(std::string("cacaca.ps/vps"));
-		cd.CP();
-		return 0;
-}

@@ -24,7 +24,7 @@ class Filterbank {
 						if(mmap) fbdata.close();
 				}
 				std::string filename; // <-- this is mine
-				std::string source_name;
+				std::string source_name, antenna;
 				int telescope_id, data_type, nchans, nbits, nifs, barycentric; /* these two added Aug 20, 2004 DRL */
 				double duration, tstart,tsamp,fch1,foff,src_raj,src_dej;
 				int headersize;

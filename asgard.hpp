@@ -6,9 +6,9 @@
 #include <map>
 #include <utility>
 #include <boost/filesystem.hpp>
-
+#include "math.h"
 // Definitions
-#define TSAMP  
+#define TSAMP  0.000097
 
 // namespace
 namespace fs = boost::filesystem;
@@ -20,6 +20,11 @@ class Filterbank;
 
 // analyze type
 class AnalyzeFB;
+
+// plot type
+class Waterfall;
+class CandPlot;
+
 
 // type def
 typedef long unsigned int timeslice;
