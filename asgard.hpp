@@ -1,11 +1,15 @@
 // I define my types and classes here
 // includes
+#ifndef ASGARD_H
+#define ASGARD_H
 #include<iostream>
 #include <algorithm>
 #include <string>
 #include <map>
 #include <utility>
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
+#include <boost/algorithm/string.hpp>
 #include "math.h"
 // Definitions
 #define TSAMP  0.000097
@@ -33,6 +37,7 @@ typedef std::vector<fs::directory_entry> DEList;
 typedef std::map<std::string, DEList> MapGroupDE; 
 typedef std::pair<std::string, DEList> PairGroupDE;
 
+typedef std::vector<float> FloatVector;
 
 
 typedef std::vector<Filterbank> FilterbankList;
@@ -40,3 +45,4 @@ typedef std::vector<Candidate>  CandidateList;
 typedef std::vector<std::string> GroupList;
 typedef std::pair<std::string, CandidateList> CandidateGroup;
 typedef std::pair<std::string, FilterbankList> FilterbankGroup;
+#endif

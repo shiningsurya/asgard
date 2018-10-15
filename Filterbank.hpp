@@ -6,7 +6,9 @@
  * I am going to shamelessly copy from sigproc code 
  * and put it here after C++-izing the code
  */
-#include <iostream>
+#ifndef ASGARD_H
+#include "asgard.hpp"
+#endif
 #include <boost/iostreams/device/mapped_file.hpp>
 #define HI2BITS 192
 #define UPMED2BITS 48
@@ -24,7 +26,8 @@ class Filterbank {
 				~Filterbank() {
 						if(mmap) fbdata.close();
 				}
-				std::string filename; // <-- this is mine
+				std::string filename, group; // <-- this is mine
+				bool isKur;
 				std::string source_name, antenna;
 				int telescope_id, data_type, nchans, nbits, nifs, barycentric; /* these two added Aug 20, 2004 DRL */
 				int b_per_spectrum;
@@ -76,6 +79,7 @@ class Filterbank {
 };
 std::ostream& operator<< (std::ostream& os, const Filterbank& fb) {
 		os << "Filename: " << fb.filename << std::endl;
+		os << "Group: " << fb.group << std::endl;
 		os << "Source Name: " << fb.source_name << std::endl;
 		os << "Header size: " << fb.headersize << std::endl;
 		os << "Num-chan: " << fb.nchans << std::endl;
@@ -85,6 +89,9 @@ std::ostream& operator<< (std::ostream& os, const Filterbank& fb) {
 		os << "Nifs: " << fb.nifs << std::endl;
 		os << "Nsamples: " << fb.totalsamp << std::endl;
 		os << "Duration:(s) " << fb.duration << std::endl;
+		os << "Antenna:" << fb.antenna << std::endl;
+		if(fb.isKur) os << "Kurtosis-ed: " << std::string("Yes") << std::endl;
+		else os << "Kurtosis-ed: " << std::string("No") << std::endl;
 		return os;
 }
 
@@ -114,6 +121,9 @@ class FilterbankReader {
 						fb.b_per_spectrum = (fb.nbits * fb.nchans * fb.nifs)/8;
 						fb.totalsamp = fb.datasize/(long int)fb.b_per_spectrum;
 						fb.duration = fb.totalsamp * fb.tsamp;
+						fb.antenna = GetAntenna(ifile);
+						fb.isKur = QueryKurtosis(ifile);
+						fb.group = GetGroup(ifile);
 						fclose(inputfile);
 						return 0;
 				}
@@ -128,6 +138,28 @@ class FilterbankReader {
 				std::string filename;
 				char *r;
 				int totalbytes;
+				std::string GetGroup(std::string fl){
+						std::vector<std::string> b,r;
+						boost::split(b, fl, boost::is_any_of("/"), boost::token_compress_on);
+						boost::split(r, b[b.size() -1], boost::is_any_of("_"), boost::token_compress_on);
+						std::string ret = r[0];
+						std::string underscore("_");
+						ret += underscore;
+						ret += r[1];
+						ret += underscore;
+						ret += r[2];
+						ret += underscore;
+						return ret;
+				}
+				bool QueryKurtosis(std::string fl) {
+						std::string kur = std::string("_kur.fil");
+						return fl.compare(fl.length() - kur.length(), kur.length(), kur) == 0;
+				}	
+				std::string GetAntenna(std::string fl) {
+						std::vector<std::string> b;
+						boost::split(b, fl, boost::is_any_of("_"), boost::token_compress_on);
+						if(b[3].compare(0, 2, std::string("ea")) == 0) return b[3];
+				}
 				int ifread(int size) {
 						int ret;
 						fread(&ret, sizeof(int), 1, inputfile);

@@ -1,7 +1,6 @@
+#ifndef ASGARD_H
 #include "asgard.hpp"
-#include <boost/algorithm/string.hpp>
-#include <boost/filesystem/fstream.hpp>
-
+#endif
 
 class Candidate {
 		public:
