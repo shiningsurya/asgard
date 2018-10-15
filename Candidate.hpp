@@ -2,6 +2,7 @@
 #include <boost/algorithm/string.hpp>
 #include <boost/filesystem/fstream.hpp>
 
+
 class Candidate {
 		public:
 				std::string antenna;
@@ -9,12 +10,12 @@ class Candidate {
 				long unsigned peak_index, dm_index;
 				double peak_time;
 				int filterwidth, ngiant;
-				long unsigned i0,i1;
+				timeslice i0,i1;
 				double tsamp, width;
 				CandidateList matches;
 		Candidate(std::string line, double ts) {
 				std::vector<std::string> b;
-				boost::split(b, line, boost::is_any_of("  "));
+				boost::split(b, line, boost::is_any_of(" \t"),boost::token_compress_on);
 				if(b.size() != 9) {
 						std::cerr << "Unable to read Candidate!" << std::endl;
 						std::cerr << "Was only able to get " << b.size() << "/9 parameters!"<< std::endl;

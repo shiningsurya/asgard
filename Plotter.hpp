@@ -1,4 +1,5 @@
 #include "cpgplot.h"
+#include "Operations.hpp"
 
 class Waterfall {
 		private:
@@ -84,6 +85,7 @@ class Waterfall {
 class CandPlot {
 		private:
 				std::string filename;
+				float tr[6];
 				// vector of candidates needs to be here for
 				// scatter plot
 				int count;
@@ -99,8 +101,26 @@ class CandPlot {
 				~CandPlot() {
 						cpgend();
 				}
-				void CP() {
+				void CP(Filterbank& f, Candidate& c) {
 						if(count != 0) cpgpage();
+						float * fdata;
+						timeslice ndur = c.i1 - c.i0;	
+						timeslice wid = 5*ndur; 
+						timeslice ndur_half = 0.5*(c.i1 + c.i0); // midpoint
+						timeslice ni0 = ndur_half - .5*wid;
+						timeslice ni1 = ndur_half + .5*wid;
+						/*
+						 *std::cout << "Totalsamp: " << f.totalsamp << std::endl;
+						 *std::cout << ni0 << " " << ni1 << " " << ndur_half << " " << wid << " " ;
+						 */
+						if(ni1 > f.totalsamp) {
+								ni1 = f.totalsamp;
+								wid = ni1 - ndur_half;
+								ni0 = ndur_half - .5*wid;
+						}
+						fdata = new float[wid*f.nchans];	
+						// I am an idiot!
+						f.Unpack(fdata, ni0, wid); // reading
 						// this function plots what is one page
 						//////////////////////////////////////////////////
 						//////////////////////////////////////////////////
@@ -110,10 +130,21 @@ class CandPlot {
 						cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 						cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
 						//////////////////////////////////////////////////
-						cpgsci(1); // color index
+						//cpgsci(1); // color index
 						cpgsvp(0.55, 0.9, 0.1, 0.45); // dispersed waterfall
-						cpgswin(20.,24., 320, 340);
+						cpgswin(ni0*f.tsamp +.5*f.tsamp, ni1*f.tsamp - .5*f.tsamp, 320, 360);
+						float trf[] = {ni0*(float)f.tsamp, (float)f.tsamp, 0.0, 320, 0.0, (360.f-320.f)/f.nchans}; 
+						//float trf2[] = {320, (360.f-320.f)/f.nchans, 0.0, ni0*(float)f.tsamp, 0.0, (float)f.tsamp}; 
 						cpgbox("BCN",0.0,0,"BCNV",0.0,0);
+						cpgsfs(1);
+						float heat_l[] = {0.0, 0.2, 0.4, 0.6, 1.0};
+						float heat_r[] = {0.0, 0.5, 1.0, 1.0, 1.0};
+						float heat_g[] = {0.0, 0.0, 0.5, 1.0, 1.0};
+						float heat_b[] = {0.0, 0.0, 0.0, 0.3, 1.0};
+						float contrast = 1,brightness = 0.5;
+						cpgctab (heat_l, heat_r, heat_g, heat_b, 5, contrast, brightness);
+						cpgimag(fdata, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
+						//cpgimag(fdata, f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
 						cpglab("Time (s)", "", "Dispersed Waterfall");
 						//////////////////////////////////////////////////
 						cpgsci(1); // color index
@@ -132,6 +163,7 @@ class CandPlot {
 						cpgmtxt("T",1.5,1.0,0.0,"EAXX");
 						//////////////////////////////////////////////////
 						count++;
+						delete[] fdata;
 				}
 };
 

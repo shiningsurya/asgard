@@ -19,6 +19,7 @@ class Filterbank {
 		public:
 				Filterbank() {
 						mmap = false;
+						//OneTimeMMap();
 				}
 				~Filterbank() {
 						if(mmap) fbdata.close();
@@ -26,6 +27,7 @@ class Filterbank {
 				std::string filename; // <-- this is mine
 				std::string source_name, antenna;
 				int telescope_id, data_type, nchans, nbits, nifs, barycentric; /* these two added Aug 20, 2004 DRL */
+				int b_per_spectrum;
 				double duration, tstart,tsamp,fch1,foff,src_raj,src_dej;
 				int headersize;
 				long int datasize, totalsamp;
@@ -53,14 +55,6 @@ class Filterbank {
 						timeslice b1 = (nsamp * b_per_spectrum) + b0;
 						dd = fbdata.data(); // <-- this is data
 						for(timeslice it = b0; it < b1; it++) {
-								if(ichan > nchans) {
-										std::cerr << "Fatal error in reading Fil\n" << std::endl;
-										exit(1);
-								}
-								if(ichan == nchans) {
-										ichan = 0;
-										ii++;
-								}
 								dc = dd[it]; // read one character
 								// one character has 4 samples
 								fbf[ii++] = (float) (dc & LO2BITS); 
@@ -75,12 +69,8 @@ class Filterbank {
 				const char *dd; 
 				char dc;
 				bios::mapped_file_source fbdata;
-				int b_per_spectrum;
 				void OneTimeMMap() {
 						fbdata.open(filename);		
-						b_per_spectrum = (nbits * nchans * nifs)/8;
-						totalsamp = datasize/(long int)b_per_spectrum;
-						duration = totalsamp * tsamp;
 						mmap = true;
 				}
 };
@@ -121,6 +111,9 @@ class FilterbankReader {
 								std::cerr << "Unable to read header of FIL: " << ifile << std::endl;
 								return 1;
 						}
+						fb.b_per_spectrum = (fb.nbits * fb.nchans * fb.nifs)/8;
+						fb.totalsamp = fb.datasize/(long int)fb.b_per_spectrum;
+						fb.duration = fb.totalsamp * fb.tsamp;
 						fclose(inputfile);
 						return 0;
 				}
