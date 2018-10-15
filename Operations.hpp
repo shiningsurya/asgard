@@ -4,7 +4,7 @@
 namespace operations {
 		void SingleAntennaCoadd(float * in, float * out, timeslice wid, int nchans);
 		void AntennaCoadd(std::vector<float*> in, float * out, timeslice wid, int nchans);
-		std::vector<timeslice> ExtractJuice(Filterbank& f, Candidate& c, float * out, int wdfac);
+		std::vector<timeslice> ExtractJuice(Filterbank& f, Candidate& c, float *&out, int wdfac);
 		void Dedisperse(float * out, Filterbank& f, Candidate& c);
 		void Dedisperse(float * in, float * out, double dm, int nchans, double tsamp, double fch1, double foff, timeslice nsamps);
 	 	FloatVector FreqTable(Filterbank& f);
@@ -12,7 +12,7 @@ namespace operations {
 		auto Delay = [](float f1, float f2, double dm) ->  double {return(4148.741601*((1.0/f1/f1)-(1.0/f2/f2))*dm);};
 }
 
-std::vector<timeslice> operations::ExtractJuice(Filterbank& f, Candidate& c, float * out, int wdfac) {
+std::vector<timeslice> operations::ExtractJuice(Filterbank& f, Candidate& c, float *&out, int wdfac) {
 		std::vector<timeslice> ret;
 		if(out != NULL) {
 				std::cerr << "Why do you want me to put juice in already initialized array?\n";
@@ -33,9 +33,12 @@ std::vector<timeslice> operations::ExtractJuice(Filterbank& f, Candidate& c, flo
 				wid = ni1 - ndur_half;
 				ni0 = ndur_half - .5*wid;
 		}
+		if(out == NULL) std::cerr << "BEFORE | Why tf are you NULL?\n";
 		out = new float[wid*f.nchans];	
+		if(out == NULL) std::cerr << "AFTER | Why tf are you NULL?\n";
 		// I am an idiot!
 		f.Unpack(out, ni0, wid); // reading
+		if(out == NULL) std::cerr << "AFTE2R | Why tf are you NULL?\n";
 		ret.push_back( wid );
 		ret.push_back( ni0 );
 		ret.push_back( ni1 );

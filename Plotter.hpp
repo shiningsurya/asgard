@@ -108,6 +108,7 @@ class CandPlot {
 						timeslice ni0 = vt[1];
 						timeslice ni1 = vt[2];
 						timeslice wid = vt[0];
+						if(fd == NULL) std::cerr << "Why tf are you NULL?\n";
 						fdd = new float[wid*f.nchans];
 						operations::Dedisperse(fd, fdd, c.dm, f.nchans, f.tsamp, f.fch1, f.foff, wid*f.nchans);
 						// this function plots what is one page
