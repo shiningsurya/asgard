@@ -5,13 +5,16 @@ namespace operations {
 		void SingleAntennaCoadd(float * in, float * out, timeslice wid, int nchans);
 		void AntennaCoadd(std::vector<float*> in, float * out, timeslice wid, int nchans);
 		std::vector<timeslice> ExtractJuice(Filterbank& f, Candidate& c, float *&out, int wdfac);
-		void Dedisperse(float * out, Filterbank& f, Candidate& c);
-		void Dedisperse(float * in, float * out, double dm, int nchans, double tsamp, double fch1, double foff, timeslice nsamps);
+		std::vector<timeslice> Dedisperse(float *&input, float *&out, Filterbank& f, Candidate& c);
 	 	FloatVector FreqTable(Filterbank& f);
 		FloatVector Delays(FloatVector freqs, double dm);
+		void TimeAxis(float *&out, float dt, timeslice start, timeslice stop); 
 		auto Delay = [](float f1, float f2, double dm) ->  double {return(4148.741601*((1.0/f1/f1)-(1.0/f2/f2))*dm);};
 }
-
+void operations::TimeAxis(float *&out, float dt, timeslice start, timeslice stop) {
+		out = new float[stop - start];
+		for(int i = 0; i < stop - start; i++) out[i] = (start + i)*dt;
+}
 std::vector<timeslice> operations::ExtractJuice(Filterbank& f, Candidate& c, float *&out, int wdfac) {
 		std::vector<timeslice> ret;
 		if(out != NULL) {
@@ -33,12 +36,9 @@ std::vector<timeslice> operations::ExtractJuice(Filterbank& f, Candidate& c, flo
 				wid = ni1 - ndur_half;
 				ni0 = ndur_half - .5*wid;
 		}
-		if(out == NULL) std::cerr << "BEFORE | Why tf are you NULL?\n";
 		out = new float[wid*f.nchans];	
-		if(out == NULL) std::cerr << "AFTER | Why tf are you NULL?\n";
 		// I am an idiot!
 		f.Unpack(out, ni0, wid); // reading
-		if(out == NULL) std::cerr << "AFTE2R | Why tf are you NULL?\n";
 		ret.push_back( wid );
 		ret.push_back( ni0 );
 		ret.push_back( ni1 );
@@ -55,41 +55,35 @@ void operations::SingleAntennaCoadd(float * in, float * out, timeslice wid, int 
 }
 FloatVector operations::FreqTable(Filterbank& f) {
 		FloatVector ret;
-		for(int i = 0; i < f.nchans; i++) ret.push_back( (float)f.fch1 - (i * (float)f.foff) );
+		for(int i = 0; i < f.nchans; i++) ret.push_back( (float)f.fch1 + (i * (float)f.foff) );
 		return ret;
 }	
 
-void operations::Dedisperse(float * in, float * out, double dm, int nchans, double tsamp, double fch1, double foff, timeslice nsamps) {
-		if(in == NULL || out == NULL) {
-				std::cerr << "Input to Dedisperse are fatal!\n";
-				if(in == NULL && out != NULL) std::cerr << "Uninitialized Input pointer\n";
-				else if(in != NULL && out == NULL) std::cerr << "Uninitialized Output pointer\n";
-				else std::cerr << "Uninitialized both pointers\n";
-				//exit(1);
-		}
+std::vector<timeslice> operations::Dedisperse(float *&input, float *&out, Filterbank& f, Candidate& c) {
+		std::vector<timeslice> ret;
 		dedisp_plan dplan;
 		dedisp_error error;
-		error = dedisp_create_plan(&dplan, nchans, tsamp, fch1, foff);
+		error = dedisp_create_plan(&dplan, f.nchans, f.tsamp, f.fch1, f.foff);
 		if( error != DEDISP_NO_ERROR ) std::cerr << "\nERROR: Could not create dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
-		/// Dedisp
-		error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)in, sizeof(float)*8, (dedisp_byte*)out, 8*sizeof(float), DEDISP_USE_DEFAULT);
+		error = dedisp_generate_dm_list(dplan, (float)c.dm, (float)c.dm, (float)c.filterwidth*f.tsamp, (float)1);
+		if( error != DEDISP_NO_ERROR ) std::cerr << "\nERROR: Could not create dmlist: " <<  dedisp_get_error_string(error) << std::endl;
+		dedisp_size maxD = dedisp_get_max_delay(dplan);
+		/// Read data 
+		ret = operations::ExtractJuice(f,c,input, maxD);
+		ret.push_back( maxD );
+		timeslice nsamps = (timeslice) ret[0];
+		/// Read data
+		if(out != NULL) {
+				std::cerr << "Why do you want me to put juice in already initialized array?\n";
+				std::cerr << "Freeing the memory\n";
+				delete[] out;
+		}
+		out = new float[nsamps - maxD];
+		error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)input, sizeof(float)*8, (dedisp_byte*)out, 8*sizeof(float), DEDISP_USE_DEFAULT);
 		/// Dedisp 
 		if( error != DEDISP_NO_ERROR ) std::cerr << "\nERROR: Could not execute dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
 		dedisp_destroy_plan(dplan);
-
-}
-
-void operations::Dedisperse(float * out, Filterbank& f, Candidate& c) {
-		/// Read data 
-		float * input;
-		timeslice nsamps = (timeslice) (operations::ExtractJuice(f, c, input, 5)[0] * f.nchans);
-		/// Read data
-		if(out == NULL) {
-				std::cerr << "Dedisperse output array not initialized\n";
-				out = new float[nsamps*f.nchans];
-				std::cerr << "Now initializing...\n";
-		}
-		operations::Dedisperse(input, out, c.dm, f.nchans, f.tsamp, f.fch1, f.foff, nsamps);
+		return ret;
 }
 
 FloatVector operations::Delays(FloatVector freqs, double dm) {

@@ -57,6 +57,7 @@ std::ostream& operator<< (std::ostream& os, const Candidate& cd){
 		os << "I0: " << cd.i0 << std::endl;
 		os << "I1: " << cd.i1 << std::endl;
 		os << "Wd: " << cd.filterwidth << std::endl;
+		os << "W: " << cd.width << std::endl;
 		os << "SN: " << cd.sn << std::endl;
 		os << "DM: " << cd.dm << std::endl;
 		return os;

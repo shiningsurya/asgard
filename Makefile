@@ -4,7 +4,7 @@
 CPP := g++
 BOOST_LD := -lboost_system -lboost_iostreams -lboost_filesystem
 PGPLOT_LD := -lpgplot -lcpgplot
-LD_FLAGS := -lm 
+LD_FLAGS := -lm  -g
 CPPFLAGS := -std=c++11
 DEDISP := /home/shining/study/MS/vLITE/dedisp
 DEDISP_INC := -I$(DEDISP)/inc

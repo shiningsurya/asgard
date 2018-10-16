@@ -103,35 +103,44 @@ class CandPlot {
 				}
 				void CP(Filterbank& f, Candidate& c) {
 						if(count != 0) cpgpage();
-						float *fd=NULL, *fdd=NULL;
-						std::vector<timeslice> vt = operations::ExtractJuice(f, c, fd, 5);
-						timeslice ni0 = vt[1];
-						timeslice ni1 = vt[2];
-						timeslice wid = vt[0];
-						if(fd == NULL) std::cerr << "Why tf are you NULL?\n";
-						fdd = new float[wid*f.nchans];
-						operations::Dedisperse(fd, fdd, c.dm, f.nchans, f.tsamp, f.fch1, f.foff, wid*f.nchans);
-						// this function plots what is one page
+						/////////////////////////////////////////////////
+						/*
+						 *if(f.antenna != c.antenna) 	std::cerr << "Filterbank antenna and Candidate antenna not same\n";
+						 *if(f.group != c.group) std::cerr << "Filterbank group and Candidate group not same\n";
+						 */
+						//
 						//////////////////////////////////////////////////
-						float trf[] = {ni0*(float)f.tsamp, (float)f.tsamp, 0.0, 320, 0.0, (360.f-320.f)/f.nchans}; 
+						float *fd=NULL, *fdd=NULL;
+						std::vector<timeslice> r = operations::Dedisperse(fd, fdd, f, c);
+						timeslice wid = r[0];
+						timeslice ni0 = r[1];
+						timeslice ni1 = r[2];
+						timeslice maxD = r[3];
+						timeslice wmd = wid-maxD;
+						FloatVector freqs = operations::FreqTable(f);
+						// this function plots what is one page
+						float * taxis;
+						operations::TimeAxis(taxis, (float)f.tsamp, ni0, ni1);
+						//////////////////////////////////////////////////
+						float trf[] = {ni0*(float)f.tsamp, (float)f.tsamp, 0.0, freqs.back(), 0.0, -1.f*(float)f.foff }; 
 						float heat_l[] = {0.0, 0.2, 0.4, 0.6, 1.0};
 						float heat_r[] = {0.0, 0.5, 1.0, 1.0, 1.0};
 						float heat_g[] = {0.0, 0.0, 0.5, 1.0, 1.0};
 						float heat_b[] = {0.0, 0.0, 0.0, 0.3, 1.0};
 						float contrast = 1,brightness = 0.5;
 						//////////////////////////////////////////////////
-						cpgsci(1); // color index
+						//cpgsci(1); // color index
 						cpgsvp(0.1, 0.45, 0.1, 0.45); // de-dispersed waterfall
 						cpgswin(ni0*f.tsamp +.5*f.tsamp, ni1*f.tsamp - .5*f.tsamp, 320, 360);
 						cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 						cpgsfs(1);
 						cpgctab (heat_l, heat_r, heat_g, heat_b, 5, contrast, brightness);
-						cpgimag(fdd, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
+						//cpgimag(fdd, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
 						cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
 						//////////////////////////////////////////////////
-						cpgsci(1); // color index
+						//cpgsci(1); // color index
 						cpgsvp(0.55, 0.9, 0.1, 0.45); // dispersed waterfall
-						cpgswin(ni0*f.tsamp +.5*f.tsamp, ni1*f.tsamp - .5*f.tsamp, 320, 360);
+						cpgswin(taxis[0], taxis[wid-1], freqs.back(),  freqs.front());
 						cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 						cpgsfs(1);
 						cpgctab (heat_l, heat_r, heat_g, heat_b, 5, contrast, brightness);
@@ -140,22 +149,25 @@ class CandPlot {
 						//////////////////////////////////////////////////
 						cpgsci(1); // color index
 						cpgsvp(0.1, 0.45, 0.55, 0.9); // fscrunched profile 
-						cpgswin(20.,24., 320, 340);
+						//cpgswin(76, 78.5, 0..0, 0.2 );
+						cpgswin(taxis[0],taxis[wmd-1], 0.1, 0.2);
 						cpgbox("BCN",0.0,0,"BCNV",0.0,0);
+						cpgline(wmd, taxis, fdd); 
 						cpglab("", "Intensity (a.u)", "De-dispersed Integrated Profile");
-						cpgmtxt("T",1.5,0.0,0.0,"UTC 2018-10-10 20:17:22");
-						cpgmtxt("T",2.0,1.0,0.0,"GROUP");
+						cpgmtxt("T",1.5,0.0,0.0,std::to_string(f.tstart).c_str());
+						cpgmtxt("T",2.0,1.0,0.0,f.group.c_str());
 						//////////////////////////////////////////////////
 						cpgsci(1); // color index
 						cpgsvp(0.55, 0.9, 0.55, 0.9); // Scatter 
 						cpgswin(20.,24., 2, 3);
 						cpgbox("BCN",0.0,0,"BCLVNTS",0.0,0);
 						cpglab("", "DM (pc/cc)", "Scatter");
-						cpgmtxt("T",1.5,1.0,0.0,"EAXX");
+						cpgmtxt("T",1.5,1.0,0.0,f.antenna.c_str());
 						//////////////////////////////////////////////////
 						count++;
 						delete[] fd;
 						delete[] fdd;
+						delete[] taxis;
 				}
 };
 
