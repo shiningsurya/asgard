@@ -4,7 +4,7 @@
 
 class Candidate {
 		public:
-				std::string antenna;
+				std::string antenna, group;
 				float sn, dm;
 				long unsigned peak_index, dm_index;
 				double peak_time;
@@ -12,10 +12,12 @@ class Candidate {
 				timeslice i0,i1;
 				double tsamp, width;
 				CandidateList matches;
-		Candidate(std::string line, double ts) {
+		Candidate(std::string line, double ts, std::string gp, std::string ant) {
+				antenna = ant;
+				group = gp;
 				std::vector<std::string> b;
 				boost::split(b, line, boost::is_any_of(" \t"),boost::token_compress_on);
-				if(b.size() != 9) {
+				if(b.size() < 9) {
 						std::cerr << "Unable to read Candidate!" << std::endl;
 						std::cerr << "Was only able to get " << b.size() << "/9 parameters!"<< std::endl;
 						for(std::string x : b) std::cerr << "Read : " << x << std::endl;
@@ -63,14 +65,25 @@ std::ostream& operator<< (std::ostream& os, const Candidate& cd){
 		return os;
 }
 
+CandidateList ReadCandidates(std::string st, double ts) {
+		CandidateList ret;
+		std::string line;
+		if(ts == 0.0) ts = TSAMP;
+		fs::ifstream ifs(st);
+		std::string group = GetGroup(st);
+		std::string ant = GetAntenna(st);
+		while(std::getline(ifs,line)) ret.push_back(Candidate(line, ts, group, ant));
+		ifs.close();
+		return ret;
+}
 
 CandidateList ReadCandidates(DEList cl, double ts) {
 		CandidateList ret;
 		std::string line;
 		if(ts == 0.0) ts = TSAMP;
 		for(fs::directory_entry il : cl) {
-				fs::ifstream ifs(il.path().string());
-				while(std::getline(ifs,line)) ret.push_back(Candidate(line,ts));
+				auto x = ReadCandidates(il.path().string(), ts);
+				ret.insert(ret.end(), x.begin(), x.begin());
 		}
 		return ret;
 }

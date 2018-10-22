@@ -5,9 +5,9 @@ namespace operations {
 		void SingleAntennaCoadd(float * in, float * out, timeslice wid, int nchans);
 		void AntennaCoadd(std::vector<float*> in, float * out, timeslice wid, int nchans);
 		std::vector<timeslice> ExtractJuice(Filterbank& f, Candidate& c, float *&out, int wdfac);
-		std::vector<timeslice> Dedisperse(float *&input, float *&out, Filterbank& f, Candidate& c);
+		std::vector<timeslice> Dedisperse(float *&input, float *&out, float *&output, Filterbank& f, Candidate& c);
 	 	FloatVector FreqTable(Filterbank& f);
-		FloatVector Delays(FloatVector freqs, double dm);
+		std::vector<timeslice> Delays(FloatVector freqs, double dm, double tsamp);
 		void TimeAxis(float *&out, float dt, timeslice start, timeslice stop); 
 		auto Delay = [](float f1, float f2, double dm) ->  double {return(4148.741601*((1.0/f1/f1)-(1.0/f2/f2))*dm);};
 }
@@ -59,7 +59,7 @@ FloatVector operations::FreqTable(Filterbank& f) {
 		return ret;
 }	
 
-std::vector<timeslice> operations::Dedisperse(float *&input, float *&out, Filterbank& f, Candidate& c) {
+std::vector<timeslice> operations::Dedisperse(float *&input, float *&out, float *&output, Filterbank& f, Candidate& c) {
 		std::vector<timeslice> ret;
 		dedisp_plan dplan;
 		dedisp_error error;
@@ -73,7 +73,7 @@ std::vector<timeslice> operations::Dedisperse(float *&input, float *&out, Filter
 		ret.push_back( maxD );
 		timeslice nsamps = (timeslice) ret[0];
 		/// Read data
-		if(out != NULL) {
+		if(out != NULL || output != NULL) {
 				std::cerr << "Why do you want me to put juice in already initialized array?\n";
 				std::cerr << "Freeing the memory\n";
 				delete[] out;
@@ -82,14 +82,23 @@ std::vector<timeslice> operations::Dedisperse(float *&input, float *&out, Filter
 		error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)input, sizeof(float)*8, (dedisp_byte*)out, 8*sizeof(float), DEDISP_USE_DEFAULT);
 		/// Dedisp 
 		if( error != DEDISP_NO_ERROR ) std::cerr << "\nERROR: Could not execute dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
+		// incoherent dedispersion
+		output = new float[nsamps*f.nchans]; // same size as input
+		FloatVector freqs = operations::FreqTable(f);
+		std::vector<timeslice> idlays = operations::Delays(freqs, c.dm, f.tsamp);
+		int i = 0;
+		for(int dmd : idlays) {
+				//std::cout << "DMD: " << dmd << std::endl;
+				std::copy(input + (i + dmd)*f.nchans, input + (i + dmd)*f.nchans + nsamps, output + i*nsamps) ;
+				i++;
+		}
 		dedisp_destroy_plan(dplan);
 		return ret;
 }
 
-FloatVector operations::Delays(FloatVector freqs, double dm) {
-		FloatVector ret;
-		sort(freqs.begin(), freqs.end());
-		float f1 = freqs[freqs.size()-1];
-		for(float f : freqs) ret.push_back( operations::Delay(f, f1, dm) );
+std::vector<timeslice> operations::Delays(FloatVector freqs, double dm, double tsamp) {
+		std::vector<timeslice> ret;
+		float f1 = freqs[0];
+		for(float f : freqs) ret.push_back( tsamp * operations::Delay(f, f1, dm) );
 		return ret;
 }

@@ -1,4 +1,3 @@
-#include <iostream>
 #include "asgard.hpp"
 #include <boost/algorithm/string.hpp>
 #include <set>
@@ -8,6 +7,7 @@
 
 class AnalyzeFB {
 		public:
+		MapGroupDE fils, kfils, cands;
 		AnalyzeFB(std::string wd) {
 				// This is the only constructor
 				workdir = wd; // The work directory
@@ -51,14 +51,12 @@ class AnalyzeFB {
 						tv.clear();
 				}
 		}
-		AnalyzeFB(std::string wd, std::string g) {
-				AnalyzeFB(wd);
-				for(PairGroupDE it : fils) if(it.first != g) fils.erase(it);
-				for(PairGroupDE it : kfils) if(it.first != g) kfils.erase(it);
-				for(PairGroupDE it : cands) if(it.first != g) cands.erase(it);
+		AnalyzeFB(std::string wd, std::string g) : AnalyzeFB(wd) {
+				for(auto it = fils.begin(); it != fils.end(); it++)   if(it->first != g) fils.erase(it);
+				for(auto it = kfils.begin(); it != kfils.end(); it++) if(it->first != g) kfils.erase(it);
+				for(auto it = cands.begin(); it != cands.end(); it++) if(it->first != g) cands.erase(it);
 		}
 		private:
-				MapGroupDE fils, kfils, cands;
 				fs::path workdir, fildir, candir, plotdir;
 				static void binder(std::string b, DEList& tv, fs::directory_entry it) {
 				// If b is found in *it push back to tv
@@ -102,12 +100,3 @@ class AnalyzeFB {
 				for(PairGroupDE it : cands) std::cout << "CANs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
 		}
 };
-
-
-int main() {
-		std::string s("/home/shining/study/MS/vLITE/mkerr");
-		AnalyzeFB f(s);
-		//f.PrintPaths();
-		f.Summary();
-		return 0;
-}
