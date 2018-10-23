@@ -82,16 +82,37 @@ std::vector<timeslice> operations::Dedisperse(float *&input, float *&out, float 
 		error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)input, sizeof(float)*8, (dedisp_byte*)out, 8*sizeof(float), DEDISP_USE_DEFAULT);
 		/// Dedisp 
 		if( error != DEDISP_NO_ERROR ) std::cerr << "\nERROR: Could not execute dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
+		
 		// incoherent dedispersion
 		output = new float[nsamps*f.nchans]; // same size as input
 		FloatVector freqs = operations::FreqTable(f);
-		std::vector<timeslice> idlays = operations::Delays(freqs, c.dm, f.tsamp);
-		int i = 0;
-		for(int dmd : idlays) {
-				//std::cout << "DMD: " << dmd << std::endl;
-				std::copy(input + (i + dmd)*f.nchans, input + (i + dmd)*f.nchans + nsamps, output + i*nsamps) ;
-				i++;
+		std::vector<timeslice> idlays = operations::Delays(freqs, c.dm, f.tsamp);		
+		///// take2
+		int lidx, ridx, idx;
+		idx = nsamps*f.nchans;
+		for(int i = 0; i < nsamps; i++) {
+				for(int j = 0; j < f.nchans; j++) {
+						lidx = f.nchans*((int)nsamps - (int)idlays[j] + i) + j;
+						ridx = f.nchans*(i - (int)idlays[j]) + j;
+						/*
+						 *if(i < idlays[j]) std::cout << "left index: " << lidx << " index: " << idx << std::endl;
+						 *else std::cout << "right index: " << ridx << " index: " << idx << std::endl;
+						 */
+						if(i < idlays[j]) output[lidx] = input[f.nchans*i + j];	
+						else output[ridx] = input[f.nchans*i + j]; 
+						/*
+						 *if(i < idlays[j]) output[nsamps*i + j] = input[f.nchans*(nsamps - idlays[j] + 1)];
+						 *else output[nsamps*i + j] = input[f.nchans*(i - idlays[j])]; 
+						 */
+				}
 		}
+		/*
+		 *for(int dmd : idlays) {
+		 *        //std::cout << "DMD: " << dmd << std::endl;
+		 *        std::copy(input + (i + dmd)*f.nchans, input + (i + dmd)*f.nchans + nsamps, output + i*nsamps) ;
+		 *        i++;
+		 *}
+		 */
 		dedisp_destroy_plan(dplan);
 		return ret;
 }
@@ -99,6 +120,6 @@ std::vector<timeslice> operations::Dedisperse(float *&input, float *&out, float 
 std::vector<timeslice> operations::Delays(FloatVector freqs, double dm, double tsamp) {
 		std::vector<timeslice> ret;
 		float f1 = freqs[0];
-		for(float f : freqs) ret.push_back( tsamp * operations::Delay(f, f1, dm) );
+		for(float f : freqs) ret.push_back( (timeslice) (operations::Delay(f, f1, dm) / tsamp) );
 		return ret;
 }

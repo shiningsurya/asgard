@@ -15,7 +15,7 @@
 // Definitions
 #define TSAMP  0.000097
 #define TROOT "/home/shining/study/MS/vLITE/mkerr"
-#define TGROUP "20180521_183057_muos"
+#define TGROUP "20180521_182857_muos"
 // namespace
 namespace fs = boost::filesystem;
 

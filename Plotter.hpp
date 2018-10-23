@@ -73,10 +73,16 @@ class Waterfall {
 								for(Filterbank f: fl) {
 										wid = timestep / f.tsamp;
 										i0 = axis[0] / f.tsamp;
-										trf[0] = i0*(float)f.tsamp;
-										trf[1] = (float)f.tsamp;
-										trf[3] = ft.back();
-										trf[5] = -1.f*(float)f.foff; 
+										/*
+										 *trf[0] = i0*(float)f.tsamp;
+										 *trf[1] = (float)f.tsamp;
+										 *trf[3] = ft.back();
+										 *trf[5] = -1.f*(float)f.foff; 
+										 */
+										trf[3] = ft.back(); // fixed
+										trf[0] = i0*(float)f.tsamp; // fixed
+										trf[2] = (float)f.tsamp;
+										trf[4] = -1.f*(float)f.foff; 
 										cpgsci(1); // color index
 										cpgsvp(xmin, xmax, ymin, ymax);
 										// xmin, xmax remain the same
@@ -97,6 +103,7 @@ class Waterfall {
 										else if(iant == nant - 1) {
 												cpgbox("BC",0.0,0,"BC",40.0,0);
 												cpgmtxt("T",1,.5,0.5,f.group.c_str()); // group at middle
+												if(f.isKur) cpgmtxt("T",1,.5,0.5,std::string("KUR").c_str()); // group at middle
 												cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
 												cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 												cpgbox("BC",0.0,0,"BC",40.0,0);
@@ -113,7 +120,8 @@ class Waterfall {
 										f.Unpack(juice, i0, wid);
 										cpgsfs(1);
 										cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-										cpgimag(juice, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
+										//cpgimag(juice, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
+										cpgimag(juice, f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
 										delete[] juice;
 										cpgmtxt("RV",2,.5,0.5,f.antenna.c_str());
 										ymin = ymax + 0.02;
@@ -164,17 +172,17 @@ class CandPlot {
 								// this function plots what is one page
 								operations::TimeAxis(taxis, (float)f.tsamp, ni0, ni1);
 								//////////////////////////////////////////////////
-								trf[0] = ni0*(float)f.tsamp;
-								trf[1] = (float)f.tsamp;
-								trf[3] = freqs.back();
-								trf[5] = -1.f*(float)f.foff; 
+								trf[3] = freqs.back(); // fixed
+								trf[0] = ni0*(float)f.tsamp; // fixed
+								trf[2] = (float)f.tsamp;
+								trf[4] = -1.f*(float)f.foff; 
 								//cpgsci(1); // color index
 								cpgsvp(0.1, 0.45, 0.1, 0.45); // de-dispersed waterfall
 								cpgswin(taxis[0], taxis[wid-1], freqs.back(),  freqs.front());
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-								cpgimag(fbd, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
+								cpgimag(fbd, f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
 								cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
 								//////////////////////////////////////////////////
 								//cpgsci(1); // color index
@@ -183,7 +191,7 @@ class CandPlot {
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-								cpgimag(fd, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
+								cpgimag(fd, f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
 								cpglab("Time (s)", "", "Dispersed Waterfall");
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index

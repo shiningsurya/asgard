@@ -13,7 +13,7 @@ int main() {
 		for(PairGroupDE mg : f.kfils) {
 				std::for_each(mg.second.begin(), mg.second.end(), [&fl, &fbr](fs::directory_entry x) { Filterbank xx; fbr.Read(xx, x.path().string()); fl.push_back( xx ); });
 		}
-		Waterfall cp(std::string("?"), 20.0f);
+		Waterfall cp(std::string("tplots/testwf.png/png"), 2.0f);
 		cp.Plot(fl);
 		return 0;
 }
