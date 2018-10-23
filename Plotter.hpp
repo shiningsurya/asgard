@@ -10,6 +10,7 @@ class Waterfall {
 				std::array<float,5> heat_b;
 				float contrast,brightness;
 				float tr[6];
+				bool interactive;
 				float charh, timestep;
 				int count, nant, hant;
 		public:
@@ -17,6 +18,8 @@ class Waterfall {
 						Waterfall(fn, 2.0);
 				}
 				Waterfall(std::string fn, float ts){
+						if(fn == std::string("?")) interactive = true;
+						else interactive = false;
 						timestep = ts;
 						filename = fn; // output plot file name
 						count = 0;
@@ -30,26 +33,33 @@ class Waterfall {
 						brightness = 0.5;
 						cpgbeg(0,filename.c_str(),1,1); // beginning of another journey
 						cpgsch(charh); // character height
-						cpgask(0); // go manual mode
+						if(interactive) cpgask(1); // go manual mode
+						else cpgask(0);
 						cpgpap (0.0,0.618); //10.0, width and aspect ratio
 				}
 				~Waterfall() {
 						cpgend();
 				}
 				void Plot(FilterbankList fl) {
+						std::sort(fl.begin(), fl.end(), [](Filterbank x, Filterbank y) { return x.antenna > y.antenna; });
 						std::string idx;
 						int iant;
+						timeslice i0, wid;
 						float axis[] = {0.0, 2.0, 320., 360.};
+						float trf[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+						float * juice;
 						float xmin, xmax, ymin, ymax, w;
 						nant = fl.size();
 						hant = nant/2;
 						FloatVector duration_list;
 						std::for_each(fl.begin(), fl.end(), [&duration_list](Filterbank bf) { duration_list.push_back( (float)bf.duration ); } ); 
-						int nsteps = *(std::max(duration_list.begin(), duration_list.end())) / timestep + 1;
+						int nsteps = *(std::max_element(duration_list.begin(), duration_list.end()));
+						nsteps = (int) nsteps/timestep + 1;
+						//nsteps += 1;
 						// assuming all the filterbanks have the same frequency
 						FloatVector ft = operations::FreqTable(fl[0]);
-						axis[2] = ft.back();
-						axis[3] = ft.front();
+						axis[2] = ft.back(); 
+						axis[3] = ft.front(); 
 						for(int i = 0; i < nsteps; i++) {
 								if(count != 0) cpgpage();
 								w = (1*0.88/nant) - 0.02;
@@ -61,6 +71,12 @@ class Waterfall {
 								axis[1] = axis[0] + timestep;
 								iant = 0;	
 								for(Filterbank f: fl) {
+										wid = timestep / f.tsamp;
+										i0 = axis[0] / f.tsamp;
+										trf[0] = i0*(float)f.tsamp;
+										trf[1] = (float)f.tsamp;
+										trf[3] = ft.back();
+										trf[5] = -1.f*(float)f.foff; 
 										cpgsci(1); // color index
 										cpgsvp(xmin, xmax, ymin, ymax);
 										// xmin, xmax remain the same
@@ -69,26 +85,37 @@ class Waterfall {
 										if(iant == 0) {
 												cpgmtxt("B",2,.5,0.5,std::string("Time (s)").c_str()); // group at middle
 												cpgbox("BCN",0.0,0,"BC",40.0,0);
-												cpgmtxt("LV",3,0.2,0.0,std::to_string(axis[2]).c_str());
-												cpgmtxt("LV",3,0.8,0.0,std::to_string(axis[3]).c_str());
+												cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
+												cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 										}
 										else if( iant == hant) {
 												cpgbox("BC",0.0,0,"BC",40.0,0);
 												cpgmtxt("L",4,0.,0.5,std::string("Freq (MHz)").c_str());
-												cpgmtxt("LV",3,0.2,0.0,std::to_string(axis[2]).c_str());
-												cpgmtxt("LV",3,0.8,0.0,std::to_string(axis[3]).c_str());
+												cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
+												cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 										}
 										else if(iant == nant - 1) {
+												cpgbox("BC",0.0,0,"BC",40.0,0);
 												cpgmtxt("T",1,.5,0.5,f.group.c_str()); // group at middle
-												idx = std::string("Slice:") + std::to_string(i) + std::string("/") + std::to_string(nsteps);
+												cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
+												cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
+												cpgbox("BC",0.0,0,"BC",40.0,0);
+												idx = std::string("Slice:") + std::to_string(i+1) + std::string("/") + std::to_string(nsteps);
 												cpgmtxt("T",.5,.0,0.0,idx.c_str());   // slice index
-												cpgmtxt("RV",2,.5,0.5,f.antenna.c_str());
 										}
 										else {
 												cpgbox("BC",0.0,0,"BC",40.0,0);
-												cpgmtxt("LV",3,0.2,0.0,std::to_string(axis[2]).c_str());
-												cpgmtxt("LV",3,0.8,0.0,std::to_string(axis[3]).c_str());
+												cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
+												cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 										}
+										// extract juice and cpgimag
+										juice = new float[wid*f.nchans];
+										f.Unpack(juice, i0, wid);
+										cpgsfs(1);
+										cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
+										cpgimag(juice, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
+										delete[] juice;
+										cpgmtxt("RV",2,.5,0.5,f.antenna.c_str());
 										ymin = ymax + 0.02;
 										ymax += w   + 0.02 ;
 										iant++;

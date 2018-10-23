@@ -6,9 +6,14 @@
 
 int main() {
 		std::string s(TROOT);
-		AnalyzeFB f(s);
-		PairGroupDE mg = f.fils[0];
-		CandPlot cp(std::string("test_wf.ps/vcps"));
-
+		std::string g(TGROUP);
+		AnalyzeFB f(s,g);
+		FilterbankList fl;
+		FilterbankReader fbr;
+		for(PairGroupDE mg : f.kfils) {
+				std::for_each(mg.second.begin(), mg.second.end(), [&fl, &fbr](fs::directory_entry x) { Filterbank xx; fbr.Read(xx, x.path().string()); fl.push_back( xx ); });
+		}
+		Waterfall cp(std::string("?"), 20.0f);
+		cp.Plot(fl);
 		return 0;
 }

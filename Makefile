@@ -21,5 +21,5 @@ testcd: TestCandidate.cpp Candidate.hpp
 operations: Operations.hpp
 	$(CPP) -c Operations.hpp $(DEDISP_INC) $(CPPFLAGS) $(DEDISP_INC) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
 testwf: *.hpp *.cpp
-	$(CPP) TestWaterfall.cpp $(CPPFLAGS) -o testwf $(BOOST_LD) $(LD_FLAGS)
+	$(CPP) TestWaterfall.cpp $(CPPFLAGS) -o testwf $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
 
