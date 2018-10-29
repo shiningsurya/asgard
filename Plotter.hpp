@@ -244,4 +244,81 @@ class CandPlot {
 						cpgend();
 				}
 };
+class CandSummary{ 
+		private:
+				int iant;
+				std::string group;
+				CandidateAntenna cant;
+				int numGroups;
+				StringVector groups;
+		public:
+				CandSummary(CandidateGroup cg) {
+				}
+				void Plot(CandidateGroup& cg) {
+						// CandidateGroup has group & Candidate Antenna
+						// CandidateAntenna is vector of CandidateList
+						group = cg.first;
+						cant = cg.second;	
+						// sort cant
+						std::sort(cant.begin(), cant.end(), [](CandidateList& x, CandidateList& y) { return x[0].antenna > y[0].antenna; } );
+						// Some variables I will need
+						float axis[] = {0.0, 2.0, 0., 1.};
+						float xmin, xmax, ymin, ymax, w;
+						int nant, hant;
+						iant = 0;
+						// the main loop
+						for(const CandidateList& x : cant) {
+								////////////////////////////////////////
+								std::sort(x.begin(), x.end(), [](const Candidate& x, const Candidate& y) { return x.i0 < y.i0; } );
 
+								////////////////////////////////////////
+								nant = x.size();
+								hant = nant/2;
+								w = (1*0.88/nant) - 0.02;
+								xmin = 0.2;
+								ymin = 0.05;
+								xmax = 0.9;
+								ymax = w + ymin;
+								cpgsci(1); // color index
+								cpgsvp(xmin, xmax, ymin, ymax);
+								cpgswin(axis[0],axis[1],axis[2],axis[3]);
+								if(iant == 0) {
+										cpgmtxt("B",2,.5,0.5,std::string("Time (s)").c_str()); // group at middle
+										cpgbox("BCN",0.0,0,"BC",40.0,0);
+										cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
+										cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
+								}
+								else if( iant == hant) {
+										cpgbox("BC",0.0,0,"BC",40.0,0);
+										cpgmtxt("L",4,0.,0.5,std::string("Freq (MHz)").c_str());
+										cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
+										cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
+								}
+								else if(iant == nant - 1) {
+										cpgbox("BC",0.0,0,"BC",40.0,0);
+										cpgmtxt("T",1,.5,0.5,f.group.c_str()); // group at middle
+										if(f.isKur) cpgmtxt("T",1,.5,0.5,std::string("KUR").c_str()); // group at middle
+										cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
+										cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
+										cpgbox("BC",0.0,0,"BC",40.0,0);
+										idx = std::string("Slice:") + std::to_string(i+1) + std::string("/") + std::to_string(nsteps);
+										cpgmtxt("T",.5,.0,0.0,idx.c_str());   // slice index
+								}
+								else {
+										cpgbox("BC",0.0,0,"BC",40.0,0);
+										cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
+										cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
+								}
+								cpgmtxt("RV",2,.5,0.5,f.antenna.c_str());
+								ymin = ymax + 0.02;
+								ymax += w   + 0.02 ;
+								iant++;
+
+
+
+						}
+
+				}
+
+
+};

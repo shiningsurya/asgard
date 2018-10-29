@@ -34,6 +34,7 @@ class CandPlot;
 
 // type def
 typedef long unsigned int timeslice;
+typedef std::vector<std::string> StringVector;
 
 typedef std::vector<fs::directory_entry> DEList;
 typedef std::map<std::string, DEList> MapGroupDE; 
@@ -44,8 +45,9 @@ typedef std::vector<float> FloatVector;
 
 typedef std::vector<Filterbank> FilterbankList;
 typedef std::vector<Candidate>  CandidateList;
-typedef std::vector<std::string> GroupList;
-typedef std::pair<std::string, CandidateList> CandidateGroup;
+//typedef std::vector<std::string> GroupList;
+typedef std::vector<CandidateList> CandidateAntenna;
+typedef std::pair<std::string, CandidateAntenna> CandidateGroup;
 typedef std::pair<std::string, FilterbankList> FilterbankGroup;
 // functions helpful everywhere
 std::string GetGroup(std::string fl){

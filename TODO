@@ -1,0 +1,9 @@
+1. Restructure candidate plot
+		Have dedispersed time series
+		Have dispersed waterfall
+		Have DM-width log log
+		Have all antenna candidate versus time
+2. Work coadd
+3. Search strategies
+4. Machine Learning (RFs + XGBoost)
+
