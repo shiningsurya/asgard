@@ -65,7 +65,7 @@ std::ostream& operator<< (std::ostream& os, const Candidate& cd){
 		return os;
 }
 
-CandidateList ReadCandidates(std::string st, double ts) {
+CandidateList ReadCandidates(std::string st, double& ts) {
 		CandidateList ret;
 		std::string line;
 		if(ts == 0.0) ts = TSAMP;
@@ -77,16 +77,16 @@ CandidateList ReadCandidates(std::string st, double ts) {
 		return ret;
 }
 
-CandidateList ReadCandidates(DEList cl, double ts) {
-		CandidateList ret;
-		std::string line;
-		if(ts == 0.0) ts = TSAMP;
-		for(fs::directory_entry il : cl) {
-				auto x = ReadCandidates(il.path().string(), ts);
-				ret.insert(ret.end(), x.begin(), x.begin());
-		}
-		return ret;
-}
+/*
+ *CandidateList ReadCandidates(fs::directory_entry& cl, double& ts) {
+ *        CandidateList ret;
+ *        std::string line;
+ *        if(ts == 0.0) ts = TSAMP;
+ *        auto x = ReadCandidates(il.path().string(), ts);
+ *        ret.insert(ret.end(), x.begin(), x.begin());
+ *        return ret;
+ *}
+ */
 
 
 void Coincidence(CandidateList& cg, float ddm, float dwi) {

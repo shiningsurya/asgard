@@ -16,7 +16,7 @@ class AnalyzeFB {
 				plotdir = workdir / std::string("plots"); // plots
 				//
 				DEList flist, clist, klist; // directories not objects 
-				GroupList base; // has the groups
+				StringVector base; // has the groups
 				/*
 				 * boost::bind should get boost::ref or else boost::bind creates internal references
 				 * time taken to learn that 25minutes
@@ -64,22 +64,22 @@ class AnalyzeFB {
 						if(r.find(b) != std::string::npos)
 								(tv).push_back(it);
 				}
-				static void selbinder(GroupList& b3, DEList& list, std::string alpha, std::string beta, fs::directory_entry one) {
+				static void selbinder(StringVector& b3, DEList& list, std::string alpha, std::string beta, fs::directory_entry one) {
 						if(one.path().extension().string() == alpha) {
 								if(one.path().string().find(beta) != std::string::npos) {
 										list.push_back(one);
-										GroupList bb;
+										StringVector bb;
 										boost::iter_split(bb, one.path().filename().string(), boost::algorithm::first_finder(std::string("_ea")));
 										bb.pop_back();		// To remove the last part. after _ea ....
 										b3.insert(b3.end(),bb.begin(),bb.end());
 								}
 						}
 				}
-				static void dselbinder(GroupList& b3, DEList& list, std::string alpha, std::string beta, fs::directory_entry one) {
+				static void dselbinder(StringVector& b3, DEList& list, std::string alpha, std::string beta, fs::directory_entry one) {
 						if(one.path().extension() == alpha) {
 								if(one.path().string().find(beta) == std::string::npos) {
 										list.push_back(one);
-										GroupList bb;
+										StringVector bb;
 										boost::iter_split(bb, one.path().filename().string(), boost::algorithm::first_finder(std::string("_ea")));
 										bb.pop_back();		// To remove the last part. after _ea ....
 										b3.insert(b3.end(),bb.begin(),bb.end());

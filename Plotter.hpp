@@ -63,7 +63,7 @@ class Waterfall {
 						for(int i = 0; i < nsteps; i++) {
 								if(count != 0) cpgpage();
 								w = (1*0.88/nant) - 0.02;
-								xmin = 0.2;
+								xmin = 0.1;
 								ymin = 0.05;
 								xmax = 0.9;
 								ymax = w + ymin;
@@ -103,7 +103,8 @@ class Waterfall {
 										else if(iant == nant - 1) {
 												cpgbox("BC",0.0,0,"BC",40.0,0);
 												cpgmtxt("T",1,.5,0.5,f.group.c_str()); // group at middle
-												if(f.isKur) cpgmtxt("T",1,.5,0.5,std::string("KUR").c_str()); // group at middle
+												if(f.isKur) cpgmtxt("T",1,.8,0.5,std::string("KUR").c_str()); // group at middle
+												else cpgmtxt("T",1,.8,0.5,std::string("NOKUR").c_str());
 												cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
 												cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 												cpgbox("BC",0.0,0,"BC",40.0,0);
@@ -201,17 +202,24 @@ class CandPlot {
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgline(wmd, taxis, fdd); 
 								cpglab("", "Intensity (a.u)", "De-dispersed Integrated Profile");
-								cpgmtxt("T",1.5,0.0,0.0,std::to_string(f.tstart).c_str());
+								cpgmtxt("T",1.5,0.0,0.0,std::to_string(std::round((float)c.peak_time)).c_str());
 								cpgmtxt("T",2.0,1.0,0.0,f.group.c_str());
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
 								cpgsvp(0.55, 0.9, 0.55, 0.9); // Scatter 
 								cpgswin(0.,2., 1, 3);
 								for(int i = 0; i < cl.size(); i++) cpgcirc(log10(1e3f*f.tsamp*cl[i].filterwidth), log10((float)cl[i].dm), fac*log10(cl[i].sn));
-								xlin[0] = (float)c.dm;
-								xlin[1] = (float)c.dm;
+								// yline
+								ylin[0] = log10((float)c.dm);
+								ylin[1] = log10((float)c.dm);
+								xlin[0] = 0.0f;
+								xlin[1] = 2.0f;
+								cpgline(2,xlin, ylin); 
+								// xline
+								xlin[0] = log10( (float)(c.filterwidth * f.tsamp * 1e3f) );
+								xlin[1] = log10( (float)(c.filterwidth * f.tsamp * 1e3f) );
 								ylin[0] = 1.0f;
-								ylin[1] = 1.0f;
+								ylin[1] = 3.0f;
 								cpgline(2,xlin, ylin); 
 								cpgbox("BCLNTS",0.0,0,"BCLVNTS",0.0,0);
 								cpglab("Width (ms)", "DM (pc/cc)", "Scatter");
@@ -244,6 +252,7 @@ class CandPlot {
 						cpgend();
 				}
 };
+/*
 class CandSummary{ 
 		private:
 				int iant;
@@ -322,3 +331,4 @@ class CandSummary{
 
 
 };
+*/
