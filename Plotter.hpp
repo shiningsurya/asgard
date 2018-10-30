@@ -1,5 +1,8 @@
-#include "cpgplot.h"
+#include "asgard.hpp"
 #include "Operations.hpp"
+#ifndef PLOTTER_H
+#define PLOTTER_H
+#include "cpgplot.h"
 
 class Waterfall {
 		private:
@@ -47,7 +50,6 @@ class Waterfall {
 						timeslice i0, wid;
 						float axis[] = {0.0, 2.0, 320., 360.};
 						float trf[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-						float * juice;
 						float xmin, xmax, ymin, ymax, w;
 						nant = fl.size();
 						hant = nant/2;
@@ -55,9 +57,9 @@ class Waterfall {
 						std::for_each(fl.begin(), fl.end(), [&duration_list](Filterbank bf) { duration_list.push_back( (float)bf.duration ); } ); 
 						int nsteps = *(std::max_element(duration_list.begin(), duration_list.end()));
 						nsteps = (int) nsteps/timestep + 1;
-						//nsteps += 1;
 						// assuming all the filterbanks have the same frequency
 						FloatVector ft = operations::FreqTable(fl[0]);
+						FloatVector juice;
 						axis[2] = ft.back(); 
 						axis[3] = ft.front(); 
 						for(int i = 0; i < nsteps; i++) {
@@ -73,12 +75,6 @@ class Waterfall {
 								for(Filterbank f: fl) {
 										wid = timestep / f.tsamp;
 										i0 = axis[0] / f.tsamp;
-										/*
-										 *trf[0] = i0*(float)f.tsamp;
-										 *trf[1] = (float)f.tsamp;
-										 *trf[3] = ft.back();
-										 *trf[5] = -1.f*(float)f.foff; 
-										 */
 										trf[3] = ft.back(); // fixed
 										trf[0] = i0*(float)f.tsamp; // fixed
 										trf[2] = (float)f.tsamp;
@@ -117,13 +113,11 @@ class Waterfall {
 												cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 										}
 										// extract juice and cpgimag
-										juice = new float[wid*f.nchans];
 										f.Unpack(juice, i0, wid);
 										cpgsfs(1);
 										cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
 										//cpgimag(juice, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
-										cpgimag(juice, f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
-										delete[] juice;
+										cpgimag(juice.data(), f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
 										cpgmtxt("RV",2,.5,0.5,f.antenna.c_str());
 										ymin = ymax + 0.02;
 										ymax += w   + 0.02 ;
@@ -146,92 +140,73 @@ class CandPlot {
 				// scatter plot
 				int count;
 		public:
-				void CP(Filterbank& f, CandidateList& cl) {
-						float *fd=NULL, *fdd=NULL, *fbd=NULL;
-						float * taxis;
+				void Plot(FilterbankCandidate& fcl) {
 						float trf[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
-						std::vector<timeslice> r;
-						FloatVector freqs;
+						FloatVector freqs, taxis;
 						float fac = 1e-2f;
 						float xlin[2], ylin[2];
-						/////////////////////////////////////////////////
-						/*
-						 *if(f.antenna != c.antenna) 	std::cerr << "Filterbank antenna and Candidate antenna not same\n";
-						 *if(f.group != c.group) std::cerr << "Filterbank group and Candidate group not same\n";
-						 */
-						//
-						//////////////////////////////////////////////////
-						for(Candidate c : cl) {
+						for(int cx = 0; cx < fcl.size(); cx++) {
 								if(count != 0) cpgpage();
-								r = operations::Dedisperse(fd, fdd, fbd, f, c);
-								timeslice wid = r[0];
-								timeslice ni0 = r[1];
-								timeslice ni1 = r[2];
-								timeslice maxD = r[3];
-								timeslice wmd = wid-maxD;
-								freqs = operations::FreqTable(f);
+								freqs = operations::FreqTable((float)fcl.fch1, (float)fcl.foff, fcl.nchans);
 								// this function plots what is one page
-								operations::TimeAxis(taxis, (float)f.tsamp, ni0, ni1);
+								taxis = operations::TimeAxis((float)fcl.tsamp, fcl.istart, fcl.istop);
 								//////////////////////////////////////////////////
 								trf[3] = freqs.back(); // fixed
-								trf[0] = ni0*(float)f.tsamp; // fixed
-								trf[2] = (float)f.tsamp;
-								trf[4] = -1.f*(float)f.foff; 
+								trf[0] = fcl.istart*(float)fcl.tsamp; // fixed
+								trf[2] = (float)fcl.tsamp;
+								trf[4] = -1.f*(float)fcl.foff; 
 								//cpgsci(1); // color index
 								cpgsvp(0.1, 0.45, 0.1, 0.45); // de-dispersed waterfall
-								cpgswin(taxis[0], taxis[wid-1], freqs.back(),  freqs.front());
+								cpgswin(taxis[0], taxis[fcl.nsamps-1], freqs.back(),  freqs.front());
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-								cpgimag(fbd, f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
+								cpgimag(fcl.d_fb.data(), fcl.nchans, fcl.nsamps, 1, fcl.nchans, 1, fcl.nsamps, 0, 3, trf);
 								cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
 								//////////////////////////////////////////////////
 								//cpgsci(1); // color index
 								cpgsvp(0.55, 0.9, 0.1, 0.45); // dispersed waterfall
-								cpgswin(taxis[0], taxis[wid-1], freqs.back(),  freqs.front());
+								cpgswin(taxis[0], taxis[fcl.nsamps-1], freqs.back(),  freqs.front());
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-								cpgimag(fd, f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
+								cpgimag(fcl.d_fb.data(), fcl.nchans, fcl.nsamps, 1, fcl.nchans, 1, fcl.nsamps, 0, 3, trf);
 								cpglab("Time (s)", "", "Dispersed Waterfall");
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
 								cpgsvp(0.1, 0.45, 0.55, 0.9); // fscrunched profile 
 								//cpgswin(76, 78.5, 0..0, 0.2 );
-								cpgswin(taxis[0],taxis[wmd-1], 0.1, 0.2);
+								xlin[0] = *std::min(fcl.dd_tim.begin(), fcl.dd_tim.end());
+								xlin[1] = *std::max(fcl.dd_tim.begin(), fcl.dd_tim.end());
+								cpgswin(taxis[0],taxis[fcl.nsamps - fcl.maxdelay -1], 0.0f, 2.0f );
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
-								cpgline(wmd, taxis, fdd); 
+								cpgline(fcl.nsamps - fcl.maxdelay, taxis.data(), fcl.dd_tim.data()); 
 								cpglab("", "Intensity (a.u)", "De-dispersed Integrated Profile");
-								cpgmtxt("T",1.5,0.0,0.0,std::to_string(std::round((float)c.peak_time)).c_str());
-								cpgmtxt("T",2.0,1.0,0.0,f.group.c_str());
+								cpgmtxt("T",1.5,0.0,0.0,std::to_string(std::round((float)fcl.peak_time)).c_str());
+								cpgmtxt("T",2.0,1.0,0.0,fcl.group.c_str());
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
 								cpgsvp(0.55, 0.9, 0.55, 0.9); // Scatter 
 								cpgswin(0.,2., 1, 3);
-								for(int i = 0; i < cl.size(); i++) cpgcirc(log10(1e3f*f.tsamp*cl[i].filterwidth), log10((float)cl[i].dm), fac*log10(cl[i].sn));
+								for(int i = 0; i < fcl.size(); i++) cpgcirc(log10(1e3f*fcl.tsamp*fcl.clwd[i]), log10(fcl.cldm[i]), fac*log10(fcl.clsn[i]));
 								// yline
-								ylin[0] = log10((float)c.dm);
-								ylin[1] = log10((float)c.dm);
+								ylin[0] = log10((float)fcl.dm);
+								ylin[1] = log10((float)fcl.dm);
 								xlin[0] = 0.0f;
 								xlin[1] = 2.0f;
 								cpgline(2,xlin, ylin); 
 								// xline
-								xlin[0] = log10( (float)(c.filterwidth * f.tsamp * 1e3f) );
-								xlin[1] = log10( (float)(c.filterwidth * f.tsamp * 1e3f) );
+								xlin[0] = log10( (float)(fcl.filterwidth * fcl.tsamp * 1e3f) );
+								xlin[1] = log10( (float)(fcl.filterwidth * fcl.tsamp * 1e3f) );
 								ylin[0] = 1.0f;
 								ylin[1] = 3.0f;
 								cpgline(2,xlin, ylin); 
 								cpgbox("BCLNTS",0.0,0,"BCLVNTS",0.0,0);
 								cpglab("Width (ms)", "DM (pc/cc)", "Scatter");
-								cpgmtxt("T",1.5,1.0,0.0,f.antenna.c_str());
+								cpgmtxt("T",1.5,1.0,0.0,fcl.antenna.c_str());
 								//////////////////////////////////////////////////
 								count++;
-								delete[] fd;
-								delete[] fdd;
-								delete[] fbd;
-								delete[] taxis;
-								taxis = NULL;
-								fd=NULL; fdd=NULL; fbd=NULL;
+								if( ! fcl.Next() ) break;
 						}
 				}
 				CandPlot(std::string fn) {
@@ -332,3 +307,4 @@ class CandSummary{
 
 };
 */
+#endif

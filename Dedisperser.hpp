@@ -1,4 +1,7 @@
-
+#include "asgard.hpp"
+#ifndef DEDISPERSER_H
+#define DEDISPERSER_H
+#include "dedisp.h"
 // Handles de-dispersion as a class
 // replaces operations::dedisperse
 // which calls DEDISP all the time
@@ -6,7 +9,7 @@
 class DedispManager {
 		private:
 				dedisp_plan  dplan;
-				dedisp_error er;
+				dedisp_error error;
 				float dm; 
 				double tsamp;
 				bool setdm;
@@ -14,13 +17,17 @@ class DedispManager {
 				timeslice maxd;
 				double f1, df;
 		public:
-				DedispManager(int nch, double ts, double fch1, double foff) {
+				DedispManager() {
+						setdm = false;
+				}
+				void CreatePlan(int nch, double ts, double fch1, double foff) {
 						setdm = false;
 						error = dedisp_create_plan(&dplan, nch, ts, fch1, foff);
 						if( error != DEDISP_NO_ERROR ) std::cerr << "\nDedispManager: Could not create dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
 						tsamp = ts;
 						f1 = fch1;
 						df = foff;
+						nchans = nch;
 				}
 				~DedispManager() {
 						dedisp_destroy_plan(dplan);
@@ -33,29 +40,30 @@ class DedispManager {
 						maxd  = (timeslice) dedisp_get_max_delay(dplan);
 						return maxd;
 				}
-				FloatVector CoherentDD(FloatVector& in) {
+				void CoherentDD(FloatVector& in, FloatVector& ret) {
 						if(!setdm) {
 								std::cerr << "DedispManager: DM not set and DD called\n";
 								std::cerr << "Fatal Error\n";
 						}
-						FloatVector ret (...);
 						timeslice nsamps = in.size() / nchans;
-						error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)in.data(), sizeof(float)*8, (dedisp_byte*)ret.data(), 8*sizeof(float), DEDISP_USE_DEFAULT);
+						float * fret = new float[nsamps - maxd];
+						if (nsamps > maxd) ret.reserve(nsamps - maxd);
+						else ret.reserve(maxd - nsamps);
+						error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)in.data(), sizeof(float)*8, (dedisp_byte*)fret, 8*sizeof(float), DEDISP_USE_DEFAULT);
+						for(int i = 0; i < nsamps - maxd; i++) ret.push_back( fret[i] );
 						/// Dedisp 
 						if( error != DEDISP_NO_ERROR ) std::cerr << "\nDedispManager: Could not execute dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
-						// following should be second last
-						setdm = false;
-						return ret;
+						delete[] fret;
 				}
-				FloatVector InCoherentDD(FloatVector& in, std::vector<timeslice>& idlays){
+				void InCoherentDD(FloatVector& input, std::vector<timeslice>& idlays, FloatVector& output){
 						if(!setdm) {
 								std::cerr << "DedispManager: DM not set and DD called\n";
 								std::cerr << "Fatal Error\n";
 						}
-						FloatVector output(...);
-						timeslice nsamps = in.size() / nchans;
+						output.resize(input.size());
+						timeslice nsamps = input.size() / nchans;
 						int lidx, ridx, idx;
-						idx = nsamps*f.nchans;
+						idx = nsamps*nchans;
 						for(int i = 0; i < nsamps; i++) {
 								for(int j = 0; j < nchans; j++) {
 										lidx = nchans*((int)nsamps - (int)idlays[j] + i) + j;
@@ -72,8 +80,6 @@ class DedispManager {
 										 */
 								}
 						}
-						return output; 
 				}
-
-
 };
+#endif

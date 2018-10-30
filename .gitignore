@@ -48,3 +48,6 @@ testwf
 
 TestPlots
 testcp
+
+#vim
+*.vim

@@ -1,125 +1,58 @@
 #include "asgard.hpp"
-#include "dedisp.h"
-
+#ifndef OPERATIONS_H
+#define OPERATIONS_H
 namespace operations {
-		void SingleAntennaCoadd(float * in, float * out, timeslice wid, int nchans);
-		void AntennaCoadd(std::vector<float*> in, float * out, timeslice wid, int nchans);
-		std::vector<timeslice> ExtractJuice(Filterbank& f, Candidate& c, float *&out, int wdfac);
-		std::vector<timeslice> Dedisperse(float *&input, float *&out, float *&output, Filterbank& f, Candidate& c);
+		FloatVector Fscrunch(FloatVector& in, int nchans_in, int nchans_out);
 	 	FloatVector FreqTable(Filterbank& f);
+	 	FloatVector FreqTable(float fch1, float foff, int nchans);
 		std::vector<timeslice> Delays(FloatVector freqs, double dm, double tsamp);
-		void TimeAxis(float *&out, float dt, timeslice start, timeslice stop); 
+		FloatVector TimeAxis(float dt, timeslice start, timeslice stop); 
 		auto Delay = [](float f1, float f2, double dm) ->  double {return(4148.741601*((1.0/f1/f1)-(1.0/f2/f2))*dm);};
 }
-void operations::TimeAxis(float *&out, float dt, timeslice start, timeslice stop) {
-		out = new float[stop - start];
-		for(int i = 0; i < stop - start; i++) out[i] = (start + i)*dt;
+FloatVector operations::TimeAxis(float dt, timeslice start, timeslice stop) {
+		FloatVector ret (stop - start);
+		for(int i = 0; i < stop - start; i++) ret[i] = (start + i)*dt;
+		return ret;
 }
-std::vector<timeslice> operations::ExtractJuice(Filterbank& f, Candidate& c, float *&out, int wdfac) {
-		std::vector<timeslice> ret;
-		if(out != NULL) {
-				std::cerr << "Why do you want me to put juice in already initialized array?\n";
-				std::cerr << "Freeing the memory\n";
-				delete[] out;
-		}
-		timeslice ndur = c.i1 - c.i0;	
-		timeslice wid = wdfac*ndur; 
-		timeslice ndur_half = 0.5*(c.i1 + c.i0); // midpoint
-		timeslice ni0 = ndur_half - .5*wid;
-		timeslice ni1 = ndur_half + .5*wid;
-		/*
-		 *std::cout << "Totalsamp: " << f.totalsamp << std::endl;
-		 *std::cout << ni0 << " " << ni1 << " " << ndur_half << " " << wid << " " ;
-		 */
-		if(ni1 > f.totalsamp) {
-				ni1 = f.totalsamp;
-				wid = ni1 - ndur_half;
-				ni0 = ndur_half - .5*wid;
-		}
-		out = new float[wid*f.nchans];	
-		// I am an idiot!
-		f.Unpack(out, ni0, wid); // reading
-		ret.push_back( wid );
-		ret.push_back( ni0 );
-		ret.push_back( ni1 );
-		return ret; 
-}
-void operations::SingleAntennaCoadd(float * in, float * out, timeslice wid, int nchans) {
-		for(timeslice i = 0; i < wid; i++) {
-				out[i] = 0.0f;
-				for(int j = 0; j < nchans; j++) {
-						out[i] += in[i*nchans + j];
-				}
-				out[i] /= nchans;
-		}
+FloatVector operations::FreqTable(float fch1, float foff, int nchans) {
+		FloatVector ret (nchans);
+		for(int i = 0; i < nchans; i++) ret.push_back( fch1 + i * foff );
+		return ret;
 }
 FloatVector operations::FreqTable(Filterbank& f) {
 		FloatVector ret;
 		for(int i = 0; i < f.nchans; i++) ret.push_back( (float)f.fch1 + (i * (float)f.foff) );
 		return ret;
 }	
-
-std::vector<timeslice> operations::Dedisperse(float *&input, float *&out, float *&output, Filterbank& f, Candidate& c) {
-		std::vector<timeslice> ret;
-		dedisp_plan dplan;
-		dedisp_error error;
-		error = dedisp_create_plan(&dplan, f.nchans, f.tsamp, f.fch1, f.foff);
-		if( error != DEDISP_NO_ERROR ) std::cerr << "\nERROR: Could not create dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
-		error = dedisp_generate_dm_list(dplan, (float)c.dm, (float)c.dm, (float)c.filterwidth*f.tsamp, (float)1);
-		if( error != DEDISP_NO_ERROR ) std::cerr << "\nERROR: Could not create dmlist: " <<  dedisp_get_error_string(error) << std::endl;
-		dedisp_size maxD = dedisp_get_max_delay(dplan);
-		/// Read data 
-		ret = operations::ExtractJuice(f,c,input, maxD);
-		ret.push_back( maxD );
-		timeslice nsamps = (timeslice) ret[0];
-		/// Read data
-		if(out != NULL || output != NULL) {
-				std::cerr << "Why do you want me to put juice in already initialized array?\n";
-				std::cerr << "Freeing the memory\n";
-				delete[] out;
-		}
-		out = new float[nsamps - maxD];
-		error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)input, sizeof(float)*8, (dedisp_byte*)out, 8*sizeof(float), DEDISP_USE_DEFAULT);
-		/// Dedisp 
-		if( error != DEDISP_NO_ERROR ) std::cerr << "\nERROR: Could not execute dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
-		
-		// incoherent dedispersion
-		output = new float[nsamps*f.nchans]; // same size as input
-		FloatVector freqs = operations::FreqTable(f);
-		std::vector<timeslice> idlays = operations::Delays(freqs, c.dm, f.tsamp);		
-		///// take2
-		int lidx, ridx, idx;
-		idx = nsamps*f.nchans;
-		for(int i = 0; i < nsamps; i++) {
-				for(int j = 0; j < f.nchans; j++) {
-						lidx = f.nchans*((int)nsamps - (int)idlays[j] + i) + j;
-						ridx = f.nchans*(i - (int)idlays[j]) + j;
-						/*
-						 *if(i < idlays[j]) std::cout << "left index: " << lidx << " index: " << idx << std::endl;
-						 *else std::cout << "right index: " << ridx << " index: " << idx << std::endl;
-						 */
-						if(i < idlays[j]) output[lidx] = input[f.nchans*i + j];	
-						else output[ridx] = input[f.nchans*i + j]; 
-						/*
-						 *if(i < idlays[j]) output[nsamps*i + j] = input[f.nchans*(nsamps - idlays[j] + 1)];
-						 *else output[nsamps*i + j] = input[f.nchans*(i - idlays[j])]; 
-						 */
-				}
-		}
-		/*
-		 *for(int dmd : idlays) {
-		 *        //std::cout << "DMD: " << dmd << std::endl;
-		 *        std::copy(input + (i + dmd)*f.nchans, input + (i + dmd)*f.nchans + nsamps, output + i*nsamps) ;
-		 *        i++;
-		 *}
-		 */
-		dedisp_destroy_plan(dplan);
-		return ret;
-}
-
 std::vector<timeslice> operations::Delays(FloatVector freqs, double dm, double tsamp) {
 		std::vector<timeslice> ret;
 		float f1 = freqs[0];
 		for(float f : freqs) ret.push_back( (timeslice) (operations::Delay(f, f1, dm) / tsamp) );
 		return ret;
 }
+FloatVector operations::Fscrunch(FloatVector& in, int nchans_in, int nchans_out) {
+		// Assuming in's and out's are sensible
+		// fastest changing axis is frequency
+		int df = nchans_in / nchans_out;
+		timeslice nsamps = in.size() / nchans_in;
+		FloatVector ret;
+		ret.reserve(nsamps * nchans_out);
+		int idf;
+		float xf;
+		// get going
+		for(timeslice i = 0; i < nsamps; i++) {
+				idf = 0;
+				for(int j = 0; j < nchans_out; j++) {
+						xf = 0.0f;
+						for(int k = 0; k < df; k++) {
+								xf += in[i*nchans_in + idf];
+								idf++;
+						}
+						ret[i*nchans_out + j] = xf;
+				}
+				if(idf != nchans_in) { std::cerr << "Operations::Fscrunch Fatal error\n";}
+		}
+		//
+		return ret;
+}
+#endif

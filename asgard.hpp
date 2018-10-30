@@ -23,6 +23,7 @@ namespace fs = boost::filesystem;
 // storage type classes
 class Candidate;
 class Filterbank;
+class FilterbankCandidate;
 
 // analyze type
 class AnalyzeFB;

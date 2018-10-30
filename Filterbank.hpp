@@ -6,9 +6,9 @@
  * I am going to shamelessly copy from sigproc code 
  * and put it here after C++-izing the code
  */
-#ifndef ASGARD_H
 #include "asgard.hpp"
-#endif
+#ifndef FILTERBANK_H
+#define FILTERBANK_H
 #include <boost/iostreams/device/mapped_file.hpp>
 #define HI2BITS 192
 #define UPMED2BITS 48
@@ -44,7 +44,7 @@ class Filterbank {
 				 *        Unpack(fbf, tts, ttd);
 				 *}
 				 */
-				void Unpack(float* fbf, timeslice nstart, timeslice nsamp) {
+				void Unpack(FloatVector& fbf, timeslice nstart, timeslice nsamp) {
 						if(!mmap) OneTimeMMap(); 
 						// unpack td slice starting from ts
 						if(nstart + nsamp > totalsamp) {
@@ -52,6 +52,7 @@ class Filterbank {
 								nsamp = totalsamp - nstart;
 								std::cerr << "Changing nsamp accordingly\n";
 						}
+						fbf.resize(nsamp*nchans);
 						int ichan = 0;
 						int ii = 0;
 						timeslice b0 = (nstart * b_per_spectrum) + headersize;
@@ -60,10 +61,10 @@ class Filterbank {
 						for(timeslice it = b0; it < b1; it++) {
 								dc = dd[it]; // read one character
 								// one character has 4 samples
-								fbf[ii++] = (float) (dc & LO2BITS); 
-								fbf[ii++] = (float) ((dc & LOMED2BITS) >> 2); 
-								fbf[ii++] = (float) ((dc & UPMED2BITS) >> 4); 
-								fbf[ii++] = (float) ((dc & HI2BITS) >> 6); 
+								fbf.push_back( (float) (dc & LO2BITS) );
+								fbf.push_back( (float) ((dc & LOMED2BITS) >> 2) ); 
+								fbf.push_back( (float) ((dc & UPMED2BITS) >> 4) ); 
+								fbf.push_back( (float) ((dc & HI2BITS) >> 6) ); 
 						}
 						// return is 2d array of size td * nchans
 				}
@@ -286,5 +287,4 @@ class FilterbankReader {
 				}
 
 };
-
-
+#endif

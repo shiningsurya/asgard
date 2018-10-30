@@ -1,7 +1,6 @@
-#ifndef ASGARD_H
 #include "asgard.hpp"
-#endif
-
+#ifndef CANDIDATE_H
+#define CANDIDATE_H
 class Candidate {
 		public:
 				std::string antenna, group;
@@ -126,4 +125,4 @@ void Coincidence(CandidateList& cg, float ddm, float dwi) {
 				it0 = it1;
 		}
 }
-
+#endif

@@ -5,5 +5,6 @@
 		Have all antenna candidate versus time
 2. Work coadd
 3. Search strategies
-4. Machine Learning (RFs + XGBoost)
+4. Machine Learning (RFs + XGBoost) Using Shogun C++
+5. Don't use autotools, use CMAKE.
 
