@@ -13,8 +13,8 @@ int main() {
 		//
 		std::string filfile = s + std::string("/fil/") + g + std::string("_ea02_kur.fil");
 		std::string candfile = s + std::string("/cands/") + g + std::string("_ea02_kur.cand");
-		std::cout << filfile << std::endl << candfile << std::endl;
 		FilterbankCandidate fbc(filfile, candfile); 
+		//while(fbc.Next()); 
 		cp.Plot(fbc);
 		return 0;
 }

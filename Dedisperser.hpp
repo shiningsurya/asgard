@@ -40,40 +40,33 @@ class DedispManager {
 						maxd  = (timeslice) dedisp_get_max_delay(dplan);
 						return maxd;
 				}
-				void CoherentDD(FloatVector& in, FloatVector& ret) {
+				void CoherentDD(float *&in, timeslice nsamps, float *&ret) {
 						if(!setdm) {
 								std::cerr << "DedispManager: DM not set and DD called\n";
 								std::cerr << "Fatal Error\n";
 						}
-						timeslice nsamps = in.size() / nchans;
-						float * fret = new float[nsamps - maxd];
-						if (nsamps > maxd) ret.reserve(nsamps - maxd);
-						else ret.reserve(maxd - nsamps);
-						error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)in.data(), sizeof(float)*8, (dedisp_byte*)fret, 8*sizeof(float), DEDISP_USE_DEFAULT);
-						for(int i = 0; i < nsamps - maxd; i++) ret.push_back( fret[i] );
+						error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)in, sizeof(float)*8, (dedisp_byte*)ret, 8*sizeof(float), DEDISP_USE_DEFAULT);
 						/// Dedisp 
 						if( error != DEDISP_NO_ERROR ) std::cerr << "\nDedispManager: Could not execute dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
-						delete[] fret;
 				}
-				void InCoherentDD(FloatVector& input, std::vector<timeslice>& idlays, FloatVector& output){
+				void InCoherentDD(float * &input, std::vector<timeslice>& idlays, timeslice nsamps, float * &output){
 						if(!setdm) {
 								std::cerr << "DedispManager: DM not set and DD called\n";
 								std::cerr << "Fatal Error\n";
 						}
-						output.resize(input.size());
-						timeslice nsamps = input.size() / nchans;
-						int lidx, ridx, idx;
-						idx = nsamps*nchans;
-						for(int i = 0; i < nsamps; i++) {
+						int ridx;
+						for(timeslice i = 0; i < nsamps; i++) {
 								for(int j = 0; j < nchans; j++) {
-										lidx = nchans*((int)nsamps - (int)idlays[j] + i) + j;
-										ridx = nchans*(i - (int)idlays[j]) + j;
+										ridx = nchans*(i + idlays[j]) + j;
+										/*
+										 *if(i > 2*idlays[i]) std::cerr << "DedispManager::InCoherentDD | Fatal Error" << std::endl;
+										 *else 
+										 */
 										/*
 										 *if(i < idlays[j]) std::cout << "left index: " << lidx << " index: " << idx << std::endl;
 										 *else std::cout << "right index: " << ridx << " index: " << idx << std::endl;
 										 */
-										if(i < idlays[j]) output[lidx] = input[nchans*i + j];	
-										else output[ridx] = input[nchans*i + j]; 
+										output[nchans*i + j] = input[ridx]; 
 										/*
 										 *if(i < idlays[j]) output[nsamps*i + j] = input[f.nchans*(nsamps - idlays[j] + 1)];
 										 *else output[nsamps*i + j] = input[f.nchans*(i - idlays[j])]; 

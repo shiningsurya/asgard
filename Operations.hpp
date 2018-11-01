@@ -2,7 +2,7 @@
 #ifndef OPERATIONS_H
 #define OPERATIONS_H
 namespace operations {
-		FloatVector Fscrunch(FloatVector& in, int nchans_in, int nchans_out);
+		void Fscrunch(float * in, int nchans_in, timeslice nsamps, int nchans_out, float * ret);
 	 	FloatVector FreqTable(Filterbank& f);
 	 	FloatVector FreqTable(float fch1, float foff, int nchans);
 		std::vector<timeslice> Delays(FloatVector freqs, double dm, double tsamp);
@@ -15,7 +15,7 @@ FloatVector operations::TimeAxis(float dt, timeslice start, timeslice stop) {
 		return ret;
 }
 FloatVector operations::FreqTable(float fch1, float foff, int nchans) {
-		FloatVector ret (nchans);
+		FloatVector ret; 
 		for(int i = 0; i < nchans; i++) ret.push_back( fch1 + i * foff );
 		return ret;
 }
@@ -30,13 +30,10 @@ std::vector<timeslice> operations::Delays(FloatVector freqs, double dm, double t
 		for(float f : freqs) ret.push_back( (timeslice) (operations::Delay(f, f1, dm) / tsamp) );
 		return ret;
 }
-FloatVector operations::Fscrunch(FloatVector& in, int nchans_in, int nchans_out) {
+void operations::Fscrunch(float * in, int nchans_in, timeslice nsamps, int nchans_out, float * ret) {
 		// Assuming in's and out's are sensible
 		// fastest changing axis is frequency
 		int df = nchans_in / nchans_out;
-		timeslice nsamps = in.size() / nchans_in;
-		FloatVector ret;
-		ret.reserve(nsamps * nchans_out);
 		int idf;
 		float xf;
 		// get going
@@ -52,7 +49,5 @@ FloatVector operations::Fscrunch(FloatVector& in, int nchans_in, int nchans_out)
 				}
 				if(idf != nchans_in) { std::cerr << "Operations::Fscrunch Fatal error\n";}
 		}
-		//
-		return ret;
 }
 #endif
