@@ -2,7 +2,7 @@ import numpy as np
 
 class Candidate(object):
 
-    def __init__(self,line,tsamp=1./1280,isfile=False):
+    def __init__(self,line,tsamp=1./1280,isfile=False, ant=None, gr=None):
         if isfile:
             f = open(line,'r')
             line  = f.read()
@@ -23,6 +23,8 @@ class Candidate(object):
         self.i1 = int(toks[8])
         self.tsamp = tsamp
         self.width = float(self.i1-self.i0)*self.tsamp
+        self.group =gr 
+        self.antenna =ant 
 
     def tophat(self,block,override_tfilt=None):
         tfilt = override_tfilt or self.tfilt
@@ -51,7 +53,16 @@ class Candidate(object):
     def __str__(self):
         return 'i0=%d i1=%d w=%.2f sn=%.2f dm=%.2f'%(self.i0,self.i1,self.width*1000,self.sn,self.dm)
 
-
+def ReadCandidates(filename):
+    # given filename read all the candidates
+    toks = filename.strip().split("/")[-1]
+    toks = toks.split("_")
+    gro = toks[0] + "_" + toks[1] + "_" + toks[2] + "_"
+    ret = []
+    with open(filename, 'r') as f:
+        for line in f:
+            ret.append( Candidate(line, ant=toks[3], gr=gro) )
+    return ret
 class FilCandidate(Candidate):
 
     def __init__(self,fil,line):

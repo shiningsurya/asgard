@@ -51,3 +51,4 @@ testcp
 test*
 #vim
 *.vim
+*.pyc

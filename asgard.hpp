@@ -96,7 +96,7 @@ bool QueryKurtosis(std::string fl) {
 		std::string kur = std::string("_kur.fil");
 		return fl.compare(fl.length() - kur.length(), kur.length(), kur) == 0;
 }	
-std::string GetAntenna(std::string fl) {
+ktd::string GetAntenna(std::string fl) {
 		std::vector<std::string> b;
 		boost::split(b, fl, boost::is_any_of("_"), boost::token_compress_on);
 		if(b[3].compare(0, 2, std::string("ea")) == 0) return b[3];
