@@ -31,7 +31,7 @@ class AnalyzeFB;
 // plot type
 class Waterfall;
 class CandPlot;
-
+class CandSummary;
 
 // type def
 typedef long unsigned int timeslice;
@@ -76,7 +76,7 @@ typedef std::vector<Filterbank> FilterbankList;
 typedef std::vector<Candidate>  CandidateList;
 //typedef std::vector<std::string> GroupList;
 typedef std::vector<CandidateList> CandidateAntenna;
-typedef std::pair<std::string, CandidateAntenna> CandidateGroup;
+//typedef std::pair<std::string, CandidateAntenna> CandidateGroup;
 typedef std::pair<std::string, FilterbankList> FilterbankGroup;
 // functions helpful everywhere
 std::string GetGroup(std::string fl){

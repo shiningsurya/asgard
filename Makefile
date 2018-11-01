@@ -24,3 +24,5 @@ testwf: *.hpp *.cpp
 	$(CPP) TestWaterfall.cpp $(CPPFLAGS) -o testwf $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(DEDISP_LIB) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
 testcp: *.hpp *.cpp
 	$(CPP) TestCandPlot.cpp $(CPPFLAGS) -o $@ $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(DEDISP_LIB) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
+testcs: *.hpp *.cpp
+	$(CPP) TestCandSummary.cpp $(CPPFLAGS) -o $@ $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(DEDISP_LIB) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 

@@ -134,13 +134,14 @@ class CandPlot {
 				std::array<float,5> heat_r;
 				std::array<float,5> heat_g;
 				std::array<float,5> heat_b;
-				float contrast,brightness;
+				float contrast,brightness, charh;
 				float tr[6];
 				// vector of candidates needs to be here for
 				// scatter plot
 				int count;
 		public:
 				void Plot(FilterbankCandidate& fcl) {
+						std::string str;
 						int twindow;
 						float trf[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
 						FloatVector freqs, taxis;
@@ -164,7 +165,10 @@ class CandPlot {
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
 								cpgimag(fcl.dd_fb, fcl.nchans, twindow, 1, fcl.nchans, 1, twindow, 0, 3, trf);
-								cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
+								//cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
+								cpgmtxt("B",2.5,.5,0.5,std::string("Time (s)").c_str()); // group at middle
+								cpgmtxt("L",4,0.5,0.5,std::string("Freq (MHz)").c_str());
+								cpgmtxt("T",.3,.5,0.5, std::string("De-Dispersed Waterfall").c_str());
 								//////////////////////////////////////////////////
 								//cpgsci(1); // color index
 								cpgsvp(0.55, 0.9, 0.1, 0.45); // dispersed waterfall
@@ -173,7 +177,9 @@ class CandPlot {
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
 								cpgimag(fcl.d_fb, fcl.nchans, fcl.nsamps, 1, fcl.nchans, 1, fcl.nsamps, 0, 3, trf);
-								cpglab("Time (s)", "", "Dispersed Waterfall");
+								//cpglab("Time (s)", "", "Dispersed Waterfall");
+								cpgmtxt("B",2.5,.5,0.5,std::string("Time (s)").c_str()); // group at middle
+								cpgmtxt("T",.3,.5,0.5, std::string("Dispersed Waterfall").c_str());
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
 								cpgsvp(0.1, 0.45, 0.55, 0.9); // fscrunched profile 
@@ -186,8 +192,11 @@ class CandPlot {
 								cpgswin(taxis[0],taxis[twindow -1], xmin, xmax );
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgline(twindow, taxis.data(), fcl.dd_tim); 
-								cpglab("", "Intensity (a.u)", "De-dispersed Integrated Profile");
-								cpgmtxt("T",1.5,0.0,0.0,std::to_string(std::round((float)fcl.peak_time)).c_str());
+								//cpglab("", "Intensity (a.u)", "De-dispersed Integrated Profile");
+								cpgmtxt("L",4,0.5,0.5,std::string("Intensity (a.u.)").c_str());
+								cpgmtxt("T",.3,.5,0.5, std::string("De-Dispersed Integrated Profile").c_str());
+								str = std::string("S/N: ") + std::to_string(fcl.sn);
+								cpgmtxt("T",-1.5*charh, .99, 1.0, str.c_str());
 								cpgmtxt("T",2.0,1.0,0.0,fcl.group.c_str());
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
@@ -207,7 +216,14 @@ class CandPlot {
 								ylin[1] = 3.0f;
 								cpgline(2,xlin, ylin); 
 								cpgbox("BCLNTS",0.0,0,"BCLVNTS",0.0,0);
-								cpglab("Width (ms)", "DM (pc/cc)", "Scatter");
+								//cpglab("Width (ms)", "DM (pc/cc)", "Scatter");
+								cpgmtxt("B",2.5,.5,0.5,std::string("Width (ms)").c_str()); // group at middle
+								cpgmtxt("L",4,0.5,0.5,std::string("DM (pc/cc)").c_str());
+								cpgmtxt("T",.3,.5,0.5, std::string("Scatter").c_str());
+								str = std::string("DM: ") + std::to_string(fcl.dm); 
+								cpgmtxt("T",-1.5*charh, 0.99, 1.0, str.c_str());
+								str = std::string("Width: ") + std::to_string(fcl.tsamp * fcl.filterwidth * 1e3f);
+								cpgmtxt("T",-3*charh, 0.99, 1.0, str.c_str());
 								cpgmtxt("T",1.5,1.0,0.0,fcl.antenna.c_str());
 								//////////////////////////////////////////////////
 								count++;
@@ -224,7 +240,8 @@ class CandPlot {
 						count = 0;
 						filename = fn;	
 						cpgbeg(0,filename.c_str(),1,1); // beginning of another journey
-						cpgsch(.65); // character height
+						charh = 0.65;
+						cpgsch(charh); // character height
 						cpgask(0); // go manual mode
 						cpgpap (0.0,0.618); //10.0, width and aspect ratio
 				}
@@ -232,84 +249,81 @@ class CandPlot {
 						cpgend();
 				}
 };
-/*
 class CandSummary{ 
 		private:
+				int count;
 				int iant;
-				std::string group;
-				CandidateAntenna cant;
-				int numGroups;
-				StringVector groups;
+				int numants;
+				timeslice imin, imax;
+				std::string filename, group, antenna;
+				float charh;
+				float xline[2], yline[2];
 		public:
-				CandSummary(CandidateGroup cg) {
+				CandSummary(std::string fn) {
+						count = 0;
+						filename = fn;	
+						cpgbeg(0,fn.c_str(),1,1); // beginning of another journey
+						charh = 0.65;
+						cpgsch(charh); // character height
+						cpgask(0); // go manual mode
+						cpgpap (0.0,0.618); //10.0, width and aspect ratio
+						imin = INT_MAX;
+						imax = INT_MIN;
+						yline[0] = 0.0;
+						yline[1] = 1.0;
 				}
-				void Plot(CandidateGroup& cg) {
-						// CandidateGroup has group & Candidate Antenna
+				~CandSummary() {
+						cpgend();
+				}
+				void Plot(CandidateAntenna& cant) {
 						// CandidateAntenna is vector of CandidateList
-						group = cg.first;
-						cant = cg.second;	
+						// CandidateList is vector of Candidate
 						// sort cant
-						std::sort(cant.begin(), cant.end(), [](CandidateList& x, CandidateList& y) { return x[0].antenna > y[0].antenna; } );
+						std::sort(cant.begin(), cant.end(), [](CandidateList x, CandidateList y) { return x[0].antenna > y[0].antenna; } );
+						for(CandidateList& x : cant) {
+								std::sort(x.begin(), x.end(), [](Candidate x, Candidate y) { return x.i0 < y.i0; } );
+								imin = imin < x.front().i0 ? imin : x.front().i0;
+								imax = imax > x.back().i0 ? imax : x.back().i0;
+						}
+						numants = cant.size();
+						int hants = numants/2;
 						// Some variables I will need
-						float axis[] = {0.0, 2.0, 0., 1.};
 						float xmin, xmax, ymin, ymax, w;
-						int nant, hant;
 						iant = 0;
+						w = (1*0.88/numants) - 0.02;
+						xmin = 0.05;
+						ymin = 0.05;
+						xmax = 0.9;
+						ymax = w + ymin;
 						// the main loop
-						for(const CandidateList& x : cant) {
-								////////////////////////////////////////
-								std::sort(x.begin(), x.end(), [](const Candidate& x, const Candidate& y) { return x.i0 < y.i0; } );
-
-								////////////////////////////////////////
-								nant = x.size();
-								hant = nant/2;
-								w = (1*0.88/nant) - 0.02;
-								xmin = 0.2;
-								ymin = 0.05;
-								xmax = 0.9;
-								ymax = w + ymin;
+						for(CandidateList& x : cant) {
 								cpgsci(1); // color index
 								cpgsvp(xmin, xmax, ymin, ymax);
-								cpgswin(axis[0],axis[1],axis[2],axis[3]);
-								if(iant == 0) {
-										cpgmtxt("B",2,.5,0.5,std::string("Time (s)").c_str()); // group at middle
-										cpgbox("BCN",0.0,0,"BC",40.0,0);
-										cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
-										cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
+								//cpgswin((float)imin,(float)imax, yline[0], yline[1]);
+								cpgswin(0, 50000, yline[0], yline[1]);
+								cpgbox("BC",0.0,0,"BC",0.0,0);
+								cpgmtxt("RV",2,.5,0.5,x[0].antenna.c_str());
+								cpgmtxt("LV",2,.5,0.5,std::to_string(x.size()).c_str());
+								if(iant == 0) cpgmtxt("B",1.5, .5, .5, std::string("-- Candidate Timestamp -->").c_str());
+								if(iant == numants - 1) {
+										// last one
+										cpgmtxt("T",1.3,.5,0.5,x[0].group.c_str()); // group at middle
+										cpgmtxt("T",.3,.5,0.5, std::string("Candidate Summary").c_str());
 								}
-								else if( iant == hant) {
-										cpgbox("BC",0.0,0,"BC",40.0,0);
-										cpgmtxt("L",4,0.,0.5,std::string("Freq (MHz)").c_str());
-										cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
-										cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
+								////////////////////////////////////////
+								//std::sort(x.begin(), x.end(), [](Candidate x, Candidate y) { return x.i0 < y.i0; } );
+								for(Candidate& cx : x) {
+										xline[1] = cx.i0;
+										xline[0] = cx.i0;
+										std::cerr << cx.i0 << std::endl;
+										cpgline(2, xline, yline);
 								}
-								else if(iant == nant - 1) {
-										cpgbox("BC",0.0,0,"BC",40.0,0);
-										cpgmtxt("T",1,.5,0.5,f.group.c_str()); // group at middle
-										if(f.isKur) cpgmtxt("T",1,.5,0.5,std::string("KUR").c_str()); // group at middle
-										cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
-										cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
-										cpgbox("BC",0.0,0,"BC",40.0,0);
-										idx = std::string("Slice:") + std::to_string(i+1) + std::string("/") + std::to_string(nsteps);
-										cpgmtxt("T",.5,.0,0.0,idx.c_str());   // slice index
-								}
-								else {
-										cpgbox("BC",0.0,0,"BC",40.0,0);
-										cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
-										cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
-								}
-								cpgmtxt("RV",2,.5,0.5,f.antenna.c_str());
+								////////////////////////////////////////
 								ymin = ymax + 0.02;
 								ymax += w   + 0.02 ;
 								iant++;
-
-
-
 						}
-
+						count++;
 				}
-
-
 };
-*/
 #endif
