@@ -8,13 +8,15 @@
 int main() {
 		std::string s(TROOT);
 		std::string g(TGROUP);
-		AnalyzeFB f(s,g);
+		AnalyzeFB f(s);
 		double zero = 0.0;
 		CandidateAntenna cant;
-		for(MapGroupDE::iterator it = f.cands.begin(); it != f.cands.end(); it++) 
+		CandSummary cs(std::string("TestPlots/CandSummary/") + std::string("CandidateSummary3.png/png"));
+		for(MapGroupDE::iterator it = f.cands.begin(); it != f.cands.end(); it++) {
+				cant.clear();
 				for(fs::directory_entry de : it->second) 
 						cant.push_back( ReadCandidates( de.path().string(), zero ) );  
-		CandSummary cs(std::string("TestPlots/CandSummary/") + g + std::string(".png/png"));
-		cs.Plot(cant);
+				cs.Plot(cant);
+		}
 		return 0;
 }

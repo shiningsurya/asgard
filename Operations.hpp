@@ -34,20 +34,17 @@ void operations::Fscrunch(float * in, int nchans_in, timeslice nsamps, int nchan
 		// Assuming in's and out's are sensible
 		// fastest changing axis is frequency
 		int df = nchans_in / nchans_out;
-		int idf;
-		float xf;
+		float xf, k1 = 1.0f/df;
 		// get going
 		for(timeslice i = 0; i < nsamps; i++) {
-				idf = 0;
-				for(int j = 0; j < nchans_out; j++) {
+				for(int k = 0; k < df; k++) {
 						xf = 0.0f;
-						for(int k = 0; k < df; k++) {
-								xf += in[i*nchans_in + idf];
-								idf++;
+						for(int j = 0; j < nchans_out; j++) {
+								//std::cout << idf << " " << k << "  " << i << " " << nsamps << std::endl;
+								ret[i*nchans_out + j] += k1 * in[i*nchans_in + j + k*nchans_out];
 						}
-						ret[i*nchans_out + j] = xf;
+						//ret[i*nchans_out + j] = xf;
 				}
-				if(idf != nchans_in) { std::cerr << "Operations::Fscrunch Fatal error\n";}
 		}
 }
 #endif

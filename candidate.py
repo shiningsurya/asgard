@@ -61,7 +61,10 @@ def ReadCandidates(filename):
     ret = []
     with open(filename, 'r') as f:
         for line in f:
-            ret.append( Candidate(line, ant=toks[3], gr=gro) )
+            try:
+                ret.append( Candidate(line, ant=toks[3], gr=gro) )
+            except IndexError:
+                print "Error in Reading Candidates from file:", filename.strip().split("/")[-1]
     return ret
 class FilCandidate(Candidate):
 

@@ -140,7 +140,137 @@ class CandPlot {
 				// scatter plot
 				int count;
 		public:
+				void Plot(FilterbankCandidate& fcl, CandidateAntenna& cant) {
+						std::string str;
+						int twindow;
+						float trf[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
+						FloatVector freqs, taxis;
+						float fac = 1e-2f, min, max, xxmin, xxmax;
+						float xmin, xmax, ymin, ymax, w;
+						float xlin[2], ylin[2];
+						/////////////////CANT//////////////////////////////
+						int nant = cant.size();
+						w = (1*0.88/nant) - 0.02;
+						xmin = 0.1;
+						ymin = 0.05;
+						xmax = 0.9;
+						ymax = w + ymin;
+						int imin, imax;
+						/*
+						 *imin = INT_MAX;
+						 *imax = INT_MIN;
+						 *std::sort(cant.begin(), cant.end(), [](CandidateList x, CandidateList y) { return x[0].antenna > y[0].antenna; } );
+						 *for(CandidateList& x : cant) {
+						 *        std::sort(x.begin(), x.end(), [](Candidate x, Candidate y) { return x.i0 < y.i0; } );
+						 *        imin = imin < x.front().i0 ? imin : x.front().i0;
+						 *        imax = imax > x.back().i0 ? imax : x.back().i0;
+						 *}
+						 */
+						/////////////////CANT//////////////////////////////
+						for(int cx = 0; cx < fcl.size(); cx++) {
+								if(count != 0) cpgpage();
+								freqs = operations::FreqTable((float)fcl.fch1, (float)fcl.foff, fcl.nchans);
+								// this function plots what is one page
+								taxis = operations::TimeAxis((float)fcl.tsamp, fcl.istart, fcl.istop);
+								twindow = fcl.nsamps - fcl.maxdelay;
+								//////////////////////////////////////////////////
+								trf[3] = freqs.back(); // fixed
+								trf[0] = fcl.istart*(float)fcl.tsamp; // fixed
+								trf[2] = (float)fcl.tsamp;
+								trf[4] = -1.f*(float)fcl.foff; 
+								//cpgsci(1); // color index
+								cpgsvp(0.03, 0.45, 0.1, 0.45); // de-dispersed waterfall
+								cpgswin(taxis[0], taxis[twindow-1], freqs.back(),  freqs.front());
+								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
+								cpgsfs(1);
+								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
+								cpgimag(fcl.dd_fb, fcl.nchans, twindow, 1, fcl.nchans, 1, twindow, 0, 3, trf);
+								//cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
+								cpgmtxt("B",2.5,.5,0.5,std::string("Time (s)").c_str()); // group at middle
+								cpgmtxt("L",4,0.5,0.5,std::string("Freq (MHz)").c_str());
+								cpgmtxt("T",.3,.5,0.5, std::string("De-Dispersed Waterfall").c_str());
+								//////////////////////////////////////////////////
+								//cpgsci(1); // color index
+								cpgsvp(0.48, 0.9, 0.1, 0.45); // dispersed waterfall
+								cpgswin(taxis[0], taxis[fcl.nsamps-1], freqs.back(),  freqs.front());
+								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
+								cpgsfs(1);
+								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
+								cpgimag(fcl.d_fb, fcl.nchans, fcl.nsamps, 1, fcl.nchans, 1, fcl.nsamps, 0, 3, trf);
+								//cpglab("Time (s)", "", "Dispersed Waterfall");
+								cpgmtxt("B",2.5,.5,0.5,std::string("Time (s)").c_str()); // group at middle
+								cpgmtxt("T",.3,.5,0.5, std::string("Dispersed Waterfall").c_str());
+								//////////////////////////////////////////////////
+								cpgsci(1); // color index
+								cpgsvp(0.03, 0.45, 0.55, 0.9); // fscrunched profile 
+								//cpgswin(76, 78.5, 0..0, 0.2 );
+								min = *std::min_element(fcl.dd_tim, fcl.dd_tim + twindow);
+								max = *std::max_element(fcl.dd_tim, fcl.dd_tim + twindow);
+								xxmin = min - .1 * min;
+								xxmax = max + .1 * min;
+								//std::cout << "Plotter limits: " << xlin[0] << " " << xlin[1] << std::endl;
+								cpgswin(taxis[0],taxis[twindow -1], xxmin, xxmax );
+								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
+								cpgline(twindow, taxis.data(), fcl.dd_tim); 
+								//cpglab("", "Intensity (a.u)", "De-dispersed Integrated Profile");
+								cpgmtxt("L",4,0.5,0.5,std::string("Intensity (a.u.)").c_str());
+								cpgmtxt("T",.3,.5,0.5, std::string("De-Dispersed Integrated Profile").c_str());
+								str = std::string("S/N: ") + std::to_string(fcl.sn);
+								cpgmtxt("T",-1.5*charh, .99, 1.0, str.c_str());
+								cpgmtxt("T",2.0,1.0,0.0,fcl.group.c_str());
+								//////////////////////////////////////////////////
+								cpgsci(1); // color index
+								cpgsvp(0.48, 0.9, 0.55, 0.9); // Scatter 
+								cpgswin(0.,2., 1, 3);
+								for(int i = 0; i < fcl.size(); i++) cpgcirc(log10(1e3f*fcl.clwd[i]), log10(fcl.cldm[i]), fac*log10(fcl.clsn[i]));
+								// yline
+								ylin[0] = log10((float)fcl.dm);
+								ylin[1] = log10((float)fcl.dm);
+								xlin[0] = 0.0f;
+								xlin[1] = 2.0f;
+								cpgline(2,xlin, ylin); 
+								// xline
+								xlin[0] = log10( (float)(fcl.filterwidth * fcl.tsamp * 1e3f) );
+								xlin[1] = log10( (float)(fcl.filterwidth * fcl.tsamp * 1e3f) );
+								ylin[0] = 1.0f;
+								ylin[1] = 3.0f;
+								cpgline(2,xlin, ylin); 
+								cpgbox("BCLNTS",0.0,0,"BCLVNTS",0.0,0);
+								//cpglab("Width (ms)", "DM (pc/cc)", "Scatter");
+								cpgmtxt("B",2.5,.5,0.5,std::string("Width (ms)").c_str()); // group at middle
+								cpgmtxt("L",4,0.5,0.5,std::string("DM (pc/cc)").c_str());
+								cpgmtxt("T",.3,.5,0.5, std::string("Scatter").c_str());
+								str = std::string("DM: ") + std::to_string(fcl.dm); 
+								cpgmtxt("T",-1.5*charh, 0.99, 1.0, str.c_str());
+								str = std::string("Width: ") + std::to_string(fcl.tsamp * fcl.filterwidth * 1e3f);
+								cpgmtxt("T",-3*charh, 0.99, 1.0, str.c_str());
+								cpgmtxt("T",1.5,1.0,0.0,fcl.antenna.c_str());
+								/////////////////CANT//////////////////////////////
+								ylin[0] = 0.0f;
+								ylin[1] = 1.0f;
+								for(CandidateList& xcl : cant) {
+										cpgsci(1); // color index
+										cpgsvp(xmin, xmax, ymin, ymax);
+										cpgswin(fcl.istart, fcl.istop, ylin[0], ylin[1]);
+										cpgbox("BC",0.0,0,"BC",0.0,0);
+										cpgmtxt("RV",2,.5,0.5,xcl[0].antenna.c_str());
+										for(Candidate& cx : xcl) {
+												xlin[1] = cx.i0;
+												xlin[0] = cx.i0;
+												cpgline(2, xlin, ylin);
+										}
+										ymin = ymax + 0.02;
+										ymax += w   + 0.02 ;
+								}
+								/////////////////CANT//////////////////////////////
+								count++;
+								break;
+								if( ! fcl.Next() ) break;
+						}
+				}
 				void Plot(FilterbankCandidate& fcl) {
+						int chanout = 512;
+						float * ffddw = NULL;
 						std::string str;
 						int twindow;
 						float trf[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
@@ -158,28 +288,50 @@ class CandPlot {
 								trf[0] = fcl.istart*(float)fcl.tsamp; // fixed
 								trf[2] = (float)fcl.tsamp;
 								trf[4] = -1.f*(float)fcl.foff; 
-								//cpgsci(1); // color index
+								cpgsci(1); // color indecx
 								cpgsvp(0.1, 0.45, 0.1, 0.45); // de-dispersed waterfall
 								cpgswin(taxis[0], taxis[twindow-1], freqs.back(),  freqs.front());
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-								cpgimag(fcl.dd_fb, fcl.nchans, twindow, 1, fcl.nchans, 1, twindow, 0, 3, trf);
+								// fsrunching
+								ffddw = new float[twindow * chanout](); // uniform initialization, c++11
+								operations::Fscrunch(fcl.dd_fb, fcl.nchans, twindow, chanout, ffddw);
+								//for(int i = 0; i < fcl.nsamps*32; i++) std::cout << ffddw[i]; std::cout << std::endl;
+								trf[4] *= (4096/chanout);
+								cpgimag(ffddw, chanout, twindow, 1, chanout, 1, twindow, 0, 3, trf);
 								//cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
 								cpgmtxt("B",2.5,.5,0.5,std::string("Time (s)").c_str()); // group at middle
 								cpgmtxt("L",4,0.5,0.5,std::string("Freq (MHz)").c_str());
 								cpgmtxt("T",.3,.5,0.5, std::string("De-Dispersed Waterfall").c_str());
+								// start line
+								cpgsci(4);
+								cpgsls(2);
+								xlin[0] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
+								xlin[1] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
+								ylin[0] = freqs.back();
+								ylin[1] = freqs.front();
+								cpgline(2,xlin, ylin);
+								// end line
+								xlin[0] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
+								xlin[1] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
+								cpgline(2,xlin, ylin);
+								cpgsls(1);
+								delete[] ffddw;
 								//////////////////////////////////////////////////
-								//cpgsci(1); // color index
+								cpgsci(1); // color index
 								cpgsvp(0.55, 0.9, 0.1, 0.45); // dispersed waterfall
 								cpgswin(taxis[0], taxis[fcl.nsamps-1], freqs.back(),  freqs.front());
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-								cpgimag(fcl.d_fb, fcl.nchans, fcl.nsamps, 1, fcl.nchans, 1, fcl.nsamps, 0, 3, trf);
+								ffddw = new float[fcl.nsamps*chanout]();
+								operations::Fscrunch(fcl.d_fb, fcl.nchans, fcl.nsamps, chanout, ffddw);
+								cpgimag(ffddw, chanout, fcl.nsamps, 1, chanout, 1, fcl.nsamps, 0, 3, trf);
 								//cpglab("Time (s)", "", "Dispersed Waterfall");
 								cpgmtxt("B",2.5,.5,0.5,std::string("Time (s)").c_str()); // group at middle
 								cpgmtxt("T",.3,.5,0.5, std::string("Dispersed Waterfall").c_str());
+								delete[] ffddw;
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
 								cpgsvp(0.1, 0.45, 0.55, 0.9); // fscrunched profile 
@@ -198,6 +350,19 @@ class CandPlot {
 								str = std::string("S/N: ") + std::to_string(fcl.sn);
 								cpgmtxt("T",-1.5*charh, .99, 1.0, str.c_str());
 								cpgmtxt("T",2.0,1.0,0.0,fcl.group.c_str());
+								// start line
+								cpgsci(4);
+								cpgsls(2);
+								xlin[0] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
+								xlin[1] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
+								ylin[0] = xmin;
+								ylin[1] = xmax;
+								cpgline(2,xlin, ylin);
+								// end line
+								xlin[0] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
+								xlin[1] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
+								cpgline(2,xlin, ylin);
+								cpgsls(1);
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
 								cpgsvp(0.55, 0.9, 0.55, 0.9); // Scatter 
@@ -276,6 +441,7 @@ class CandSummary{
 						cpgend();
 				}
 				void Plot(CandidateAntenna& cant) {
+						if(count > 0) cpgpage();
 						// CandidateAntenna is vector of CandidateList
 						// CandidateList is vector of Candidate
 						// sort cant

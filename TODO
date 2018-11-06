@@ -1,12 +1,18 @@
-1. Restructure candidate plot
-[*]		Have dedispersed time series
+-  Restructure candidate plot
+    [*] Have dedispersed time series
 	[*]	Have dispersed waterfall
-		[*]Have DM-width log log
-	[*]	Have all antenna candidate versus time
-	Fscrunching
-	Draw lines
-2. Work coadd
-3. Search strategies
-4. Machine Learning (RFs + XGBoost) Using Shogun C++
-5. Don't use autotools, use CMAKE.
-
+    [*] Have DM-width log log
+    [*]	Fscrunching
+	[*] Draw lines
+	[ ] Side bar CandidateAntenna
+-  Bias search
+    [ ] Generate FILs, write python to automate and distribution wise
+    [ ] Heimdall candidate analysis
+-  Work coadd
+    [ ] Distribution based co-addition
+    [ ] GPTOOL-like tool
+-  Search strategies
+    - Work on this after Bias
+-  Machine Learning (RFs + XGBoost) Using Shogun C++
+    [ ] After Search strategies
+-  Don't use autotools, use CMAKE. | Low priority
