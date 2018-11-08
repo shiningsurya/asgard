@@ -7,7 +7,7 @@ PGPLOT_LD := -lpgplot -lcpgplot
 DEBUG := -g
 OPTIMIZE:= -O3
 LD_FLAGS := -lm 
-CPPFLAGS := -std=c++11 $(DEBUG) 
+CPPFLAGS := -std=c++11 $(OPTIMIZE) 
 DEDISP := /home/shining/study/MS/vLITE/dedisp
 DEDISP_INC := -I$(DEDISP)/inc
 DEDISP_LIB   := -L$(DEDISP)/lib

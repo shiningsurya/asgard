@@ -141,6 +141,8 @@ class CandPlot {
 				int count;
 		public:
 				void Plot(FilterbankCandidate& fcl, CandidateAntenna& cant) {
+						int chanout = 512;
+						float * ffddw = NULL;
 						std::string str;
 						int twindow;
 						float trf[] = {0.0f, 0.0f, 0.0f, 0.0f, 0.0f, 0.0f};
@@ -151,15 +153,15 @@ class CandPlot {
 						/////////////////CANT//////////////////////////////
 						int nant = cant.size();
 						w = (1*0.88/nant) - 0.02;
-						xmin = 0.1;
-						ymin = 0.05;
+						xmin = 0.7;
+						ymin = 0.07;
 						xmax = 0.9;
 						ymax = w + ymin;
 						int imin, imax;
+						 std::sort(cant.begin(), cant.end(), [](CandidateList x, CandidateList y) { return x[0].antenna > y[0].antenna; } );
 						/*
 						 *imin = INT_MAX;
 						 *imax = INT_MIN;
-						 *std::sort(cant.begin(), cant.end(), [](CandidateList x, CandidateList y) { return x[0].antenna > y[0].antenna; } );
 						 *for(CandidateList& x : cant) {
 						 *        std::sort(x.begin(), x.end(), [](Candidate x, Candidate y) { return x.i0 < y.i0; } );
 						 *        imin = imin < x.front().i0 ? imin : x.front().i0;
@@ -168,41 +170,73 @@ class CandPlot {
 						 */
 						/////////////////CANT//////////////////////////////
 						for(int cx = 0; cx < fcl.size(); cx++) {
-								if(count != 0) cpgpage();
+								if(count != 0) {
+										cpgpage();
+										w = (1*0.88/nant) - 0.02;
+										xmin = 0.7;
+										ymin = 0.07;
+										xmax = 0.9;
+										ymax = w + ymin;
+								}
 								freqs = operations::FreqTable((float)fcl.fch1, (float)fcl.foff, fcl.nchans);
 								// this function plots what is one page
 								taxis = operations::TimeAxis((float)fcl.tsamp, fcl.istart, fcl.istop);
 								twindow = fcl.nsamps - fcl.maxdelay;
 								//////////////////////////////////////////////////
-								trf[3] = freqs.back(); // fixed
+								trf[3] = freqs.front(); // fixed
 								trf[0] = fcl.istart*(float)fcl.tsamp; // fixed
 								trf[2] = (float)fcl.tsamp;
-								trf[4] = -1.f*(float)fcl.foff; 
+								trf[4] = 1.f*(float)fcl.foff; 
 								//cpgsci(1); // color index
-								cpgsvp(0.03, 0.45, 0.1, 0.45); // de-dispersed waterfall
-								cpgswin(taxis[0], taxis[twindow-1], freqs.back(),  freqs.front());
+								cpgsvp(0.08, 0.33, 0.1, 0.45); // de-dispersed waterfall
+								cpgswin(taxis[0], taxis[twindow-1], freqs.front(),  freqs.back());
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-								cpgimag(fcl.dd_fb, fcl.nchans, twindow, 1, fcl.nchans, 1, twindow, 0, 3, trf);
+								// fsrunching
+								ffddw = new float[twindow * chanout](); // uniform initialization, c++11
+								operations::Fscrunch(fcl.dd_fb, fcl.nchans, twindow, chanout, ffddw);
+								trf[4] *= (4096/chanout);
+								cpgimag(ffddw, chanout, twindow, 1, chanout, 1, twindow, 0, 3, trf);
 								//cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
 								cpgmtxt("B",2.5,.5,0.5,std::string("Time (s)").c_str()); // group at middle
 								cpgmtxt("L",4,0.5,0.5,std::string("Freq (MHz)").c_str());
 								cpgmtxt("T",.3,.5,0.5, std::string("De-Dispersed Waterfall").c_str());
+								// start line
+								cpgsci(6);
+								cpgsls(2);
+								xlin[0] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
+								xlin[1] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
+								ylin[0] = freqs.back();
+								ylin[1] = freqs.front();
+								cpgline(2,xlin, ylin);
+								// end line
+								xlin[0] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
+								xlin[1] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
+								cpgline(2,xlin, ylin);
+								cpgsls(1);
+								delete[] ffddw;
 								//////////////////////////////////////////////////
-								//cpgsci(1); // color index
-								cpgsvp(0.48, 0.9, 0.1, 0.45); // dispersed waterfall
-								cpgswin(taxis[0], taxis[fcl.nsamps-1], freqs.back(),  freqs.front());
+								//chanout = 4096;
+								//trf[4] = 1.f*(float)fcl.foff * fcl.nchans / chanout;
+								cpgsci(1); // color index
+								cpgsvp(0.42, 0.67, 0.1, 0.45); // dispersed waterfall
+								cpgswin(taxis[0], taxis[fcl.nsamps-1], freqs.front(),  freqs.back());
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
 								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-								cpgimag(fcl.d_fb, fcl.nchans, fcl.nsamps, 1, fcl.nchans, 1, fcl.nsamps, 0, 3, trf);
+								ffddw = new float[fcl.nsamps*chanout]();
+								operations::Fscrunch(fcl.d_fb, fcl.nchans, fcl.nsamps, chanout, ffddw);
+								cpgimag(ffddw, chanout, fcl.nsamps, 1, chanout, 1, fcl.nsamps, 0, 3, trf);
+								//trf[4] = 1.f*(float)fcl.foff; 
+								//cpgimag(fcl.d_fb, fcl.nchans, fcl.nsamps, 1, fcl.nchans, 1, fcl.nsamps, 0, 3, trf);
 								//cpglab("Time (s)", "", "Dispersed Waterfall");
 								cpgmtxt("B",2.5,.5,0.5,std::string("Time (s)").c_str()); // group at middle
 								cpgmtxt("T",.3,.5,0.5, std::string("Dispersed Waterfall").c_str());
+								delete[] ffddw;
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
-								cpgsvp(0.03, 0.45, 0.55, 0.9); // fscrunched profile 
+								cpgsvp(0.08, 0.33, 0.55, 0.9); // fscrunched profile 
 								//cpgswin(76, 78.5, 0..0, 0.2 );
 								min = *std::min_element(fcl.dd_tim, fcl.dd_tim + twindow);
 								max = *std::max_element(fcl.dd_tim, fcl.dd_tim + twindow);
@@ -217,10 +251,24 @@ class CandPlot {
 								cpgmtxt("T",.3,.5,0.5, std::string("De-Dispersed Integrated Profile").c_str());
 								str = std::string("S/N: ") + std::to_string(fcl.sn);
 								cpgmtxt("T",-1.5*charh, .99, 1.0, str.c_str());
-								cpgmtxt("T",2.0,1.0,0.0,fcl.group.c_str());
+								cpgmtxt("T",2.0,1.0,0.3,fcl.group.c_str());
+								// start line
+								cpgsci(6);
+								cpgsls(2);
+								xlin[0] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
+								xlin[1] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
+								ylin[0] = xxmin;
+								ylin[1] = xxmax;
+								cpgline(2,xlin, ylin);
+								// end line
+								xlin[0] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
+								xlin[1] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
+								cpgline(2,xlin, ylin);
+								cpgsls(1);
+								cpgsci(1);
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
-								cpgsvp(0.48, 0.9, 0.55, 0.9); // Scatter 
+								cpgsvp(0.42, 0.67, 0.55, 0.9); // Scatter 
 								cpgswin(0.,2., 1, 3);
 								for(int i = 0; i < fcl.size(); i++) cpgcirc(log10(1e3f*fcl.clwd[i]), log10(fcl.cldm[i]), fac*log10(fcl.clsn[i]));
 								// yline
@@ -244,27 +292,47 @@ class CandPlot {
 								cpgmtxt("T",-1.5*charh, 0.99, 1.0, str.c_str());
 								str = std::string("Width: ") + std::to_string(fcl.tsamp * fcl.filterwidth * 1e3f);
 								cpgmtxt("T",-3*charh, 0.99, 1.0, str.c_str());
-								cpgmtxt("T",1.5,1.0,0.0,fcl.antenna.c_str());
+								//cpgmtxt("T",1.5,1.0,0.0,fcl.antenna.c_str());
 								/////////////////CANT//////////////////////////////
 								ylin[0] = 0.0f;
 								ylin[1] = 1.0f;
 								for(CandidateList& xcl : cant) {
 										cpgsci(1); // color index
+										if(xcl[0].antenna == fcl.antenna) {
+												// change color
+												cpgsci(6);
+												//cpgsls(2);
+										}
 										cpgsvp(xmin, xmax, ymin, ymax);
-										cpgswin(fcl.istart, fcl.istop, ylin[0], ylin[1]);
-										cpgbox("BC",0.0,0,"BC",0.0,0);
+										cpgswin(fcl.istart*fcl.tsamp, fcl.istop*fcl.tsamp, ylin[0], ylin[1]);
+										// ONLY first time
+										if(ymin == 0.07f)  { 
+												cpgbox("BCN",0.0,0,"BC",0.0,0);
+												cpgmtxt("B",2.5,.5,0.5,std::string("Time (s)").c_str()); 
+										}
+										else  cpgbox("BC",0.0,0,"BC",0.0,0);
 										cpgmtxt("RV",2,.5,0.5,xcl[0].antenna.c_str());
 										for(Candidate& cx : xcl) {
-												xlin[1] = cx.i0;
-												xlin[0] = cx.i0;
+												cpgsci(1);
+												xlin[1] = cx.i0*fcl.tsamp; 
+												xlin[0] = cx.i0*fcl.tsamp;
+												if(cx.i0 == fcl.i0) {
+														cpgsci(5);
+														//cpgsls(3);
+												}
 												cpgline(2, xlin, ylin);
 										}
+										xlin[1] = fcl.i0*fcl.tsamp;
+										xlin[0] = fcl.i0*fcl.tsamp;
+										cpgsci(5); cpgsls(2);
+										cpgline(2,xlin, ylin);
+										cpgsci(1); cpgsls(1);
 										ymin = ymax + 0.02;
 										ymax += w   + 0.02 ;
 								}
 								/////////////////CANT//////////////////////////////
 								count++;
-								break;
+								//break;
 								if( ! fcl.Next() ) break;
 						}
 				}
