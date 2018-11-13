@@ -7,6 +7,7 @@
 
 class AnalyzeFB {
 		public:
+		StringVector base;
 		MapGroupDE fils, kfils, cands;
 		AnalyzeFB(std::string wd) {
 				// This is the only constructor
@@ -16,7 +17,6 @@ class AnalyzeFB {
 				plotdir = workdir / std::string("plots"); // plots
 				//
 				DEList flist, clist, klist; // directories not objects 
-				StringVector base; // has the groups
 				/*
 				 * boost::bind should get boost::ref or else boost::bind creates internal references
 				 * time taken to learn that 25minutes

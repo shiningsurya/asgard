@@ -112,6 +112,9 @@ class FilterbankCandidate {
 						ddm.CreatePlan(nchans, tsamp, fch1, foff);
 						read();
 				}
+				~FilterbankCandidate() {
+						// I will have to use smart pointers at one point 
+				}
 				timeslice size() { return (timeslice) cl.size(); }
 				bool Next() {
 						if(d_fb != NULL) {delete[] d_fb; d_fb = NULL;}

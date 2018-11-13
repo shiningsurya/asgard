@@ -52,3 +52,6 @@ test*
 #vim
 *.vim
 *.pyc
+
+# 
+_coadd_in.cpp
