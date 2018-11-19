@@ -101,4 +101,5 @@ std::string GetAntenna(std::string fl) {
 		boost::split(b, fl, boost::is_any_of("_"), boost::token_compress_on);
 		if(b[3].compare(0, 2, std::string("ea")) == 0) return b[3];
 }
+auto AntennaIndex = [](std::string& ant) -> int { return std::stoi(ant.substr(2,2)) - 1; };
 #endif

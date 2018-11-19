@@ -5,12 +5,17 @@
     [*]	Fscrunching
 	[*] Draw lines
 	[ ] Side bar CandidateAntenna
+- Candidate summary
+    [*] Color-coded antenna DM, S/N, Width
+    [ ] Plot the distribution
 -  Bias search
     [ ] Generate FILs, write python to automate and distribution wise
     [ ] Heimdall candidate analysis
 -  Work coadd
     [ ] Distribution based co-addition
     [ ] GPTOOL-like tool
+-  Scrutinizer
+    [ ] Matched filter based scrutinizing
 -  Search strategies
     - Work on this after Bias
 -  Machine Learning (RFs + XGBoost) Using Shogun C++

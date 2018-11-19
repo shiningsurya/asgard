@@ -484,6 +484,7 @@ class CandPlot {
 };
 class CandSummary{ 
 		private:
+				double tsamp;
 				int count;
 				int iant;
 				int numants;
@@ -492,7 +493,7 @@ class CandSummary{
 				float charh;
 				float xline[2], yline[2];
 		public:
-				CandSummary(std::string fn) {
+				CandSummary(std::string fn, double ts) {
 						count = 0;
 						filename = fn;	
 						cpgbeg(0,fn.c_str(),1,1); // beginning of another journey
@@ -504,6 +505,8 @@ class CandSummary{
 						imax = INT_MIN;
 						yline[0] = 0.0;
 						yline[1] = 1.0;
+						tsamp = ts;
+						iant = 0;
 				}
 				~CandSummary() {
 						cpgend();
@@ -559,5 +562,80 @@ class CandSummary{
 						}
 						count++;
 				}
+				void TPlot(CandidateAntenna& cant) {
+						float xxx[1], yyy[1];
+						float fac = 2*1e-2f;
+						double imin, imax;
+						imin = 1e16;
+						imax = -1e16; 
+						if(count > 0) cpgpage();
+						// CandidateAntenna is vector of CandidateList
+						// CandidateList is vector of Candidate
+						// sort cant
+						std::sort(cant.begin(), cant.end(), [](CandidateList& x, CandidateList& y) { return x[0].antenna > y[0].antenna; } );
+						for(CandidateList& x : cant) {
+								std::sort(x.begin(), x.end(), [](Candidate& x, Candidate& y) { return x.i0 < y.i0; } );
+								imin = imin < x.front().peak_time ? imin : x.front().peak_time;
+								imax = imax > x.back().peak_time ? imax : x.back().peak_time;
+						}
+						numants = cant.size();
+						int hants = numants/2;
+						//////////DM////////////////////////////////////// 
+						cpgsvp(0.05, 0.9, 0.05, 0.35);
+						cpgswin(imin, imax, 1.0, 3.0);
+						cpgsci(1); // color index
+						cpgsls(1);
+						cpgtbox("BCNTS",0.0,0,"BCLTSN",0.0,0);
+						cpgmtxt("L", 2, .5, .5, std::string("DM (pc/cc)").c_str());
+						cpgmtxt("B", 3*charh, .5, .5, std::string("Time (s)").c_str());
+						// the main loop
+						for(CandidateList& xx : cant) for(Candidate& x : xx) {
+								iant = (AntennaIndex(x.antenna) % 16) + 1;
+								cpgsci((int)(iant / 4) + 1);
+								cpgsls((int)(iant % 4) + 1);
+								xxx[0] =  x.peak_time;
+								yyy[0] = log10(x.dm);
+								cpgcirc(xxx[0],yyy[0],fac);
+						}
+						//////////width/////////////////////////////////// 
+						cpgsvp(0.05, 0.9, 0.35, 0.65);
+						cpgsci(1); // color index
+						cpgsls(1);
+						cpgswin(imin, imax, 0.0, 1.0);
+						cpgtbox("BCTS",0.0,0,"BCLMTS",0.0,0);
+						cpgmtxt("R", 2.5, .5, .5, std::string("Width (ms)").c_str());
+						// the main loop
+						for(CandidateList& xx : cant) for(Candidate& x : xx) {
+								iant = (AntennaIndex(x.antenna) % 16) + 1;
+								cpgsci((int)(iant / 4) + 1);
+								cpgsls((int)(iant % 4) + 1);
+								xxx[0] =  x.peak_time;
+								yyy[0] = log10(x.filterwidth);
+								cpgcirc(xxx[0],yyy[0],fac);
+								//cpgline(1,xxx,yyy);
+						}
+						//////////sn////////////////////////////////////// 
+						cpgsvp(0.05, 0.9, 0.65, .95);
+						cpgsci(1); // color index
+						cpgsls(1); // color index
+						cpgswin(imin, imax, 1.0, 3.0);
+						cpgtbox("BCTS",0.0,0,"BCLNTS",0.0,0);
+						cpgmtxt("L", 2, .5, .5, std::string("S/N").c_str());
+						// the main loop
+						for(CandidateList& xx : cant) for(Candidate& x : xx) {
+								iant = (AntennaIndex(x.antenna) % 16) + 1;
+								cpgsci((int)(iant / 4) + 1);
+								cpgsls((int)(iant % 4) + 1);
+								xxx[0] =  x.peak_time;
+								yyy[0] = log10(x.sn);
+								cpgcirc(xxx[0],yyy[0],fac);
+						}
+						////////////////////////////////////////////////// 
+						cpgsci(1); // color index
+						cpgmtxt("T",1, .5, .5, cant[0][0].group.c_str());
+						count++;
+						iant++;
+				}
+
 };
 #endif
