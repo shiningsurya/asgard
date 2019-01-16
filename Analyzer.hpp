@@ -8,23 +8,20 @@
 class AnalyzeFB {
 		public:
 		StringVector base;
-		MapGroupDE fils, kfils, cands;
-		AnalyzeFB(std::string wd) {
-				// This is the only constructor
-				workdir = wd; // The work directory
-				fildir = workdir / std::string("fil");    // filterbank 
-				candir = workdir / std::string("cands");  // candidates
-				plotdir = workdir / std::string("plots"); // plots
-				//
-				DEList flist, clist, klist; // directories not objects 
+		MapGroupDE fils, kfils, cands, kcands;
+		void Crawl(std::string fd, std::string cd) {
+				fildir = fd; // filterbank
+				candir = cd; // candidate
+				DEList flist, clist, klist, kclist; 
 				/*
 				 * boost::bind should get boost::ref or else boost::bind creates internal references
 				 * time taken to learn that 25minutes
 				 * learnt it after reading a SO answer
 				 */
 				std::for_each(fs::directory_iterator(fildir),fs::directory_iterator(),boost::bind(AnalyzeFB::dselbinder,boost::ref(base),boost::ref(flist),std::string(".fil"), std::string("_kur.fil"),_1));
+				std::for_each(fs::directory_iterator(candir),fs::directory_iterator(),boost::bind(AnalyzeFB::dselbinder,boost::ref(base),boost::ref(clist),std::string(".cand"), std::string("_kur.cand"),_1));
 				std::for_each(fs::directory_iterator(fildir),fs::directory_iterator(),boost::bind(AnalyzeFB::selbinder,boost::ref(base),boost::ref(klist),std::string(".fil"), std::string("_kur.fil"),_1));
-				std::for_each(fs::directory_iterator(candir),fs::directory_iterator(),boost::bind(AnalyzeFB::selbinder,boost::ref(base),boost::ref(clist),std::string(".cand"), std::string(".cand"),_1));
+				std::for_each(fs::directory_iterator(candir),fs::directory_iterator(),boost::bind(AnalyzeFB::selbinder,boost::ref(base),boost::ref(kclist),std::string(".cand"), std::string("_kur.cand"),_1));
 				// taking out duplicates
 				std::set<std::string> bset( base.begin(), base.end() );
 				base.assign( bset.begin(), bset.end() );
@@ -35,29 +32,29 @@ class AnalyzeFB {
 						std::for_each(flist.begin(),flist.end(),boost::bind(AnalyzeFB::binder,b,boost::ref(tv),_1));
 						ttp = std::make_pair(b,tv);
 						fils.insert(ttp);
-						//fils[*b] = tv;
 						tv.clear();
-						// fils done.. now have to do kfils and cands
+						// fils done
 						std::for_each(clist.begin(),clist.end(),boost::bind(AnalyzeFB::binder,b,boost::ref(tv),_1));
 						ttp = std::make_pair(b,tv);
 						cands.insert(ttp);
-						//cands[*b] = tv;
 						tv.clear();
-						// cands and fils done
+						// cands done
 						std::for_each(klist.begin(),klist.end(),boost::bind(AnalyzeFB::binder,b,boost::ref(tv),_1));
-						//kfils[*b] = tv;
 						ttp = std::make_pair(b,tv);
 						kfils.insert(ttp);
 						tv.clear();
+						// kfils done
+						std::for_each(kclist.begin(),kclist.end(),boost::bind(AnalyzeFB::binder,b,boost::ref(tv),_1));
+						ttp = std::make_pair(b,tv);
+						kcands.insert(ttp);
+						tv.clear();
 				}
 		}
-		AnalyzeFB(std::string wd, std::string g) : AnalyzeFB(wd) {
-				for(auto it = fils.begin(); it != fils.end(); it++)   if(it->first != g) fils.erase(it);
-				for(auto it = kfils.begin(); it != kfils.end(); it++) if(it->first != g) kfils.erase(it);
-				for(auto it = cands.begin(); it != cands.end(); it++) if(it->first != g) cands.erase(it);
+		void Crawl(std::string fd) {
+				Crawl(fd,fd);
 		}
 		private:
-				fs::path workdir, fildir, candir, plotdir;
+				fs::path fildir, candir;
 				static void binder(std::string b, DEList& tv, fs::directory_entry it) {
 				// If b is found in *it push back to tv
 						std::string r = it.path().filename().string();
@@ -88,10 +85,11 @@ class AnalyzeFB {
 				}
 		public:
 		void PrintPaths() {
-				std::cout << "Workdir: " << workdir.string() << std::endl;
 				std::cout << "Fildir: " << fildir.string() << std::endl;
 				std::cout << "Candir: " << candir.string() << std::endl;
-				std::cout << "Plotdir: " << plotdir.string() << std::endl;
+		}
+		void Groups() {
+				for(auto ix : base) std::cout << ix << std::endl;
 		}
 		void Summary() {
 				std::cout << "Summary\n";
@@ -100,3 +98,4 @@ class AnalyzeFB {
 				for(PairGroupDE it : cands) std::cout << "CANs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
 		}
 };
+

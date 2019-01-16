@@ -2,7 +2,7 @@
 #
 #
 CPP := g++
-BOOST_LD := -lboost_system -lboost_iostreams -lboost_filesystem
+BOOST_LD := -lboost_system -lboost_iostreams -lboost_filesystem -lboost_program_options
 PGPLOT_LD := -lpgplot -lcpgplot
 DEBUG := -g
 OPTIMIZE:= -O3
@@ -28,3 +28,5 @@ testcp: *.hpp *.cpp
 	$(CPP) TestCandPlot.cpp $(CPPFLAGS) -o $@ $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(DEDISP_LIB) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
 testcs: *.hpp *.cpp
 	$(CPP) TestCandSummary.cpp $(CPPFLAGS) -o $@ $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(DEDISP_LIB) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
+asgard: asgard.cpp
+	$(CPP) asgard.cpp $(CPPFLAGS) -o $@ $(BOOST_LD) $(LD_FLAGS)

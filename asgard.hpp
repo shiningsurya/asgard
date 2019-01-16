@@ -14,8 +14,9 @@
 #include "math.h"
 // Definitions
 #define TSAMP  0.000097
-#define TROOT "/home/shining/study/MS/vLITE/mkerr"
-#define TGROUP "20180521_182857_muos"
+//#define TROOT "/home/shining/study/MS/vLITE/mkerr"
+#define TROOT "/home/shining/mega/vLITE-data/R20"
+#define TGROUP "20181213_015843_muos"
 // namespace
 namespace fs = boost::filesystem;
 

@@ -16,9 +16,11 @@ class Waterfall {
 				bool interactive;
 				float charh, timestep;
 				int count, nant, hant;
+				int chanout; 
 		public:
-				Waterfall(std::string fn) {
-						Waterfall(fn, 2.0);
+				Waterfall(std::string fn, int fs) {
+						chanout = fs;
+						Waterfall(fn, 2.0f);
 				}
 				Waterfall(std::string fn, float ts){
 						if(fn == std::string("?")) interactive = true;
@@ -43,8 +45,8 @@ class Waterfall {
 				~Waterfall() {
 						cpgend();
 				}
-				void Plot(FilterbankList fl) {
-						std::sort(fl.begin(), fl.end(), [](Filterbank x, Filterbank y) { return x.antenna > y.antenna; });
+				void Plot(FilterbankList& fl) {
+						std::sort(fl.begin(), fl.end(), [](Filterbank& x, Filterbank& y) { return x.antenna > y.antenna; });
 						std::string idx;
 						int iant;
 						timeslice i0, wid;
@@ -54,12 +56,12 @@ class Waterfall {
 						nant = fl.size();
 						hant = nant/2;
 						FloatVector duration_list;
-						std::for_each(fl.begin(), fl.end(), [&duration_list](Filterbank bf) { duration_list.push_back( (float)bf.duration ); } ); 
+						std::for_each(fl.begin(), fl.end(), [&duration_list](Filterbank& bf) { duration_list.push_back( (float)bf.duration ); } ); 
 						int nsteps = *(std::max_element(duration_list.begin(), duration_list.end()));
 						nsteps = (int) nsteps/timestep + 1;
 						// assuming all the filterbanks have the same frequency
 						FloatVector ft = operations::FreqTable(fl[0]);
-						float * juice;
+						float * juice, * juice2;
 						axis[2] = ft.back(); 
 						axis[3] = ft.front(); 
 						for(int i = 0; i < nsteps; i++) {
@@ -72,13 +74,13 @@ class Waterfall {
 								axis[0] = i * timestep;
 								axis[1] = axis[0] + timestep;
 								iant = 0;	
-								for(Filterbank f: fl) {
+								for(Filterbank& f: fl) {
 										wid = timestep / f.tsamp;
 										i0 = axis[0] / f.tsamp;
-										trf[3] = ft.back(); // fixed
+										trf[3] = ft.front(); // fixed
 										trf[0] = i0*(float)f.tsamp; // fixed
 										trf[2] = (float)f.tsamp;
-										trf[4] = -1.f*(float)f.foff; 
+										trf[4] = 1.f*(float)f.foff * (4096/chanout); 
 										cpgsci(1); // color index
 										cpgsvp(xmin, xmax, ymin, ymax);
 										// xmin, xmax remain the same
@@ -114,14 +116,17 @@ class Waterfall {
 										}
 										// extract juice and cpgimag
 										f.Unpack(juice, i0, wid);
+										juice2 = new float[wid*chanout];
+										operations::Fscrunch(juice, f.nchans, wid, chanout, juice2);
 										cpgsfs(1);
 										cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-										cpgimag(juice, wid,  f.nchans, 1, wid, 1, f.nchans, 0, 3, trf);
+										cpgimag(juice2, chanout,  wid, 1, chanout, 1, wid, 0, 3, trf);
 										//cpgimag(juice.data(), f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
 										cpgmtxt("RV",2,.5,0.5,f.antenna.c_str());
 										ymin = ymax + 0.02;
 										ymax += w   + 0.02 ;
 										iant++;
+										delete juice2;
 								}
 								count++;
 						}

@@ -22,7 +22,7 @@ int main() {
 		std::string cfile, ffile;
 		//f.Summary();
 		for(std::string& g : f.base) {
-				CandPlot cp(std::string("TestPlots/CandPlot/") + g + std::string(".png/png"));
+				CandPlot cp(s + std::string("/TestPlots/CandPlot/") + g + std::string(".png/png"));
 				std::cout << "base: " << g << std::endl;
 				fed = DE2String(f.kfils[g]); ced = DE2String(f.cands[g]);
 				for(std::string cdde : ced)
