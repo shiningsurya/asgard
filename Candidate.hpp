@@ -64,7 +64,7 @@ std::ostream& operator<< (std::ostream& os, const Candidate& cd){
 		return os;
 }
 
-CandidateList ReadCandidates(std::string st, double& ts) {
+CandidateList ReadCandidates(const std::string st, double ts) {
 		CandidateList ret;
 		std::string line;
 		if(ts == 0.0) ts = TSAMP;

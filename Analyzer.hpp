@@ -96,6 +96,7 @@ class AnalyzeFB {
 				for(PairGroupDE it : fils) std::cout << "FILs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
 				for(PairGroupDE it : kfils) std::cout << "KILs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
 				for(PairGroupDE it : cands) std::cout << "CANs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
+				for(PairGroupDE it : kcands) std::cout << "CANs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
 		}
 };
 

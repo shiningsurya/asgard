@@ -28,5 +28,5 @@ testcp: *.hpp *.cpp
 	$(CPP) TestCandPlot.cpp $(CPPFLAGS) -o $@ $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(DEDISP_LIB) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
 testcs: *.hpp *.cpp
 	$(CPP) TestCandSummary.cpp $(CPPFLAGS) -o $@ $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(DEDISP_LIB) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
-asgard: asgard.cpp
-	$(CPP) asgard.cpp $(CPPFLAGS) -o $@ $(BOOST_LD) $(LD_FLAGS)
+agplot: agplot.cpp Plotter.hpp
+	$(CPP) agplot.cpp $(CPPFLAGS) $(DEDISP_INC) $(DEDISP_LIB) -o $@ $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) $(PGPLOT_LD)

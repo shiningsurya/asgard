@@ -56,3 +56,5 @@ test*
 # 
 _coadd_in.cpp
 asgard
+bv
+agplot
