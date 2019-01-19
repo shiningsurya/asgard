@@ -72,6 +72,12 @@ FilterbankList FLFromDE(DEList& x) {
 				fbr.Read(xx, de.path().string()); 
 				ret.push_back(xx);
 		}
+		return ret;
+		// I would like to take time to tell you that
+		// I took 10 mins into debugging why this function was 
+		// going haywire.
+		// And the reason is self explanatory:
+		// I forgot "return ret"
 }
 class CandSummary : protected Plotter {
 		protected:
@@ -376,16 +382,15 @@ class Waterfall : protected Plotter {
 				int chanout;
 				float timestep;
 		public:
-				Waterfall(std::string fn, float ts) : Plotter(fn) {
+				Waterfall(std::string fn, float ts, int chout) : Plotter(fn) {
+						chanout = chout;
 						timestep = ts;
 						cpgpap (0.0,0.618); //10.0, width and aspect ratio
 				}
 				void Plot(DEList& x) {
 						FilterbankList fl; 
 						fl = FLFromDE(x);
-						std::cout << "size: " << fl.size() << std::endl;
-						std::cout << "size: " << x.size() << std::endl;
-						//Plot( fl );
+						Plot( fl );
 				}
 				void Plot(FilterbankList& fl) {
 						std::sort(fl.begin(), fl.end(), FCompare); 
@@ -455,6 +460,7 @@ class Waterfall : protected Plotter {
 												cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 										}
 										// extract juice and cpgimag
+										juice = new float[f.nchans*wid];
 										f.Unpack(juice, i0, wid);
 										juice2 = new float[wid*chanout];
 										operations::Fscrunch(juice, f.nchans, wid, chanout, juice2);
@@ -467,6 +473,7 @@ class Waterfall : protected Plotter {
 										ymax += w   + 0.02 ;
 										iant++;
 										delete juice2;
+										delete juice;
 								}
 								count++;
 						}

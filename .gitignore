@@ -32,29 +32,19 @@
 *.app
 
 # test
-test
-del10
+TestPlots
+misc
 testfb
 testcd
-*.ps
-plot
-tplot
-cacaca.pdf
-wut
-*.pdf
-*.ps
 testwf
+*.ps
+*.pdf
 *.png
 
-TestPlots
 testcp
-test*
 #vim
 *.vim
 *.pyc
 
 # 
-_coadd_in.cpp
-asgard
-bv
-agplot
+bin

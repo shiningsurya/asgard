@@ -40,6 +40,7 @@ int main(int ac, char * av[]){
 		opd.add("group",-1);
 		//
 		double tsamp;
+		float timestep;
 		int fschanout;
 		po::options_description popt("Plotting options");
 		popt.add_options()
@@ -48,7 +49,8 @@ int main(int ac, char * av[]){
 		("candplot,l","Candidate plot")
 		("waterfall,w","Waterfall plot")
 		("chanout",po::value<int>(&fschanout)->default_value(32), "Fscrunching channels")
-		("plot,p", po::value<StringVector>(&pasked)->composing(), "If you have more than one plotting requirement. For example,\n"
+		("timestep",po::value<float>(&timestep)->default_value(2.0f), "Timestep in Waterfall")
+		("plot,p", po::value<StringVector>(&pasked)->composing()->required(), "If you have more than one plotting requirement. For example,\n"
 		 "sl: candidate summary and candidate plot;\n"
 		 "lw: candidate and waterfall plot;\n"
 		 "slw: candidate summary, candidate plot and waterfall plot.\n");
@@ -129,12 +131,12 @@ int main(int ac, char * av[]){
 								// waterfall plot
 								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 										// nokur
-										Waterfall wf( (pdir / (groups[gin] + std::string("_waterfall.png/png"))).string(), fschanout);
+										Waterfall wf( (pdir / (groups[gin] + std::string("_waterfall.png/png"))).string(), timestep, fschanout);
 										wf.Plot(fb.fils[groups[gin]]);	
 								}
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
-										Waterfall wf( (pdir / (groups[gin] + std::string("_kur_waterfall.png/png"))).string(), fschanout);
+										Waterfall wf( (pdir / (groups[gin] + std::string("_kur_waterfall.png/png"))).string(), timestep, fschanout);
 										wf.Plot(fb.kfils[groups[gin]]);	
 								}
 						}

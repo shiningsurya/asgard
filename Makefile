@@ -1,17 +1,8 @@
 # This is just the beginning of a long night. 
 #
 #
-CPP := g++
-BOOST_LD := -lboost_system -lboost_iostreams -lboost_filesystem -lboost_program_options
-PGPLOT_LD := -lpgplot -lcpgplot
-DEBUG := -g
-OPTIMIZE:= -O3
-LD_FLAGS := -lm 
-CPPFLAGS := -std=c++11 $(DEBUG) 
-DEDISP := /home/shining/study/MS/vLITE/dedisp
-DEDISP_INC := -I$(DEDISP)/inc
-DEDISP_LIB   := -L$(DEDISP)/lib
-DEDISP_LD := -ldedisp
+include Makefile.inc
+
 testanalyze: TestAnalyzer.cpp Analyzer.hpp 
 	$(CPP) TestAnalyzer.cpp $(CPPFLAGS) -o test $(BOOST_LD) $(LD_FLAGS) 
 testplot: *.hpp *.cpp
