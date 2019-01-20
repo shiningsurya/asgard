@@ -40,7 +40,7 @@ int main(int ac, char * av[]){
 		opd.add("group",-1);
 		//
 		double tsamp;
-		float timestep;
+		float timestep, ctimestep;
 		int fschanout;
 		po::options_description popt("Plotting options");
 		popt.add_options()
@@ -49,8 +49,10 @@ int main(int ac, char * av[]){
 		("candplot,l","Candidate plot")
 		("waterfall,w","Waterfall plot")
 		("chanout",po::value<int>(&fschanout)->default_value(32), "Fscrunching channels")
-		("timestep",po::value<float>(&timestep)->default_value(2.0f), "Timestep in Waterfall")
-		("plot,p", po::value<StringVector>(&pasked)->composing()->required(), "If you have more than one plotting requirement. For example,\n"
+		("timestep",po::value<float>(&timestep)->default_value(1.0f), "Timestep in Waterfall in seconds")
+		("coarse waterfall,q", "Coarse waterfall plot")
+		("coarse-timestep",po::value<float>(&ctimestep)->default_value(1e-2f), "Coarse time resolution\nPassing 0.0f would make a single plot for the entire duration.")
+		("plot,p", po::value<StringVector>(&pasked)->composing(), "If you have more than one plotting requirement. For example,\n"
 		 "sl: candidate summary and candidate plot;\n"
 		 "lw: candidate and waterfall plot;\n"
 		 "slw: candidate summary, candidate plot and waterfall plot.\n");
@@ -83,6 +85,7 @@ int main(int ac, char * av[]){
 		if(fdirs.size() < cdirs.size()) for(int i = imin; i < cdirs.size(); i++) fb.Crawl(cdirs[i]);
 		if(cdirs.size() < fdirs.size()) for(int i = imin; i < fdirs.size(); i++) fb.Crawl(fdirs[i]);
 		//fb.Summary();
+		///////////////////////////////////////////////////////////////////////////////////////////
 		///////////////////////////////////////////////////////////////////////////////////////////
 		// in an ideal setting
 		// rfiflag.size() == groups.size() == pasked.size()
@@ -137,6 +140,19 @@ int main(int ac, char * av[]){
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
 										Waterfall wf( (pdir / (groups[gin] + std::string("_kur_waterfall.png/png"))).string(), timestep, fschanout);
+										wf.Plot(fb.kfils[groups[gin]]);	
+								}
+						}
+						else if(pin == 'q') {
+								// coarse waterfall plot
+								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
+										// nokur
+										Waterfall wf( (pdir / (groups[gin] + std::string("_coarse_waterfall.png/png"))).string(), timestep, ctimestep, fschanout);
+										wf.Plot(fb.fils[groups[gin]]);	
+								}
+								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
+										// kur
+										Waterfall wf( (pdir / (groups[gin] + std::string("_kur_coarse_waterfall.png/png"))).string(), timestep, ctimestep, fschanout);
 										wf.Plot(fb.kfils[groups[gin]]);	
 								}
 						}

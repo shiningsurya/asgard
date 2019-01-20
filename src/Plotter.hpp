@@ -381,10 +381,16 @@ class Waterfall : protected Plotter {
 		private:
 				int chanout;
 				float timestep;
+				float ctimestep;
+				bool coarse;
 		public:
-				Waterfall(std::string fn, float ts, int chout) : Plotter(fn) {
-						chanout = chout;
-						timestep = ts;
+				Waterfall(std::string fn, float ts, int chout) : chanout(chout), timestep(ts), Plotter(fn) {
+						coarse = false;
+						ctimestep = 0.0f;
+						cpgpap (0.0,0.618); //10.0, width and aspect ratio
+				}
+				Waterfall(std::string fn, float ts, float cts, int chout) : chanout(chout), timestep(ts), ctimestep(cts), Plotter(fn) {
+						coarse = true;
 						cpgpap (0.0,0.618); //10.0, width and aspect ratio
 				}
 				void Plot(DEList& x) {
@@ -395,15 +401,23 @@ class Waterfall : protected Plotter {
 				void Plot(FilterbankList& fl) {
 						std::sort(fl.begin(), fl.end(), FCompare); 
 						std::string idx;
-						int iant;
-						timeslice i0, wid;
+						int iant, nsteps;
+						timeslice i0, wid, widout;
 						float axis[] = {0.0, 2.0, 320., 360.};
+						float maxdur;
 						nant = fl.size();
 						int hant = nant/2;
 						FloatVector duration_list;
 						std::for_each(fl.begin(), fl.end(), [&duration_list](Filterbank& bf) { duration_list.push_back( (float)bf.duration ); } ); 
-						int nsteps = *(std::max_element(duration_list.begin(), duration_list.end()));
-						nsteps = (int) nsteps/timestep + 1;
+						maxdur = *(std::max_element(duration_list.begin(), duration_list.end()));
+						//
+						if(coarse && ctimestep == 0.0f) {
+								timestep = maxdur;
+								nsteps = 1;
+						}
+						else {
+								nsteps = (int) maxdur/timestep + 1;
+						}
 						// assuming all the filterbanks have the same frequency
 						FloatVector ft = operations::FreqTable(fl[0]);
 						float * juice, * juice2;
@@ -420,12 +434,18 @@ class Waterfall : protected Plotter {
 								axis[1] = axis[0] + timestep;
 								iant = 0;	
 								for(Filterbank& f: fl) {
-										wid = timestep / f.tsamp;
+										if(coarse && ctimestep == 0.0f) wid = maxdur / f.tsamp;
+										else wid = timestep / f.tsamp;
+										if(ctimestep == 0.0f) widout = wid; 
+										else widout = wid / (ctimestep / f.tsamp);	
 										i0 = axis[0] / f.tsamp;
 										tr[3] = ft.front(); // fixed
-										tr[0] = i0*(float)f.tsamp; // fixed
-										tr[2] = (float)f.tsamp;
-										tr[4] = 1.f*(float)f.foff * (4096/chanout); 
+										tr[0] = axis[0]; // fixed
+										tr[2] = (float)f.tsamp * wid / widout;
+										tr[0] -= 0.5*tr[2];
+										//tr[2] = (float)f.tsamp * widout / wid;
+										tr[4] = 1.f*(float)f.foff * (f.nchans/chanout); 
+										tr[3] -= 0.5*tr[4];
 										cpgsci(1); // color index
 										cpgsvp(xmin, xmax, ymin, ymax);
 										// xmin, xmax remain the same
@@ -460,13 +480,13 @@ class Waterfall : protected Plotter {
 												cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 										}
 										// extract juice and cpgimag
-										juice = new float[f.nchans*wid];
+										juice = new float[f.nchans*wid]();
 										f.Unpack(juice, i0, wid);
-										juice2 = new float[wid*chanout];
-										operations::Fscrunch(juice, f.nchans, wid, chanout, juice2);
+										juice2 = new float[widout*chanout];
+										operations::Crunch(juice, f.nchans, wid, chanout, widout, juice2);
 										cpgsfs(1);
 										cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-										cpgimag(juice2, chanout,  wid, 1, chanout, 1, wid, 0, 3, tr);
+										cpgimag(juice2, chanout,  widout, 1, chanout, 1, widout, 0, 3, tr);
 										//cpgimag(juice.data(), f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
 										cpgmtxt("RV",2,.5,0.5,f.antenna.c_str());
 										ymin = ymax + 0.02;

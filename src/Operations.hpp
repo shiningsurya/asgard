@@ -3,11 +3,29 @@
 #define OPERATIONS_H
 namespace operations {
 		void Fscrunch(float * in, int nchans_in, timeslice nsamps, int nchans_out, float * ret);
+		void Crunch(float * in, const int nchans_in, const timeslice nsamps_in, const int nchans_out, const timeslice nsamps_out, float * ret); 
 	 	FloatVector FreqTable(Filterbank& f);
 	 	FloatVector FreqTable(float fch1, float foff, int nchans);
 		std::vector<timeslice> Delays(FloatVector freqs, double dm, double tsamp);
 		FloatVector TimeAxis(float dt, timeslice start, timeslice stop); 
 		auto Delay = [](float f1, float f2, double dm) ->  double {return(4148.741601*((1.0/f1/f1)-(1.0/f2/f2))*dm);};
+}
+void operations::Crunch(float * in, const int nchans_in, const timeslice nsamps_in, const int nchans_out, const timeslice nsamps_out, float * ret) {
+		// assuming in's and out's are sensible
+		int df = nchans_in / nchans_out;
+		timeslice di = nsamps_in / nsamps_out;
+		float dd = df * di;
+		float xf;
+		// get going
+		for(timeslice i = 0; i < nsamps_out; i++) {
+				for(int c = 0; c < nchans_out; c++) {
+						xf = 0.0f;
+						for(timeslice ii = i*di; ii < (i+1)*di; ii++)
+								for(int cc = c*df; cc < (c+1)*df; cc++)
+										xf += in[ii*nchans_in + cc];
+						ret[i*nchans_out + c] = xf/dd;
+				}
+		}
 }
 FloatVector operations::TimeAxis(float dt, timeslice start, timeslice stop) {
 		FloatVector ret (stop - start);
