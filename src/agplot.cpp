@@ -35,7 +35,9 @@ int main(int ac, char * av[]){
 		("fil-directory,f",po::value<StringVector>(&fdirs)->composing(),"Filterbank directory")
 		("cand-directory,c",po::value<StringVector>(&cdirs)->composing(),"Candidate directory")
 		("plot-directory,o",po::value<fs::path>(&pdir), "Plot directory,\nwhere plots will be stored")
-		("group,g", po::value<StringVector>(&groups)->composing(),"Sets the group to use")
+		("group,g", po::value<StringVector>(&groups)->composing(),"Sets the group to use.\nIf option not given, all the groups found"
+																"\nwhile crawling will be used."
+		)
 		("xrfi,r", po::value<std::vector<int>>(&rfiflag)->composing()->default_value(std::vector<int>{1}, "1"), "0 to use standard\n1 to use kur(default)\n2 to use both");
 		opd.add("group",-1);
 		//
@@ -83,19 +85,19 @@ int main(int ac, char * av[]){
 		int imin = fdirs.size() < cdirs.size() ? fdirs.size() : cdirs.size();
 		for(int i = 0; i < imin; i++) fb.Crawl(fdirs[i], cdirs[i]);
 		if(fdirs.size() < cdirs.size()) for(int i = imin; i < cdirs.size(); i++) fb.Crawl(cdirs[i]);
-		if(cdirs.size() < fdirs.size()) for(int i = imin; i < fdirs.size(); i++) fb.Crawl(fdirs[i]);
-		//fb.Summary();
+		else if(cdirs.size() < fdirs.size()) for(int i = imin; i < fdirs.size(); i++) fb.Crawl(fdirs[i]);
+		/*
+		 *fb.Summary();
+		 *for(auto& x : pasked) std::cout << x << std::endl;
+		 */
 		///////////////////////////////////////////////////////////////////////////////////////////
+		if(groups.size() == 0) groups = fb.base;
 		///////////////////////////////////////////////////////////////////////////////////////////
 		// in an ideal setting
 		// rfiflag.size() == groups.size() == pasked.size()
 		// now starts the actual plotting
-		if(pasked.size() < groups.size()) std::copy(pasked.end(), 
-						pasked.end() - (groups.size() - pasked.size()),
-						pasked.end());
-		if(rfiflag.size() < groups.size()) std::copy(rfiflag.end(), 
-						rfiflag.end() - (groups.size() - rfiflag.size()),
-						rfiflag.end());
+		while(pasked.size() <= groups.size()) pasked.push_back(pasked.back());
+		while(rfiflag.size() <= groups.size()) rfiflag.push_back(rfiflag.back());
 		// When pasked is less than group size
 		// last options of pasked is copied. 
 		// This is minor convenience and bad practise
@@ -104,16 +106,19 @@ int main(int ac, char * av[]){
 				// plot dir is pdir
 				// rfiflag tells if kur, nokur, or both
 				for(char& pin : pasked[gin]) {
+						fs::path xp = pdir / groups[gin];
 						if(pin == 's') {
 								// candidate summary plot
 								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 										// nokur
-										CandSummary cs( (pdir / (groups[gin] + std::string("_candsummary.png/png"))).string(), tsamp);
+										if(! fs::exists(xp)) fs::create_directory(xp);
+										CandSummary cs((xp / (groups[gin] + std::string("_candsummary.png/png"))).string(), tsamp);
 										cs.Plot(fb.cands[groups[gin]]);	
 								}
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
-										CandSummary cs( (pdir / (groups[gin] + std::string("_kur_candsummary.png/png"))).string(), tsamp);
+										if(! fs::exists(xp)) fs::create_directory(xp);
+										CandSummary cs( (xp / (groups[gin] + std::string("_kur_candsummary.png/png"))).string(), tsamp);
 										cs.Plot(fb.kcands[groups[gin]]);	
 								}
 						}
@@ -121,12 +126,14 @@ int main(int ac, char * av[]){
 								// candidate plot
 								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 										// nokur
-										CandPlot cp( (pdir / (groups[gin] + std::string("_cand.png/png"))).string());
+										if(! fs::exists(xp)) fs::create_directory(xp);
+										CandPlot cp( (xp / (groups[gin] + std::string("_cand.png/png"))).string());
 										cp.Plot(fb.fils[groups[gin]], fb.cands[groups[gin]]);	
 								}
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
-										CandPlot cp( (pdir / (groups[gin] + std::string("_kur_cand.png/png"))).string());
+										if(! fs::exists(xp)) fs::create_directory(xp);
+										CandPlot cp( (xp / (groups[gin] + std::string("_kur_cand.png/png"))).string());
 										cp.Plot(fb.kfils[groups[gin]], fb.kcands[groups[gin]]);	
 								}
 						}
@@ -134,12 +141,14 @@ int main(int ac, char * av[]){
 								// waterfall plot
 								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 										// nokur
-										Waterfall wf( (pdir / (groups[gin] + std::string("_waterfall.png/png"))).string(), timestep, fschanout);
+										if(! fs::exists(xp)) fs::create_directory(xp);
+										Waterfall wf( (xp / (groups[gin] + std::string("_waterfall.png/png"))).string(), timestep, fschanout);
 										wf.Plot(fb.fils[groups[gin]]);	
 								}
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
-										Waterfall wf( (pdir / (groups[gin] + std::string("_kur_waterfall.png/png"))).string(), timestep, fschanout);
+										if(! fs::exists(xp)) fs::create_directory(xp);
+										Waterfall wf( (xp / (groups[gin] + std::string("_kur_waterfall.png/png"))).string(), timestep, fschanout);
 										wf.Plot(fb.kfils[groups[gin]]);	
 								}
 						}
@@ -147,12 +156,14 @@ int main(int ac, char * av[]){
 								// coarse waterfall plot
 								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 										// nokur
-										Waterfall wf( (pdir / (groups[gin] + std::string("_coarse_waterfall.png/png"))).string(), timestep, ctimestep, fschanout);
+										if(! fs::exists(xp)) fs::create_directory(xp);
+										Waterfall wf( (xp / (groups[gin] + std::string("_coarse_waterfall.png/png"))).string(), timestep, ctimestep, fschanout);
 										wf.Plot(fb.fils[groups[gin]]);	
 								}
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
-										Waterfall wf( (pdir / (groups[gin] + std::string("_kur_coarse_waterfall.png/png"))).string(), timestep, ctimestep, fschanout);
+										if(! fs::exists(xp)) fs::create_directory(xp);
+										Waterfall wf( (xp / (groups[gin] + std::string("_kur_coarse_waterfall.png/png"))).string(), timestep, ctimestep, fschanout);
 										wf.Plot(fb.kfils[groups[gin]]);	
 								}
 						}

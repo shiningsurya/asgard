@@ -93,7 +93,7 @@ class CandSummary : protected Plotter {
 						imin = 1e16;
 						imax = -1e16; 
 						tsamp = ts;
-						float fac = 2*1e-2f;
+						fac = 2*1e-2f;
 				}	
 				void Plot(CandidateAntenna& cant) {
 						if(count > 0) cpgpage();
