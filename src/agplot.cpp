@@ -36,7 +36,7 @@ int main(int ac, char * av[]){
 		("cand-directory,c",po::value<StringVector>(&cdirs)->composing(),"Candidate directory")
 		("plot-directory,o",po::value<fs::path>(&pdir), "Plot directory,\nwhere plots will be stored")
 		("group,g", po::value<StringVector>(&groups)->composing(),"Sets the group to use")
-		("xrfi,r", po::value<std::vector<int>>(&rfiflag)->composing(), "0 to use standard\n1 to use kur\n2 to use both");
+		("xrfi,r", po::value<std::vector<int>>(&rfiflag)->composing()->default_value(std::vector<int>{1}, "1"), "0 to use standard\n1 to use kur(default)\n2 to use both");
 		opd.add("group",-1);
 		//
 		double tsamp;
@@ -63,7 +63,7 @@ int main(int ac, char * av[]){
 		try{
 				po::store(po::command_line_parser(ac, av).options(tp).positional(opd).run(), vm);
 				po::notify(vm);
-				if(vm.count("help") || ac == 1) {
+				if(vm.count("help") || ac == 1 || vm.count("plot") == 0) {
 						std::cout << "------------------------------------------------------\n";
 						std::cout << "Asgard::Plot -- agplot\n";
 						std::cout << tp << std::endl;

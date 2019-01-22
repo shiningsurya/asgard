@@ -21,3 +21,10 @@
 -  Machine Learning (RFs + XGBoost) Using Shogun C++
     [ ] After Search strategies
 -  Don't use autotools, use CMAKE. | Low priority
+
+
+-	boost::asio for multicast socket stuff
+		int MulticastSend(const char *ip, int port, const char *message, int length)
+		int openMultiCastSocket(const char *ip, int port)
+		int closeMultiCastSocket(int sock)
+		int MultiCastReceive(int sock, char *message, int maxlen, char *from)
