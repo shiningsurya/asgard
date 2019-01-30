@@ -1,7 +1,6 @@
 #include "asgard.hpp"
 #include "Analyzer.hpp"
-#include "Filterbank.hpp"
-#include "Candidate.hpp"
+#include "Filterbank.hpp" #include "Candidate.hpp"
 #include "FilterbankCandidate.hpp"
 #include "Plotter.hpp"
 
@@ -101,38 +100,40 @@ int main(int ac, char * av[]){
 		// When pasked is less than group size
 		// last options of pasked is copied. 
 		// This is minor convenience and bad practise
+		////
+		std::string strcs("candsummary"), strc("cand"), strwf("waterfall"), strcwf("coarse_waterfall");
 		for(int gin = 0; gin < groups.size(); gin++) {
 				// g = groups[gin]
 				// plot dir is pdir
 				// rfiflag tells if kur, nokur, or both
+				fs::path xp = pdir / groups[gin];
+				fs::path pxp;
 				for(char& pin : pasked[gin]) {
-						fs::path xp = pdir / groups[gin];
+						if(! fs::exists(xp)) fs::create_directory(xp);
 						if(pin == 's') {
 								// candidate summary plot
+								if(! fs::exists(xp / std::string("candsummary"))) fs::create_directory(xp / std::string("candsummary"));
 								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 										// nokur
-										if(! fs::exists(xp)) fs::create_directory(xp);
 										CandSummary cs((xp / (groups[gin] + std::string("_candsummary.png/png"))).string(), tsamp);
 										cs.Plot(fb.cands[groups[gin]]);	
 								}
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
-										if(! fs::exists(xp)) fs::create_directory(xp);
 										CandSummary cs( (xp / (groups[gin] + std::string("_kur_candsummary.png/png"))).string(), tsamp);
 										cs.Plot(fb.kcands[groups[gin]]);	
 								}
 						}
 						else if(pin == 'l') {
 								// candidate plot
+								if(! fs::exists(xp / std::string("cand"))) fs::create_directory(xp / std::string("cand"));
 								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 										// nokur
-										if(! fs::exists(xp)) fs::create_directory(xp);
 										CandPlot cp( (xp / (groups[gin] + std::string("_cand.png/png"))).string());
 										cp.Plot(fb.fils[groups[gin]], fb.cands[groups[gin]]);	
 								}
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
-										if(! fs::exists(xp)) fs::create_directory(xp);
 										CandPlot cp( (xp / (groups[gin] + std::string("_kur_cand.png/png"))).string());
 										cp.Plot(fb.kfils[groups[gin]], fb.kcands[groups[gin]]);	
 								}
@@ -141,13 +142,11 @@ int main(int ac, char * av[]){
 								// waterfall plot
 								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 										// nokur
-										if(! fs::exists(xp)) fs::create_directory(xp);
 										Waterfall wf( (xp / (groups[gin] + std::string("_waterfall.png/png"))).string(), timestep, fschanout);
 										wf.Plot(fb.fils[groups[gin]]);	
 								}
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
-										if(! fs::exists(xp)) fs::create_directory(xp);
 										Waterfall wf( (xp / (groups[gin] + std::string("_kur_waterfall.png/png"))).string(), timestep, fschanout);
 										wf.Plot(fb.kfils[groups[gin]]);	
 								}
@@ -156,13 +155,11 @@ int main(int ac, char * av[]){
 								// coarse waterfall plot
 								if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 										// nokur
-										if(! fs::exists(xp)) fs::create_directory(xp);
 										Waterfall wf( (xp / (groups[gin] + std::string("_coarse_waterfall.png/png"))).string(), timestep, ctimestep, fschanout);
 										wf.Plot(fb.fils[groups[gin]]);	
 								}
 								if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 										// kur
-										if(! fs::exists(xp)) fs::create_directory(xp);
 										Waterfall wf( (xp / (groups[gin] + std::string("_kur_coarse_waterfall.png/png"))).string(), timestep, ctimestep, fschanout);
 										wf.Plot(fb.kfils[groups[gin]]);	
 								}

@@ -7,7 +7,7 @@ int main(int ac, char * av[]) {
 						std::cerr << "Usage: testmc <listen-ip> <listen-port> <mc-ip> <mc-port>\n";
 						return 1;
 				}
-				Multicast mc(av[1], std::atoi(av[2]), av[3], std::atoi(av[4]));
+				Multicast mc(std::string(av[1]), std::atoi(av[2]), std::string(av[3]), std::atoi(av[4]));
 				mc.Receive();
 		}
 		catch(std::exception& e) {
