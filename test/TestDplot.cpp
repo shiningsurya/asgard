@@ -9,6 +9,6 @@ int main() {
 		Filterbank f;
 		fbr.Read(f, fbname);
 		// we have a filterbank
-		xd.Plot(f,0);		
+		xd.Plot(f,1);		
 		return 0;
 }

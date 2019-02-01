@@ -506,10 +506,11 @@ class Waterfall : protected Plotter {
 class DPlot : protected Plotter {
 		private:
 				int nsteps, nchans;
-				timeslice wid, nsamps_out;
+				timeslice widin, wid, nsamps_out;
 				bool ikur;
 				int nchans_out;
 				double timestep;
+				std::string slice_str;
                 FloatVector bins = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f};
 		public:
 				DPlot(std::string fn, float ts, int chout) : nchans(chout), timestep(ts),
@@ -518,12 +519,13 @@ class DPlot : protected Plotter {
 
 						}
 				void Plot(Filterbank& f, int method) {
+						nchans = 1024;
+						wid = 256;
 						// variables
 						float axis[4];
-						FloatVector ft = operations::FreqTable(f);
 						double duration = f.duration;
 						int nsteps;
-						int nchans = f.nchans;
+						int nchansin = f.nchans;
 						excision::xestimate estt, estf;
 						if(timestep == 0.0f) {
 								timestep = duration;
@@ -532,20 +534,31 @@ class DPlot : protected Plotter {
 						else {
 								nsteps = duration/timestep + 1;
 						}
-						wid = timestep / f.tsamp;
+						widin = timestep / f.tsamp;
 						timeslice i0 = 0; // one time initialization
 						// RAII
 						// Resource acquisition is initialization
 						float * dat = new float[wid*nchans];
+						float * datin = new float[widin*nchansin];
 						float * bandshape = new float[nchans];
 						float * timeshape = new float[wid];
 						char *  bandflags = new char[nchans];
 						char * timeflags = new char[wid];
+						float * timex = new float[wid];
+						float * freqx = new float[nchans];
+						float dt = timestep / wid;
+						float ft = f.foff * nchansin / nchans;
+						freqx[nchans-1] = f.fch1;
+						for(int ii = nchans-2; ii >= 0; ii--) freqx[ii] = freqx[ii+1] + ft;
+						tr[3] = freqx[nchans-1]; // fixed
+						tr[2] = (float)f.tsamp * widin / wid;
+						tr[4] = ft;
 						// work loop
 						for(int i = 0; i < nsteps; i++, i0+=wid, count++) {
-								if(count != 0) cpgpage();
+								if(count != 0)break;// cpgpage();
 								// work part
-								f.Unpack(dat, i0, wid);
+								f.Unpack(datin, i0, widin);
+								operations::Crunch(datin, nchansin, widin, nchans, wid, dat);
 								operations::FreqShape(dat, wid, nchans, bandshape);
 								operations::TimeShape(dat, wid, nchans, timeshape);
 								// xrfi part
@@ -561,28 +574,53 @@ class DPlot : protected Plotter {
 								// filterbank
 								axis[0] = i * timestep;
 								axis[1] = axis[0] + timestep;
-								axis[2] = ft.back();
-								axis[3] = ft.front();
+								axis[2] = freqx[0];
+								axis[3] = freqx[nchans-1];
 								cpgsci(1);
 								cpgsvp(0.1, 0.7, 0.1, 0.7);
 								cpgswin(axis[0],axis[1],axis[2],axis[3]);
+								cpgbox("BCNT",0.0,0,"BCTN",20.0,4);
+								cpgsfs(1);
+								cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
+								tr[0] = axis[0];
+								cpgimag(dat, nchans, wid, 1, nchans, 1, wid, 0, 3, tr);
+								cpgmtxt("B",2,0.5,0.5,"Time (s)");
+								cpgmtxt("L",3, 0.5, 0.5, "Freq (Hz)");
 								// bandshape
 								cpgsci(1);
 								cpgsvp(0.7, 0.9, 0.1, 0.7);
-								axis[2] = ft.back();
-								axis[3] = ft.front();
-								axis[0] = -1.0f;
+								axis[2] = freqx[0];
+								axis[3] = freqx[nchans-1];
+								axis[0] = 0.0f;
 								axis[1] = 4.0f;
 								cpgswin(axis[0],axis[1],axis[2],axis[3]);
+								cpgbox("BCM",0.0,0,"BC",30.0,0);
+								cpgline(nchans, bandshape, freqx);
 								// timeshape
 								axis[0] = i * timestep;
 								axis[1] = axis[0] + timestep;
-								axis[2] = -1.0f;
+								axis[2] = 0.0f;
 								axis[3] = 4.0f;
 								cpgsci(1);
 								cpgsvp(0.1, 0.7, 0.7, 0.9);
 								cpgswin(axis[0],axis[1],axis[2],axis[3]);
+								cpgbox("BC",0.0,0,"BCM",0.0,0);
+								cpgmtxt("T",3, 0.5, 0.5, f.group.c_str());
+								cpgmtxt("T",0.5, 0.5, 0.5, f.antenna.c_str());
+								if(f.isKur) cpgmtxt("T",3, 0.8, 0.0, "KUR");
+								else cpgmtxt("T",3, 0.8, 0.0, "NOKUR");
+								slice_str = std::string("Slice:") + std::to_string(i+1) + std::string("/") + std::to_string(nsteps);
+								cpgmtxt("T",3,.0,0.0,slice_str.c_str());   // slice index
+								timex[0] = axis[0];
+								for(int ii = 1; ii < wid; ii++) timex[ii] = axis[ii-1] + dt;
+								cpgline(wid, timex, timeshape);
 						}
+						delete[] dat;
+						delete[] bandshape;
+						delete[] timeshape;
+						delete[] bandflags;
+						delete[] timeflags;
+						delete[] timex;
 				}
 };
 #endif
