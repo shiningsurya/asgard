@@ -512,6 +512,7 @@ class DPlot : protected Plotter {
 				double timestep;
 				std::string slice_str;
                 FloatVector bins = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f};
+                float xlin[2] = {0.0f, 0.0f}, ylin[2] = {0.0f, 0.0f};
 		public:
 				DPlot(std::string fn, float ts, int chout) : nchans(chout), timestep(ts),
 						Plotter(fn) {
@@ -555,7 +556,7 @@ class DPlot : protected Plotter {
 						tr[4] = ft;
 						// work loop
 						for(int i = 0; i < nsteps; i++, i0+=wid, count++) {
-								if(count != 0)break;// cpgpage();
+								if(count != 0) cpgpage();
 								// work part
 								f.Unpack(datin, i0, widin);
 								operations::Crunch(datin, nchansin, widin, nchans, wid, dat);
@@ -596,6 +597,17 @@ class DPlot : protected Plotter {
 								cpgswin(axis[0],axis[1],axis[2],axis[3]);
 								cpgbox("BCM",0.0,0,"BC",30.0,0);
 								cpgline(nchans, bandshape, freqx);
+								// lines in bandshape
+								xlin[0] = axis[0];
+								xlin[1] = axis[1];
+								cpgsci(3);
+								for(int ii = 0; ii < nchans; ii++) {
+										if(bandflags[ii] == 'm' || bandflags[ii] == 'h') {
+												ylin[0] = freqx[ii];
+												ylin[1] = freqx[ii];
+												cpgline(2,xlin,ylin);
+										}
+								}
 								// timeshape
 								axis[0] = i * timestep;
 								axis[1] = axis[0] + timestep;
@@ -612,8 +624,19 @@ class DPlot : protected Plotter {
 								slice_str = std::string("Slice:") + std::to_string(i+1) + std::string("/") + std::to_string(nsteps);
 								cpgmtxt("T",3,.0,0.0,slice_str.c_str());   // slice index
 								timex[0] = axis[0];
-								for(int ii = 1; ii < wid; ii++) timex[ii] = axis[ii-1] + dt;
+								for(int ii = 1; ii < wid; ii++) timex[ii] = timex[ii-1] + dt;
 								cpgline(wid, timex, timeshape);
+								// lines in timeshape
+								ylin[0] = axis[2];
+								ylin[1] = axis[3];
+								cpgsci(3);
+								for(int ii = 0; ii < wid; ii++) {
+										if(timeflags[ii] == 'm' || timeflags[ii] == 'h') {
+												xlin[0] = timex[ii];
+												xlin[1] = timex[ii];
+												cpgline(2,xlin,ylin);
+										}
+								}
 						}
 						delete[] dat;
 						delete[] bandshape;
@@ -621,6 +644,7 @@ class DPlot : protected Plotter {
 						delete[] bandflags;
 						delete[] timeflags;
 						delete[] timex;
+						delete[] freqx;
 				}
 };
 #endif
