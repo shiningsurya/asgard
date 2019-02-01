@@ -8,6 +8,7 @@
 #include <map>
 #include <array>
 #include <utility>
+#include <memory>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
@@ -72,7 +73,8 @@ typedef std::vector<float> FloatVector;
  *                float *  end() { return &p[data -1]; }
  *};
  */
-
+typedef std::unique_ptr<float*> PtrFloatUnique;
+typedef std::unique_ptr<char*> PtrCharUnique;
 typedef std::vector<Filterbank> FilterbankList;
 typedef std::vector<Candidate>  CandidateList;
 //typedef std::vector<std::string> GroupList;

@@ -50,3 +50,5 @@ testcp
 bin
 testcd
 testmc
+test/testdp
+Makefile

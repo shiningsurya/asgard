@@ -2,6 +2,8 @@
 #ifndef OPERATIONS_H
 #define OPERATIONS_H
 namespace operations {
+		void FreqShape(float * in, timeslice nsamps, int nchans, float * out);
+		void TimeShape(float * in, timeslice nsamps, int nchans, float * out);
 		void Fscrunch(float * in, int nchans_in, timeslice nsamps, int nchans_out, float * ret);
 		void Crunch(float * in, const int nchans_in, const timeslice nsamps_in, const int nchans_out, const timeslice nsamps_out, float * ret); 
 	 	FloatVector FreqTable(Filterbank& f);
@@ -9,6 +11,24 @@ namespace operations {
 		std::vector<timeslice> Delays(FloatVector freqs, double dm, double tsamp);
 		FloatVector TimeAxis(float dt, timeslice start, timeslice stop); 
 		auto Delay = [](float f1, float f2, double dm) ->  double {return(4148.741601*((1.0/f1/f1)-(1.0/f2/f2))*dm);};
+}
+void operations::FreqShape(float * in, timeslice nsamps, int nchans, float * out) {
+		for(int ichan = 0; ichan < nchans; ichan++) {
+				out[ichan] = 0.0f;
+				for(timeslice isamp = 0; isamp < nsamps; isamp++) {
+						out[ichan] += in[isamp*nchans + ichan];
+				}
+				out[ichan] /= nsamps;
+		}
+}
+void operations::TimeShape(float * in, timeslice nsamps, int nchans, float * out) {
+		for(timeslice isamp = 0; isamp < nsamps; isamp++) {
+				out[isamp] = 0.0f;
+				for(int ichan = 0; ichan < nchans; ichan++) {
+						out[isamp] += in[isamp*nchans + ichan];
+				}
+				out[isamp] /= nchans;
+		}
 }
 void operations::Crunch(float * in, const int nchans_in, const timeslice nsamps_in, const int nchans_out, const timeslice nsamps_out, float * ret) {
 		// assuming in's and out's are sensible

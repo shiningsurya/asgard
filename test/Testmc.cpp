@@ -3,7 +3,7 @@
 
 int main(int ac, char * av[]) { 
 		try {
-				if(ac != 3) {
+				if(ac != 5) {
 						std::cerr << "Usage: testmc <listen-ip> <listen-port> <mc-ip> <mc-port>\n";
 						return 1;
 				}

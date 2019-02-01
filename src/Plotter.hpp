@@ -1,5 +1,9 @@
 #include "asgard.hpp"
 #include "Operations.hpp"
+#include "Filterbank.hpp"
+#include "Candidate.hpp"
+#include "FilterbankCandidate.hpp"
+#include "xRFI.hpp"
 #ifndef PLOTTER_H
 #define PLOTTER_H
 #include "cpgplot.h"
@@ -496,6 +500,88 @@ class Waterfall : protected Plotter {
 										delete juice;
 								}
 								count++;
+						}
+				}
+};
+class DPlot : protected Plotter {
+		private:
+				int nsteps, nchans;
+				timeslice wid, nsamps_out;
+				bool ikur;
+				int nchans_out;
+				double timestep;
+                FloatVector bins = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f};
+		public:
+				DPlot(std::string fn, float ts, int chout) : nchans(chout), timestep(ts),
+						Plotter(fn) {
+								cpgpap (0.0,0.618); //10.0, width and aspect ratio
+
+						}
+				void Plot(Filterbank& f, int method) {
+						// variables
+						float axis[4];
+						FloatVector ft = operations::FreqTable(f);
+						double duration = f.duration;
+						int nsteps;
+						int nchans = f.nchans;
+						excision::xestimate estt, estf;
+						if(timestep == 0.0f) {
+								timestep = duration;
+								nsteps = 1;
+						}
+						else {
+								nsteps = duration/timestep + 1;
+						}
+						wid = timestep / f.tsamp;
+						timeslice i0 = 0; // one time initialization
+						// RAII
+						// Resource acquisition is initialization
+						float * dat = new float[wid*nchans];
+						float * bandshape = new float[nchans];
+						float * timeshape = new float[wid];
+						char *  bandflags = new char[nchans];
+						char * timeflags = new char[wid];
+						// work loop
+						for(int i = 0; i < nsteps; i++, i0+=wid, count++) {
+								if(count != 0) cpgpage();
+								// work part
+								f.Unpack(dat, i0, wid);
+								operations::FreqShape(dat, wid, nchans, bandshape);
+								operations::TimeShape(dat, wid, nchans, timeshape);
+								// xrfi part
+								if(method == 1) {
+										estf = excision::MAD(bandshape, nchans, bandflags);
+										estt = excision::MAD(timeshape, wid, timeflags);
+								}
+								else if(method == 2) {
+										estf = excision::Histogram(bandshape, nchans, bandflags, bins);
+										estt = excision::Histogram(timeshape, wid, timeflags, bins);
+								}
+								// plot part
+								// filterbank
+								axis[0] = i * timestep;
+								axis[1] = axis[0] + timestep;
+								axis[2] = ft.back();
+								axis[3] = ft.front();
+								cpgsci(1);
+								cpgsvp(0.1, 0.7, 0.1, 0.7);
+								cpgswin(axis[0],axis[1],axis[2],axis[3]);
+								// bandshape
+								cpgsci(1);
+								cpgsvp(0.7, 0.9, 0.1, 0.7);
+								axis[2] = ft.back();
+								axis[3] = ft.front();
+								axis[0] = -1.0f;
+								axis[1] = 4.0f;
+								cpgswin(axis[0],axis[1],axis[2],axis[3]);
+								// timeshape
+								axis[0] = i * timestep;
+								axis[1] = axis[0] + timestep;
+								axis[2] = -1.0f;
+								axis[3] = 4.0f;
+								cpgsci(1);
+								cpgsvp(0.1, 0.7, 0.7, 0.9);
+								cpgswin(axis[0],axis[1],axis[2],axis[3]);
 						}
 				}
 };
