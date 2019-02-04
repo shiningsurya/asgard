@@ -15,8 +15,8 @@
 #include "math.h"
 // Definitions
 #define TSAMP  0.000097
-//#define TROOT "/home/shining/study/MS/vLITE/mkerr"
-#define TROOT "/home/shining/mega/vLITE-data/R20"
+#define TROOT "/home/shining/study/MS/vLITE/mkerr"
+//#define TROOT "/home/shining/mega/vLITE-data/R20"
 #define TGROUP "20181213_015843_muos"
 // namespace
 namespace fs = boost::filesystem;
@@ -74,6 +74,7 @@ typedef std::vector<float> FloatVector;
  *};
  */
 typedef std::unique_ptr<float*> PtrFloatUnique;
+typedef float* PtrFloat;
 typedef std::unique_ptr<char*> PtrCharUnique;
 typedef std::vector<Filterbank> FilterbankList;
 typedef std::vector<Candidate>  CandidateList;

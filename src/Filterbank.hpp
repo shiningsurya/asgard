@@ -18,7 +18,7 @@
 #define LO2BITS 3
 namespace bios = boost::iostreams;
 //#include <fstream>
-typedef long unsigned int timeslice;
+//typedef long unsigned int timeslice;
 class Filterbank {
 		public:
 				Filterbank() {
@@ -287,5 +287,89 @@ class FilterbankReader {
 						return totalbytes;
 				}
 
+};
+
+class FilterbankWriter {
+		private:
+				unsigned char A, B, C, D, ucval;
+				timeslice nsamps;
+				int nchans;
+				float fval;
+				FILE * outputfile;
+				void _copy_fbdata(PtrFloat ret) {
+						timeslice datasamps = nsamps*nchans;
+						for(timeslice i = 0; i < datasamps; i++) {
+								fval = ret[i];
+								A = (unsigned char)(fval)&0x3;
+								B = (unsigned char)(fval)&0x3 << 2;
+								C = (unsigned char)(fval)&0x3 << 4;
+								D = (unsigned char)(fval)&0x3 << 6;
+								ucval = A|B|C|D;	
+								fwrite(&ucval, sizeof(ucval), 1, outputfile);
+						}
+				}
+				void _copy_header(Filterbank& from) {
+						send_string("HEADER_START");
+						send_string("source_name");
+						send_string(from.source_name);
+						send_double("src_raj",from.src_raj);
+						send_double("src_dej",from.src_dej);
+						send_int("telescope_id",from.telescope_id);
+						send_int("data_type",from.data_type);
+						send_double("fch1",from.fch1);
+						send_double("foff",from.foff);
+						send_int("nchans",from.nchans);
+						send_int("nbits",from.nbits);
+						send_double("tstart",from.tstart);
+						send_double("tsamp",from.tsamp);
+						send_int("nifs",from.nifs);
+						send_int("barycentric", 1);
+						send_string("HEADER_END");
+				}
+				void send_string(const std::string str) {
+						int len = str.length();
+						fwrite(&len, sizeof(int), 1, outputfile);
+						fwrite(str.c_str(), sizeof(char), len, outputfile);
+				}
+				void send_string(const char * str) {
+						int len = strlen(str);
+						fwrite(&len, sizeof(int), 1, outputfile);
+						fwrite(str, sizeof(char), len, outputfile);
+				}
+				void send_float(const char *name, const float ft) {
+						send_string(name);
+						fwrite(&ft,sizeof(float),1,outputfile);
+				}
+				void send_double (const char *name, const double db) {
+						send_string(name);
+						fwrite(&db,sizeof(double),1,outputfile);
+				}
+				void send_int(const char *name, const int integer) {
+						send_string(name);
+						fwrite(&integer,sizeof(int),1,outputfile);
+				}
+				void send_char(const char *name, const char ch) {
+						send_string(name);
+						fwrite(&ch,sizeof(char),1,outputfile);
+				}
+				void send_long(const char *name, const long lin)  {
+						send_string(name);
+						fwrite(&lin,sizeof(long),1,outputfile);
+				}
+		public:
+				FilterbankWriter() {
+						// chill empty initialization
+				}
+				int Write(std::string filename, Filterbank& takeHeader, PtrFloat fbdata) {
+						// 
+						outputfile = fopen(filename.c_str(),"wb");
+						// copy header
+						_copy_header(takeHeader);
+						nchans = takeHeader.nchans;
+						nsamps = takeHeader.totalsamp;
+						_copy_fbdata(fbdata);
+						fclose(outputfile);
+						return 0;
+				}
 };
 #endif
