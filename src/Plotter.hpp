@@ -555,7 +555,7 @@ class DPlot : protected Plotter {
 						tr[2] = (float)f.tsamp * widin / wid;
 						tr[4] = ft;
 						// work loop
-						for(int i = 0; i < nsteps; i++, i0+=wid, count++) {
+						for(int i = 0; i < nsteps; i++, i0+=widin, count++) {
 								if(count != 0) cpgpage();
 								// work part
 								f.Unpack(datin, i0, widin);

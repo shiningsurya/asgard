@@ -292,23 +292,33 @@ class FilterbankReader {
 class FilterbankWriter {
 		private:
 				unsigned char A, B, C, D, ucval;
-				timeslice nsamps;
-				int nchans;
-				float fval;
-				FILE * outputfile;
-				void _copy_fbdata(PtrFloat ret) {
-						timeslice datasamps = nsamps*nchans;
-						for(timeslice i = 0; i < datasamps; i++) {
-								fval = ret[i];
-								A = (unsigned char)(fval)&0x3;
-								B = (unsigned char)(fval)&0x3 << 2;
-								C = (unsigned char)(fval)&0x3 << 4;
-								D = (unsigned char)(fval)&0x3 << 6;
+				int ival;
+				char * dd;
+				bios::mapped_file_sink fbdata;
+				timeslice it;
+				void _copy_fbdata(PtrFloat ret, timeslice datasamps) {
+						for(timeslice i = 0; i < datasamps;) {
+								ival = static_cast<int>(ret[i++]);
+								A = (unsigned char) ival & 0x03 << 6;
+								ival = static_cast<int>(ret[i++]);
+								B = (unsigned char) ival & 0x03 << 4;
+								ival = static_cast<int>(ret[i++]);
+								C = (unsigned char) ival & 0x03 << 2;
+								ival = static_cast<int>(ret[i++]);
+								D = (unsigned char) ival & 0x03 << 0;
+								//
+								//A = (unsigned char) ret[i++] & 0x03;
+								//B = (unsigned char) ret[i++] & 0x03 << 2;
+								//C = (unsigned char) ret[i++] & 0x03 << 4;
+								//D = (unsigned char) ret[i++] & 0x03 << 6;
 								ucval = A|B|C|D;	
-								fwrite(&ucval, sizeof(ucval), 1, outputfile);
+								dd[it++] = ucval;
 						}
 				}
-				void _copy_header(Filterbank& from) {
+				void _copy_header(Filterbank& from, double tst) {
+						it = 0;
+						dd = fbdata.data();
+						// ^ initializes 
 						send_string("HEADER_START");
 						send_string("source_name");
 						send_string(from.source_name);
@@ -320,56 +330,63 @@ class FilterbankWriter {
 						send_double("foff",from.foff);
 						send_int("nchans",from.nchans);
 						send_int("nbits",from.nbits);
-						send_double("tstart",from.tstart);
+						send_double("tstart",tst);
 						send_double("tsamp",from.tsamp);
 						send_int("nifs",from.nifs);
 						send_int("barycentric", 1);
 						send_string("HEADER_END");
 				}
+				void fdwrite( const void* ddd, int size, int num,  char* idd ) {
+						//std::copy(ddd, ddd + size*num, idd);
+						std::size_t sn = size * num;
+						std::memcpy(idd + it, ddd, sn);
+						it += sn;
+				}
 				void send_string(const std::string str) {
 						int len = str.length();
-						fwrite(&len, sizeof(int), 1, outputfile);
-						fwrite(str.c_str(), sizeof(char), len, outputfile);
+						fdwrite(&len, sizeof(int), 1, dd);
+						fdwrite(str.c_str(), sizeof(char), len, dd);
 				}
 				void send_string(const char * str) {
 						int len = strlen(str);
-						fwrite(&len, sizeof(int), 1, outputfile);
-						fwrite(str, sizeof(char), len, outputfile);
-				}
-				void send_float(const char *name, const float ft) {
-						send_string(name);
-						fwrite(&ft,sizeof(float),1,outputfile);
+						fdwrite(&len, sizeof(int), 1, dd);
+						fdwrite(str, sizeof(char), len, dd);
 				}
 				void send_double (const char *name, const double db) {
 						send_string(name);
-						fwrite(&db,sizeof(double),1,outputfile);
+						fdwrite(&db,sizeof(double),1,dd);
 				}
 				void send_int(const char *name, const int integer) {
 						send_string(name);
-						fwrite(&integer,sizeof(int),1,outputfile);
-				}
-				void send_char(const char *name, const char ch) {
-						send_string(name);
-						fwrite(&ch,sizeof(char),1,outputfile);
-				}
-				void send_long(const char *name, const long lin)  {
-						send_string(name);
-						fwrite(&lin,sizeof(long),1,outputfile);
+						fdwrite(&integer,sizeof(int),1,dd);
 				}
 		public:
 				FilterbankWriter() {
 						// chill empty initialization
 				}
-				int Write(std::string filename, Filterbank& takeHeader, PtrFloat fbdata) {
-						// 
-						outputfile = fopen(filename.c_str(),"wb");
+				timeslice Initialize(std::string fname, Filterbank& takeHeader, float dur, float tstrt) {
+						// dur is the length
+						// tstrt is the starting time
+						// take headers from f and account for dur and tstrt
+						//
+						//outputfile = fopen(fname.c_str(),"wb");
+						std::size_t flength = takeHeader.headersize + (dur/takeHeader.tsamp*takeHeader.nchans);
+						bios::mapped_file_params param;
+						param.path = fname;
+						param.new_file_size = flength;
+						param.flags = bios::mapped_file::mapmode::readwrite;
+						fbdata.open(param);	
 						// copy header
-						_copy_header(takeHeader);
-						nchans = takeHeader.nchans;
-						nsamps = takeHeader.totalsamp;
-						_copy_fbdata(fbdata);
-						fclose(outputfile);
-						return 0;
+						_copy_header(takeHeader, (double)tstrt);
+						return it;
+				}
+				void WriteFBdata(PtrFloat da, timeslice ib, timeslice datasamps) {
+						if(it != ib) std::cerr << "Writing non-aligned FB data\n";
+						_copy_fbdata(da, datasamps);
+				}
+				void Close() {
+						// close the mmap file here
+						fbdata.close();
 				}
 };
 #endif
