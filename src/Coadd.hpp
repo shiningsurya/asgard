@@ -41,10 +41,10 @@ class Coadd {
 										if(currTime < f.duration && currTime >= (f.tstart - mintstart) ) {  
 												f.Unpack(fbdat, i0, tstep);
 												NumAnt++;
-										}
-										for(timeslice j = 0; j < tdat_size; j++) {
-												tdat[j] += fbdat[j]; 
-												fbdat[j] = 0.0f;
+												for(timeslice j = 0; j < tdat_size; j++) {
+														tdat[j] += fbdat[j]; 
+														fbdat[j] = 0.0f;
+												}
 										}
 								}
 								for(timeslice j = 0; j < tdat_size; j++) {

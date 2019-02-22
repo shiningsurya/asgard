@@ -293,19 +293,19 @@ class FilterbankWriter {
 		private:
 				unsigned char A, B, C, D, ucval;
 				int ival;
-				char * dd;
+				unsigned char * dd;
 				bios::mapped_file_sink fbdata;
 				timeslice it;
 				void _copy_fbdata(PtrFloat ret, timeslice datasamps) {
 						for(timeslice i = 0; i < datasamps;) {
 								ival = static_cast<int>(ret[i++]);
-								A = (unsigned char) ival & 0x03 << 6;
+								A = (unsigned char) (ival & 0x03) << 6;
 								ival = static_cast<int>(ret[i++]);
-								B = (unsigned char) ival & 0x03 << 4;
+								B = (unsigned char) (ival & 0x03) << 4;
 								ival = static_cast<int>(ret[i++]);
-								C = (unsigned char) ival & 0x03 << 2;
+								C = (unsigned char) (ival & 0x03) << 2;
 								ival = static_cast<int>(ret[i++]);
-								D = (unsigned char) ival & 0x03 << 0;
+								D = (unsigned char) (ival & 0x03) << 0;
 								//
 								//A = (unsigned char) ret[i++] & 0x03;
 								//B = (unsigned char) ret[i++] & 0x03 << 2;
@@ -317,7 +317,7 @@ class FilterbankWriter {
 				}
 				void _copy_header(Filterbank& from, double tst) {
 						it = 0;
-						dd = fbdata.data();
+						dd = (unsigned char*)fbdata.data();
 						// ^ initializes 
 						send_string("HEADER_START");
 						send_string("source_name");
@@ -336,7 +336,7 @@ class FilterbankWriter {
 						send_int("barycentric", 1);
 						send_string("HEADER_END");
 				}
-				void fdwrite( const void* ddd, int size, int num,  char* idd ) {
+				void fdwrite( const void* ddd, int size, int num,  unsigned char* idd ) {
 						//std::copy(ddd, ddd + size*num, idd);
 						std::size_t sn = size * num;
 						std::memcpy(idd + it, ddd, sn);
@@ -370,7 +370,8 @@ class FilterbankWriter {
 						// take headers from f and account for dur and tstrt
 						//
 						//outputfile = fopen(fname.c_str(),"wb");
-						std::size_t flength = takeHeader.headersize + (dur/takeHeader.tsamp*takeHeader.nchans);
+						std::size_t flength = takeHeader.headersize + (dur/takeHeader.tsamp *takeHeader.nchans)/4;
+						// by 4 because one byte yields 4 samples
 						bios::mapped_file_params param;
 						param.path = fname;
 						param.new_file_size = flength;
