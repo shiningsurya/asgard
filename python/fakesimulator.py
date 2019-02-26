@@ -10,8 +10,8 @@ import numpy as np
 import subprocess as sp
 import tqdm
 ##### USER IO #####
-sig = '9876' # signature
-Ndm = 10
+sig = '6543' # signature
+Ndm = 1
 Nw  = 10
 Nsp = 10
 cmd = ['fake']

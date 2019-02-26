@@ -5,6 +5,22 @@
 #define COADD_H
 #include "Filterbank.hpp"
 
+FilterbankList FLFromDE(DEList& x) {
+		FilterbankList ret;
+		FilterbankReader fbr;
+		for(fs::directory_entry& de : x) {
+				Filterbank xx;
+				fbr.Read(xx, de.path().string()); 
+				ret.push_back(xx);
+		}
+		return ret;
+		// I would like to take time to tell you that
+		// I took 10 mins into debugging why this function was 
+		// going haywire.
+		// And the reason is self explanatory:
+		// I forgot "return ret"
+}
+
 class Coadd {
 		private:
 				//std::string method("MAD");
@@ -69,6 +85,11 @@ class Coadd {
 				}
 				Coadd() {
 						returnFil = false;
+				}
+				void Work(DEList& x) {
+						FilterbankList fl; 
+						fl = FLFromDE(x);
+						Work( fl );
 				}
 				void Work(FilterbankList& fl) {
 						// compute max duration here

@@ -1,6 +1,7 @@
 #include "asgard.hpp"
 #include "Analyzer.hpp"
-#include "Filterbank.hpp" #include "Candidate.hpp"
+#include "Filterbank.hpp" 
+#include "Candidate.hpp"
 #include "FilterbankCandidate.hpp"
 #include "Plotter.hpp"
 

@@ -1,0 +1,92 @@
+#include "asgard.hpp"
+#include "Analyzer.hpp"
+#include "Filterbank.hpp"
+#include "Coadd.hpp"
+// CLI stuff
+#include<boost/program_options/cmdline.hpp>
+#include<boost/program_options/config.hpp>
+#include<boost/program_options/environment_iterator.hpp>
+#include<boost/program_options/option.hpp>
+#include<boost/program_options/options_description.hpp>
+#include<boost/program_options/parsers.hpp>
+#include<boost/program_options/positional_options.hpp>
+#include<boost/program_options/variables_map.hpp>
+
+namespace po = boost::program_options;
+
+int main(int ac, char * av[]) {
+		StringVector fdirs, groups;
+		fs::path pdir;
+		int xrfichoice;
+		std::vector<int> rfiflag;
+		//
+		po::variables_map vm;
+		po::options_description opt("Options");
+		po::positional_options_description opd;
+		opt.add_options()
+		("help,h","Prints help")
+		("rfi-help,H","Prints RFI Excision help")
+		("fil-directories,f",po::value<StringVector>(&fdirs)->composing(),"Filterbank directory")
+		("group,g", po::value<StringVector>(&groups)->composing(),
+		 "Sets the group to use.\n"
+		 "If option not given, all the groups found\n"
+		 "while crawling will be used."
+		)
+		("rfi-excision,x", po::value<int>(&xrfichoice)->default_value(0), 
+		 "0 : no RFI-excision\n"
+		 "1 : MAD based RFI-excision\n"
+		 "2 : Histogram based RFI-excision"
+		)
+		("xrfi,r", po::value<std::vector<int>>(&rfiflag)->composing()->default_value(std::vector<int>{1}, "1"), "0 to use standard\n1 to use kur(default)\n2 to use both");
+		opd.add("group",-1);
+		po::options_description xopt("xRFI options");
+		float mad_tfac, mad_ffac;
+		float hist_tfac, hist_ffac;
+		xopt.add_options()
+		("MAD_TFAC", po::value<float>(&mad_tfac)->default_value(1.0f),"Multiplicative factor for Time flagging.")
+		("MAD_FFAC", po::value<float>(&mad_ffac)->default_value(1.0f),"Multiplicative factor for Freq flagging.")
+		("HIST_TFAC", po::value<float>(&hist_tfac)->default_value(1.0f),"Multiplicative factor for Time flagging.")
+		("HIST_FFAC", po::value<float>(&hist_ffac)->default_value(1.0f),"Multiplicative factor for Freq flagging.");
+		///
+		po::options_description mainopt;
+		mainopt.add(opt).add(xopt);
+		//
+		try{
+				po::store(po::command_line_parser(ac, av).options(mainopt).positional(opd).run(), vm);
+				po::notify(vm);
+				if(ac == 1 ||  vm.count("groups") != 0 ) {
+						std::cout << "------------------------------------------------------\n";
+						std::cout << "Asgard::Coadd -- agcodd\n";
+						if(vm.count("help")) std::cout << opt << std::endl;
+						if(vm.count("rfi-help")) std::cout << xopt << std::endl;
+						return 0;
+				}
+		}
+		catch(std::exception& e) {
+				std::cerr << "Error in asgard main: " << e.what() << std::endl;
+				return 1;
+		}
+		catch(...) {
+				std::cerr << "Exception of unknown type! " << std::endl;
+				return 1;
+		}
+		//
+		AnalyzeFB fb;
+		for(auto& fd : fdirs) fb.Crawl(fd);
+		std::string fn, ea0k("_ea00_kur.fil"), ea0("_ea00.fil");
+		for(int gin = 0; gin < groups.size(); gin++) {
+				if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
+						// nokur
+						fn = groups[gin] + ea0;
+						Coadd wf(fn);
+						wf.Work(fb.fils[groups[gin]]);	
+				}
+				if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
+						// kur
+						fn = groups[gin] + ea0k;
+						Coadd wf(fn);
+						wf.Work(fb.kfils[groups[gin]]);	
+				}
+		}
+		return 0;
+}
