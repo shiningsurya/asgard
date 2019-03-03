@@ -51,6 +51,6 @@ bin
 testcd
 testmc
 test/testdp
-Makefile
 test/testco
 test/testwl
+Makefile.inc

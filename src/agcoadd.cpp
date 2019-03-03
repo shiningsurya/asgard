@@ -16,7 +16,7 @@ namespace po = boost::program_options;
 
 int main(int ac, char * av[]) {
 		StringVector fdirs, groups;
-		fs::path pdir;
+		fs::path odir;
 		int xrfichoice;
 		std::vector<int> rfiflag;
 		//
@@ -24,29 +24,29 @@ int main(int ac, char * av[]) {
 		po::options_description opt("Options");
 		po::positional_options_description opd;
 		opt.add_options()
-		("help,h","Prints help")
-		("rfi-help,H","Prints RFI Excision help")
-		("fil-directories,f",po::value<StringVector>(&fdirs)->composing(),"Filterbank directory")
-		("group,g", po::value<StringVector>(&groups)->composing(),
-		 "Sets the group to use.\n"
-		 "If option not given, all the groups found\n"
-		 "while crawling will be used."
-		)
-		("rfi-excision,x", po::value<int>(&xrfichoice)->default_value(0), 
-		 "0 : no RFI-excision\n"
-		 "1 : MAD based RFI-excision\n"
-		 "2 : Histogram based RFI-excision"
-		)
-		("xrfi,r", po::value<std::vector<int>>(&rfiflag)->composing()->default_value(std::vector<int>{1}, "1"), "0 to use standard\n1 to use kur(default)\n2 to use both");
+				("help,h","Prints help")
+				("rfi-help,H","Prints RFI Excision help")
+				("fil-directories,f",po::value<StringVector>(&fdirs)->composing(),"Filterbank directory")
+				("out-directory,o",po::value<fs::path>(&odir), "Directory where coadded files will be written.")
+				("group,g", po::value<StringVector>(&groups)->composing(),
+				 "Sets the group to use.\n"
+				 "If option not given, all the groups found\n"
+				 "while crawling will be used."
+				)
+				("rfi-excision,x", po::value<int>(&xrfichoice)->default_value(0), 
+				 "0 : no RFI-excision\n"
+				 "1 : MAD based RFI-excision\n"
+				 "2 : Histogram based RFI-excision"
+				)
+				("xrfi,r", po::value<std::vector<int>>(&rfiflag)->composing()->default_value(std::vector<int>{1}, "1"), "0 to use standard\n1 to use kur(default)\n2 to use both");
 		opd.add("group",-1);
 		po::options_description xopt("xRFI options");
-		float mad_tfac, mad_ffac;
-		float hist_tfac, hist_ffac;
+		float tfac, ffac;
+		float loadsecs;
 		xopt.add_options()
-		("MAD_TFAC", po::value<float>(&mad_tfac)->default_value(1.0f),"Multiplicative factor for Time flagging.")
-		("MAD_FFAC", po::value<float>(&mad_ffac)->default_value(1.0f),"Multiplicative factor for Freq flagging.")
-		("HIST_TFAC", po::value<float>(&hist_tfac)->default_value(1.0f),"Multiplicative factor for Time flagging.")
-		("HIST_FFAC", po::value<float>(&hist_ffac)->default_value(1.0f),"Multiplicative factor for Freq flagging.");
+				("load-secs", po::value<float>(&loadsecs)->default_value(2.0f), "Step size for RFI excision.")
+				("TFAC", po::value<float>(&tfac)->default_value(1.0f),"Multiplicative factor for Time flagging.")
+				("FFAC", po::value<float>(&ffac)->default_value(1.0f),"Multiplicative factor for Freq flagging.");
 		///
 		po::options_description mainopt;
 		mainopt.add(opt).add(xopt);
@@ -54,7 +54,7 @@ int main(int ac, char * av[]) {
 		try{
 				po::store(po::command_line_parser(ac, av).options(mainopt).positional(opd).run(), vm);
 				po::notify(vm);
-				if(ac == 1 ||  vm.count("groups") != 0 ) {
+				if(ac == 1 ||  vm.count("group") == 0 || vm.count("help") || vm.count("rfi-help")) {
 						std::cout << "------------------------------------------------------\n";
 						std::cout << "Asgard::Coadd -- agcodd\n";
 						if(vm.count("help")) std::cout << opt << std::endl;
@@ -78,14 +78,26 @@ int main(int ac, char * av[]) {
 				if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 						// nokur
 						fn = groups[gin] + ea0;
-						Coadd wf(fn);
-						wf.Work(fb.fils[groups[gin]]);	
+						if(xrfichoice) {
+								Coadd wf(fn, loadsecs, tfac, ffac, xrfichoice);
+								wf.coadd(fb.kfils[groups[gin]]);	
+						}
+						else {
+								Coadd wf(fn, loadsecs);
+								wf.coadd(fb.kfils[groups[gin]]);	
+						}
 				}
 				if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 						// kur
 						fn = groups[gin] + ea0k;
-						Coadd wf(fn);
-						wf.Work(fb.kfils[groups[gin]]);	
+						if(xrfichoice) {
+								Coadd wf(fn, loadsecs, tfac, ffac, xrfichoice);
+								wf.coadd(fb.kfils[groups[gin]]);	
+						}
+						else {
+								Coadd wf(fn, loadsecs);
+								wf.coadd(fb.kfils[groups[gin]]);	
+						}
 				}
 		}
 		return 0;

@@ -53,19 +53,25 @@ class Candidate(object):
     def __str__(self):
         return 'i0=%d i1=%d w=%.2f sn=%.2f dm=%.2f'%(self.i0,self.i1,self.width*1000,self.sn,self.dm)
 
-def ReadCandidates(filename):
+def ReadCandidates(filename, metadata=False):
     # given filename read all the candidates
-    toks = filename.strip().split("/")[-1]
-    toks = toks.split("_")
-    gro = toks[0] + "_" + toks[1] + "_" + toks[2] + "_"
+    if metadata:
+        toks = filename.strip().split("/")[-1]
+        toks = toks.split("_")
+        gro = toks[0] + "_" + toks[1] + "_" + toks[2] + "_"
+        ant = toks[3]
+    else:
+        gro = 'No-metadata'
+        ant = 'No-metadata'
     ret = []
     with open(filename, 'r') as f:
         for line in f:
             try:
-                ret.append( Candidate(line, ant=toks[3], gr=gro) )
+                ret.append( Candidate(line, ant=ant, gr=gro) )
             except IndexError:
                 print "Error in Reading Candidates from file:", filename.strip().split("/")[-1]
     return ret
+
 class FilCandidate(Candidate):
 
     def __init__(self,fil,line):

@@ -3,17 +3,18 @@ Fake simulator | Asgard
 
 Python program to generate fake pulsar observations according to a distribution.
 
-TODO
+TODO optimize it
+TODO provide multiprocessing support
 
 '''
 import numpy as np
 import subprocess as sp
 import tqdm
 ##### USER IO #####
-sig = '6543' # signature
-Ndm = 1
-Nw  = 10
-Nsp = 10
+sig = '5000' # signature
+Ndm = 10
+Nw  = 5
+Nsp = 5 
 cmd = ['fake']
 ldm      = np.random.uniform(400, 1000, (Ndm,))
 lwidth   = np.random.randint(1, 10, (Nw,))
@@ -50,8 +51,13 @@ def AddArgument(cmd, argp, argv):
         cmd = cmd + argv
     elif isinstance(cmd, list):
         st = '-'+argp
-        cmd.append(st)
-        cmd.append(str(argv))
+        if st in cmd:
+            # if already there, func updates
+            idx = cmd.index(st)
+            cmd[idx+1] = str(argv)
+        else:
+            cmd.append(st)
+            cmd.append(str(argv))
 ##
 def Execute(cmd, sgs):
     for k, v in sgs.iteritems():
@@ -90,19 +96,23 @@ sparams = ['tobs']
 
 Execute(cmd, sargs)
 idx = 0
+didx = 0
 header = ''
 pb = tqdm.tqdm(desc='Number of fils', total=lidx.size)
 for d in ldm:
     AddArgument(cmd, 'dm', d)
-    tab[idx, 0] = d
+    didx = idx + (Nw*Nsp*len(ltobs))
+    tab[idx:didx, 0] = d
     header = header + 'DM' + ', '
     for w in lwidth:
         AddArgument(cmd, 'width', w)
-        tab[idx, 1] = w
+        didx = idx + (Nsp*len(ltobs))
+        tab[idx:didx, 1] = w
         header = header + 'Width' + ', '
         for s in lsnrpeak:
             AddArgument(cmd, 'snrpeak', s)
-            tab[idx, 2] = s
+            didx = idx + (len(ltobs))
+            tab[idx:didx, 2] = s
             header = header + 'SN' + ', '
             for t in ltobs:
                 AddArgument(cmd, 'tobs', t)
@@ -115,7 +125,7 @@ for d in ldm:
                 idx = idx + 1
                 # execute
                 with open(fn,'wb') as fout:
-                    sp.Popen(cmd, stdout=fout)
+                    sp.call(cmd, stdout=fout)
                     pb.update()
 ## write db
 np.save('fakes_dm_width_sn_idx'+sig+'.npy', tab) 

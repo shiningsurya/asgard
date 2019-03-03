@@ -12,7 +12,7 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
-#include "math.h"
+#include <cmath>
 // Definitions
 #define TSAMP  0.000097
 #define TROOT "/home/shining/study/MS/vLITE/mkerr"

@@ -2,8 +2,6 @@
 #include "Operations.hpp"
 #ifndef XRFI_H
 #define XRFI_H
-#define MAD_RMS_FAC 1.0f
-#define HIST_RMS_FAC 1.0f
 namespace excision {
 		struct xestimate {
 				float CentralTendency;
@@ -11,7 +9,7 @@ namespace excision {
 				float rmsfac;
 				bool isMad, isHist;
 		};
-		struct xestimate  MAD(float * in, timeslice length, char * flag) {
+		struct xestimate  MAD(float * in, timeslice length, char * flag, float fac) {
 				// Median Absolute Deviation
 				float median, rms;
 				int hlen= length / 2;
@@ -35,21 +33,21 @@ namespace excision {
 						rms = tin[hlen];
 				rms *= 1.4826;
 				// flagging
-				float cutoff = rms * MAD_RMS_FAC;
+				float cutoff = rms * fac;
 				for(timeslice i = 0; i < length; i++)
 						if( fabs(in[i] - median) > cutoff )
-								flag[i] = 'm';
+								flag[i] = 'o';
 						else
-								flag[i] = 'u';
+								flag[i] = 'c';
 				struct xestimate ret;
 				ret.CentralTendency = median;
 				ret.rms = rms;
-				ret.rmsfac = MAD_RMS_FAC;
+				ret.rmsfac = fac;
 				ret.isMad = true;
 				ret.isHist = false;
 				return ret;
 		}
-		struct xestimate  Histogram(float * in, timeslice length, char * flag, FloatVector& bins) {
+		struct xestimate  Histogram(float * in, timeslice length, char * flag, FloatVector& bins, float fac) {
 				// Histogram
 				float mode, hmode, rms;
 				timeslice modepoint, fwhm_1, fwhm_2;
@@ -79,16 +77,16 @@ namespace excision {
 				// rms
 				rms = (fwhm_2 - fwhm_1) * bstep / 2.355;
 				// flagging
-				float cutoff = rms * HIST_RMS_FAC;
+				float cutoff = rms * fac;
 				for(timeslice i = 0; i < length; i++)
 						if( fabs(in[i] - mode) > cutoff )
-								flag[i] = 'h';
+								flag[i] = 'o';
 						else
-								flag[i] = 'n';
+								flag[i] = 'c';
 				struct xestimate ret;
 				ret.CentralTendency = mode;
 				ret.rms = rms;
-				ret.rmsfac = HIST_RMS_FAC;
+				ret.rmsfac = fac;
 				ret.isMad = false;
 				ret.isHist = true;
 				return ret;
