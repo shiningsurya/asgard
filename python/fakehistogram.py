@@ -42,4 +42,4 @@ if args.detection:
     sec2samp = 1/tsamp
     for ixc, ix in enumerate(cands):
         ci0 = np.array( [c.i0 for c in ix]  )
-        ti0 = np.arange(0, 100.0/sec2samp, 1.0/sec2samp)
+        ti0 = np.arange(0.5/sec2samp, 100.0/sec2samp, 1.0/sec2samp)

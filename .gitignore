@@ -50,6 +50,7 @@ testcp
 bin
 testcd
 testmc
+Makefile.inc
 test/testdp
 test/testco
 test/testwl
