@@ -55,3 +55,6 @@ test/testdp
 test/testco
 test/testwl
 Makefile.inc
+tags
+test/test
+test/testcompi

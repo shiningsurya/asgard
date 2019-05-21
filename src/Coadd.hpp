@@ -5,6 +5,7 @@
 #define COADD_H
 #include "Filterbank.hpp"
 #include "xRFI.hpp"
+#include "Group.hpp"
 
 FilterbankList FLFromDE(DEList& x) {
 		FilterbankList ret;
@@ -171,4 +172,146 @@ class Coadd {
 						if(!timeflags) delete[] timeshape;
 				}
 };
+
+#ifdef MPI
+#include "Group.hpp"
+#include "Analyzer.hpp"
+#include <boost/mpi/environment.hpp>
+#include <boost/mpi/communicator.hpp>
+#include <boost/mpi/collectives.hpp>
+#include <boost/mpi/operations.hpp>
+struct CoaddMPI_Params {
+		bool same_for_all;
+		StringVector rootpath;
+		std::string outfile;
+		std::string group_string;
+		float loadsecs;
+		bool kur;
+};
+namespace mpi = boost::mpi;
+/****
+ *	An assumption is at play here.
+ *	I am assuming that MPI coaddition is run from any vlite-difx* nodes.
+ *  and not from vlite-nrl.
+ *  This is by design of MPI. "in_value".
+ *  One workaround for future would be to use 
+ *  zero'd array as inptr on vlite-nrl
+ * */
+class CoaddMPI {
+		private:
+				std::string filename;
+				FilterbankWriter fbw;
+				FilterbankReader fbr;
+				mpi::environment env;
+				mpi::communicator world;
+				int root;
+				void work_one_group(const CoaddMPI_Params& param) {
+						// name resolution
+						PathList pl;
+						std::string ifile;
+						AnalyzeFB afb;	
+						if(param.same_for_all) afb.Crawl(param.rootpath[0]);
+						else afb.Crawl(param.rootpath[ world.rank() ]);
+						// TODO process slave affinity
+						if(param.kur) pl = afb.kfils[param.group_string];
+						else pl = afb.fils[param.group_string];
+						// assert(pl.size() == 1); // disabled during debug
+						//ifile = pl[0].string();
+						ifile = pl[world.rank()].string();
+						std::cout << " I  " << world.rank() << " working  " << ifile << std::endl;
+						// coadd variables
+						double mintstart, tsamp, maxtstop, tstop, duration;
+						DoubleVector tstarts, tstops;
+						timeslice nsteps, numelems, boundcheck, i0, tstep;
+						PtrFloat inptr = nullptr, outptr = nullptr;
+						double timenow;
+						bool inptr_all_zeros = false;
+						// read filterbank into f
+						Filterbank f;
+						fbr.Read(f, ifile);
+						tstop = f.tstart + f.duration;
+						// figure out start time and duration
+						// open-mpi docs say that order is guaranteed
+						// therefore no need to make pair
+						mpi::all_reduce(world, f.tstart, mintstart, mpi::minimum<double>());
+						mpi::all_reduce(world, tstop, maxtstop, mpi::maximum<double>());
+						mpi::gather(world, f.tstart, tstarts, root);
+						mpi::gather(world, tstop, tstops, root);
+						duration = maxtstop - mintstart;
+						// offset .. tsteps later when filterbank starts
+						timeslice offset;
+						offset = std::ceil( ( f.tstart - mintstart ) / param.loadsecs  );
+						// write fb header logic
+						if(world.rank() == root) {
+								boundcheck = fbw.Initialize(param.outfile, f,  duration, mintstart);
+						}
+						// figure out tstep(width)
+						tstep = param.loadsecs / f.tsamp;				
+						numelems = tstep * f.nchans;
+						nsteps = duration / param.loadsecs;
+						// initialize stuff
+						inptr = new float[numelems]();
+						if(world.rank() == root) outptr = new float[numelems]();
+						inptr_all_zeros = true;
+						timenow = 0.0;
+						i0 = 0;
+						// coadd logic
+						int numants = 0;
+						timeslice i = 0;
+						while (true) {
+								mpi::broadcast(world, i, root);
+								numants = 0;
+								i0 = i * tstep;
+								timenow = i0 * f.tsamp;
+								if(timenow >= duration) break;
+								// read fbdata into inptr
+								/***
+								 * i0 is Bcasted.
+								 * each process either sends fbdata or zero'array.
+								 * this is bc MPI communicator is fixed
+								 * ----------
+								 *  The differential (offset) which remains is ignored bc current coadd logic 
+								 *  is in loadsecs steps 
+								 *  My rational is different tstarts is not something we expect 
+								 *  in our pipeline very often. Infact it is bad behavior.
+								***/
+								if(timenow >= f.tstart && timenow < tstop) {
+										f.Unpack(inptr, i0 - offset*tstep, tstep);
+										inptr_all_zeros = false;
+								}
+								else{
+										if(!inptr_all_zeros) {
+												std::fill(inptr, inptr + numelems, 0);
+												inptr_all_zeros = true;
+										}
+								}
+								// actual MPI coadd call
+								mpi::reduce(world, inptr, numelems, outptr, std::plus<float>(), root);
+								// divide logic
+								if(world.rank() == root) {
+										// count numant
+										for(int i = 0; i < world.size(); i++){
+												if(timenow <= tstops[i] && timenow >= tstarts[i]) numants++;
+										}
+										// write fb data logic
+										fbw.WriteFBdata(outptr, boundcheck, numelems, numants);
+								}
+								// incrementing as in serial
+								// NB see comments in serial code
+								boundcheck += numelems/4;
+								i++;
+						}
+						delete[] inptr;
+						if(world.rank() == root) delete[] outptr;
+				}
+		public:
+				//CoaddMPI(mpi::environment _env, mpi::communicator _comm) :
+				//env(_env), world(_comm) {
+				//}
+				void Work(CoaddMPI_Params& param) {
+						root = 0;
+						work_one_group(param);
+				}
+};
+#endif // MPI
 #endif

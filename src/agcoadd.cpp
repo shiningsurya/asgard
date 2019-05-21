@@ -80,7 +80,7 @@ int main(int ac, char * av[]) {
 						fn = groups[gin] + ea0;
 						if(xrfichoice) {
 								Coadd wf(fn, loadsecs, tfac, ffac, xrfichoice);
-								wf.coadd(fb.kfils[groups[gin]]);	
+								wf.coadd(fb.fils[groups[gin]]);	
 						}
 						else {
 								Coadd wf(fn, loadsecs);

@@ -1,4 +1,6 @@
+#pragma once
 #include "asgard.hpp"
+#include "Group.hpp"
 #include <boost/algorithm/string.hpp>
 #include <set>
 #include <boost/algorithm/string/iter_find.hpp>
@@ -7,81 +9,52 @@
 
 class AnalyzeFB {
 		public:
+		Map_Pathgroups fils, kfils, cands, kcands;
+		GroupVector Gvector;
 		StringVector base;
-		MapGroupDE fils, kfils, cands, kcands;
-		void Crawl(std::string fd, std::string cd) {
-				fildir = fd; // filterbank
-				candir = cd; // candidate
-				DEList flist, clist, klist, kclist; 
-				/*
-				 * boost::bind should get boost::ref or else boost::bind creates internal references
-				 * time taken to learn that 25minutes
-				 * learnt it after reading a SO answer
-				 */
-				std::for_each(fs::directory_iterator(fildir),fs::directory_iterator(),boost::bind(AnalyzeFB::dselbinder,boost::ref(base),boost::ref(flist),std::string(".fil"), std::string("_kur.fil"),_1));
-				std::for_each(fs::directory_iterator(candir),fs::directory_iterator(),boost::bind(AnalyzeFB::dselbinder,boost::ref(base),boost::ref(clist),std::string(".cand"), std::string("_kur.cand"),_1));
-				std::for_each(fs::directory_iterator(fildir),fs::directory_iterator(),boost::bind(AnalyzeFB::selbinder,boost::ref(base),boost::ref(klist),std::string(".fil"), std::string("_kur.fil"),_1));
-				std::for_each(fs::directory_iterator(candir),fs::directory_iterator(),boost::bind(AnalyzeFB::selbinder,boost::ref(base),boost::ref(kclist),std::string(".cand"), std::string("_kur.cand"),_1));
-				// taking out duplicates
-				std::set<std::string> bset( base.begin(), base.end() );
-				base.assign( bset.begin(), bset.end() );
-				//
-				DEList tv;
-				PairGroupDE ttp;
-				for(std::string b : base) {
-						std::for_each(flist.begin(),flist.end(),boost::bind(AnalyzeFB::binder,b,boost::ref(tv),_1));
-						ttp = std::make_pair(b,tv);
-						fils.insert(ttp);
-						tv.clear();
-						// fils done
-						std::for_each(clist.begin(),clist.end(),boost::bind(AnalyzeFB::binder,b,boost::ref(tv),_1));
-						ttp = std::make_pair(b,tv);
-						cands.insert(ttp);
-						tv.clear();
-						// cands done
-						std::for_each(klist.begin(),klist.end(),boost::bind(AnalyzeFB::binder,b,boost::ref(tv),_1));
-						ttp = std::make_pair(b,tv);
-						kfils.insert(ttp);
-						tv.clear();
-						// kfils done
-						std::for_each(kclist.begin(),kclist.end(),boost::bind(AnalyzeFB::binder,b,boost::ref(tv),_1));
-						ttp = std::make_pair(b,tv);
-						kcands.insert(ttp);
-						tv.clear();
+		void Crawl(const std::string& fdir, const std::string& cdir) {
+				fildir = fdir;
+				candir = cdir;
+				// iterating in directories
+				std::for_each(fs::directory_iterator(fildir), fs::directory_iterator(), boost::bind(AnalyzeFB::Builder, _1, boost::ref(Gvector)));
+				std::for_each(fs::directory_iterator(candir), fs::directory_iterator(), boost::bind(AnalyzeFB::Builder, _1, boost::ref(Gvector)));
+				// taking out file duplicates
+				std::set<Group, GroupCompare, std::allocator<Group> > bset( Gvector.begin(), Gvector.end() );
+				Gvector.assign( bset.begin(), bset.end() );
+				// building maps
+				for(const auto& b : Gvector) {
+						base.push_back(b.group);
+						if(b.kflag) {
+								if(b.ext == efil) {
+										kfils[b.group].push_back(b.path());
+								}
+								else if(b.ext == ecand) {
+										kcands[b.group].push_back(b.path());
+								}
+						}
+						else {
+								if(b.ext == efil) {
+										fils[b.group].push_back(b.path());
+								}
+								else if(b.ext == ecand) {
+										cands[b.group].push_back(b.path());
+								}
+						}
 				}
+				// taking out group duplicates
+				std::set<std::string> sset(base.begin(), base.end());
+				base.assign( sset.begin(), sset.end() );
 		}
-		void Crawl(std::string fd) {
+		void Crawl(const std::string& fd) {
+				fildir = fd;
+				candir = fd;
 				Crawl(fd,fd);
 		}
 		private:
 				fs::path fildir, candir;
-				static void binder(std::string b, DEList& tv, fs::directory_entry it) {
-				// If b is found in *it push back to tv
-						std::string r = it.path().filename().string();
-						if(r.find(b) != std::string::npos)
-								(tv).push_back(it);
-				}
-				static void selbinder(StringVector& b3, DEList& list, std::string alpha, std::string beta, fs::directory_entry one) {
-						if(one.path().extension().string() == alpha) {
-								if(one.path().string().find(beta) != std::string::npos) {
-										list.push_back(one);
-										StringVector bb;
-										boost::iter_split(bb, one.path().filename().string(), boost::algorithm::first_finder(std::string("_ea")));
-										bb.pop_back();		// To remove the last part. after _ea ....
-										b3.insert(b3.end(),bb.begin(),bb.end());
-								}
-						}
-				}
-				static void dselbinder(StringVector& b3, DEList& list, std::string alpha, std::string beta, fs::directory_entry one) {
-						if(one.path().extension() == alpha) {
-								if(one.path().string().find(beta) == std::string::npos) {
-										list.push_back(one);
-										StringVector bb;
-										boost::iter_split(bb, one.path().filename().string(), boost::algorithm::first_finder(std::string("_ea")));
-										bb.pop_back();		// To remove the last part. after _ea ....
-										b3.insert(b3.end(),bb.begin(),bb.end());
-								}
-						}
+				static void Builder(fs::directory_entry x, GroupVector& gv) {
+						Group gg = GroupFactory(x);
+						if(gg.kflag != -1) gv.push_back( gg );
 				}
 		public:
 		void PrintPaths() {
@@ -89,14 +62,14 @@ class AnalyzeFB {
 				std::cout << "Candir: " << candir.string() << std::endl;
 		}
 		void Groups() {
-				for(auto ix : base) std::cout << ix << std::endl;
+				for(const auto& ix : base) std::cout << ix << std::endl;
 		}
 		void Summary() {
 				std::cout << "Summary\n";
-				for(PairGroupDE it : fils) std::cout << "FILs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
-				for(PairGroupDE it : kfils) std::cout << "KILs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
-				for(PairGroupDE it : cands) std::cout << "CANs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
-				for(PairGroupDE it : kcands) std::cout << "CANs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
+				for(const auto& it : fils) std::cout << "FILs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
+				for(const auto& it : kfils) std::cout << "KILs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
+				for(const auto& it : cands) std::cout << "CANs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
+				for(const auto& it : kcands) std::cout << "CANs base: " << it.first << " Length: " << it.second.size() <<   std::endl;
 		}
 };
 

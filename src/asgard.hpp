@@ -21,8 +21,8 @@
 // namespace
 namespace fs = boost::filesystem;
 
-
 // storage type classes
+class Group;
 class Candidate;
 class Filterbank;
 class FilterbankCandidate;
@@ -40,10 +40,14 @@ typedef long unsigned int timeslice;
 typedef std::vector<std::string> StringVector;
 
 typedef std::vector<fs::directory_entry> DEList;
+typedef std::vector<fs::path> PathList;
 typedef std::map<std::string, DEList> MapGroupDE; 
+typedef std::map<std::string, PathList> Map_Pathgroups;
 typedef std::pair<std::string, DEList> PairGroupDE;
+typedef std::vector<Group> GroupVector;
 
 typedef std::vector<float> FloatVector;
+typedef std::vector<double> DoubleVector;
 /*
  *class  FloatVector {
  *        private:

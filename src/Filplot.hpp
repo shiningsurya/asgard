@@ -27,6 +27,7 @@ class CandSummary : protected Plotter {
 						// sort cant
 						std::sort(cant.begin(), cant.end(), CLCompare );
 						for(CandidateList& x : cant) {
+								if(x.size() == 0) return;
 								std::sort(x.begin(), x.end(), iCompare );
 								imin = imin < x.front().peak_time ? imin : x.front().peak_time;
 								imax = imax > x.back().peak_time ? imax : x.back().peak_time;

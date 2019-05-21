@@ -289,6 +289,14 @@ class FilterbankReader {
 
 };
 
+struct FilterbankHeader {
+		std::string source_name;
+		double src_raj, src_dej;
+		int telescope_id, data_type;
+		double fch1, foff, tsamp;
+		int nchans, nbits, nifs;
+};
+
 class FilterbankWriter {
 		private:
 				unsigned char A, B, C, D, ucval;
@@ -296,15 +304,15 @@ class FilterbankWriter {
 				unsigned char * dd;
 				bios::mapped_file_sink fbdata;
 				timeslice it;
-				void _copy_fbdata(PtrFloat ret, timeslice datasamps) {
+				void _copy_fbdata(PtrFloat ret, timeslice datasamps, int nant) {
 						for(timeslice i = 0; i < datasamps;) {
-								ival = static_cast<int>(ret[i++]);
+								ival = static_cast<int>(ret[i++] / nant);
 								A = (unsigned char) (ival & 0x03) << 6;
-								ival = static_cast<int>(ret[i++]);
+								ival = static_cast<int>(ret[i++] / nant);
 								B = (unsigned char) (ival & 0x03) << 4;
-								ival = static_cast<int>(ret[i++]);
+								ival = static_cast<int>(ret[i++] / nant);
 								C = (unsigned char) (ival & 0x03) << 2;
-								ival = static_cast<int>(ret[i++]);
+								ival = static_cast<int>(ret[i++] / nant);
 								D = (unsigned char) (ival & 0x03) << 0;
 								//
 								//A = (unsigned char) ret[i++] & 0x03;
@@ -316,6 +324,27 @@ class FilterbankWriter {
 						}
 				}
 				void _copy_header(Filterbank& from, double tst) {
+						it = 0;
+						dd = (unsigned char*)fbdata.data();
+						// ^ initializes 
+						send_string("HEADER_START");
+						send_string("source_name");
+						send_string(from.source_name);
+						send_double("src_raj",from.src_raj);
+						send_double("src_dej",from.src_dej);
+						send_int("telescope_id",from.telescope_id);
+						send_int("data_type",from.data_type);
+						send_double("fch1",from.fch1);
+						send_double("foff",from.foff);
+						send_int("nchans",from.nchans);
+						send_int("nbits",from.nbits);
+						send_double("tstart",tst);
+						send_double("tsamp",from.tsamp);
+						send_int("nifs",from.nifs);
+						send_int("barycentric", 1);
+						send_string("HEADER_END");
+				}
+				void _copy_header(struct FilterbankHeader& from, double tst) {
 						it = 0;
 						dd = (unsigned char*)fbdata.data();
 						// ^ initializes 
@@ -383,7 +412,28 @@ class FilterbankWriter {
 				}
 				void WriteFBdata(PtrFloat da, timeslice ib, timeslice datasamps) {
 						if(it != ib) std::cerr << "Writing non-aligned FB data\n";
-						_copy_fbdata(da, datasamps);
+						_copy_fbdata(da, datasamps, 1);
+				}
+				void WriteFBdata(PtrFloat da, timeslice ib, timeslice datasamps, int nant) {
+						if(it != ib) std::cerr << "Writing non-aligned FB data\n";
+						_copy_fbdata(da, datasamps, nant);
+				}
+				struct FilterbankHeader GetHeader(Filterbank& from) {
+						struct FilterbankHeader ret;
+						// copy values
+						ret.src_raj = from.src_raj;
+						ret.source_name = from.source_name;
+						ret.src_raj = from.src_raj;
+						ret.src_dej = from.src_dej;
+						ret.telescope_id = from.telescope_id;
+						ret.data_type = from.data_type;
+						ret.fch1 = from.fch1;
+						ret.foff = from.foff;
+						ret.nchans = from.nchans;
+						ret.nbits = from.nbits;
+						ret.tsamp = from.tsamp;
+						ret.nifs = from.nifs;
+						return ret;
 				}
 				void Close() {
 						// close the mmap file here
