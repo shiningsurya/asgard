@@ -393,7 +393,7 @@ class FilterbankWriter {
 				FilterbankWriter() {
 						// chill empty initialization
 				}
-				timeslice Initialize(std::string fname, Filterbank& takeHeader, float dur, float tstrt) {
+				timeslice Initialize(std::string fname, Filterbank& takeHeader, double dur, double tstrt) {
 						// dur is the length
 						// tstrt is the starting time
 						// take headers from f and account for dur and tstrt
@@ -407,7 +407,7 @@ class FilterbankWriter {
 						param.flags = bios::mapped_file::mapmode::readwrite;
 						fbdata.open(param);	
 						// copy header
-						_copy_header(takeHeader, (double)tstrt);
+						_copy_header(takeHeader, tstrt);
 						return it;
 				}
 				void WriteFBdata(PtrFloat da, timeslice ib, timeslice datasamps) {

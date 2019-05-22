@@ -229,7 +229,9 @@ class CoaddMPI {
 						// read filterbank into f
 						Filterbank f;
 						fbr.Read(f, ifile);
-						tstop = f.tstart + f.duration;
+						// tstart is in MJD
+						// duration is in seconds
+						tstop = f.tstart + ( f.duration/86400.0f );
 						// figure out start time and duration
 						// open-mpi docs say that order is guaranteed
 						// therefore no need to make pair
@@ -237,7 +239,8 @@ class CoaddMPI {
 						mpi::all_reduce(world, tstop, maxtstop, mpi::maximum<double>());
 						mpi::gather(world, f.tstart, tstarts, root);
 						mpi::gather(world, tstop, tstops, root);
-						duration = maxtstop - mintstart;
+						// maxtstop - mintstart is in fractional mjd
+						duration = 86400.0f * ( maxtstop - mintstart );
 						// offset .. tsteps later when filterbank starts
 						timeslice offset;
 						offset = std::ceil( ( f.tstart - mintstart ) / param.loadsecs  );
@@ -259,11 +262,16 @@ class CoaddMPI {
 						int numants = 0;
 						timeslice i = 0;
 						while (true) {
+								/***
+								 * Current version is not generic. 
+								 * The granularity is fixed by loadsecs.
+								 *
+								 * **/
 								mpi::broadcast(world, i, root);
+								if(i == nsteps) break;
 								numants = 0;
 								i0 = i * tstep;
-								timenow = i0 * f.tsamp;
-								if(timenow >= duration) break;
+								timenow = mintstart + ( i0 * f.tsamp / 86400.0f );
 								// read fbdata into inptr
 								/***
 								 * i0 is Bcasted.
@@ -290,19 +298,22 @@ class CoaddMPI {
 								// divide logic
 								if(world.rank() == root) {
 										// count numant
-										for(int i = 0; i < world.size(); i++){
-												if(timenow <= tstops[i] && timenow >= tstarts[i]) numants++;
+										for(int j = 0; j < world.size(); j++){
+												if(timenow <= tstops[j] && timenow >= tstarts[j]) numants++;
 										}
 										// write fb data logic
 										fbw.WriteFBdata(outptr, boundcheck, numelems, numants);
+										// incrementing as in serial
+										// NB see comments in serial code
+										boundcheck += numelems/4;
+										i++;
 								}
-								// incrementing as in serial
-								// NB see comments in serial code
-								boundcheck += numelems/4;
-								i++;
 						}
 						delete[] inptr;
-						if(world.rank() == root) delete[] outptr;
+						if(world.rank() == root) {
+								delete[] outptr;
+								fbw.Close();
+						}
 				}
 		public:
 				//CoaddMPI(mpi::environment _env, mpi::communicator _comm) :
