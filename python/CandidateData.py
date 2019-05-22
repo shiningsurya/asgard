@@ -5,6 +5,7 @@ All for the sake of efficiency
 '''
 import numpy as np
 
+
 def OneLine(line):
     '''
     Returns
@@ -16,6 +17,18 @@ def OneLine(line):
     tsamp = pt / int(lt[1])
     diff = int(lt[8]) - int(lt[7])
     return float(lt[0]), pt, float(lt[5]), diff * tsamp
+
+class NullCandidateData(object):
+    '''
+    Null class
+
+    Attributes
+    ----------
+    procname: str
+        procname where it didn't find any cand files
+    '''
+    def __init__(self, procname):
+        self.procname = procname
 
 class CandidateData(object):
     '''
@@ -33,8 +46,12 @@ class CandidateData(object):
         Peak times in an array
     DM : array, float
         Dispersion measure in an array
+    antenna : str
+        Antenna
+        default: None
     '''
-    def __init__(self, flines):
+    def __init__(self, flines, ant=None):
+        self.ant = ant
         self.n = len(flines)
         self.sn = np.zeros(self.n, dtype=np.float)
         self.width = np.zeros(self.n, dtype=np.float)
@@ -46,3 +63,23 @@ class CandidateData(object):
             self.peak_time[i],\
             self.dm[i],       \
             self.width[i] = OneLine(l)
+
+def PrometheusExporter(group, cdata, path):
+    import prometheus_client as pc
+    '''
+    Function to generate prometheus prom files
+    in nodes
+
+    Arguments
+    ---------
+    group: str
+        Group of the observation
+    cdata: str
+        candidate data 
+        either an object of CandidateData or NullCandidateData
+    path: str
+        Path where prom files are dumped
+    '''
+    if isinstance(cdata, NullCandidateData):
+        pass
+
