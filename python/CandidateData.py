@@ -5,7 +5,6 @@ All for the sake of efficiency
 '''
 import numpy as np
 
-
 def OneLine(line):
     '''
     Returns
@@ -64,22 +63,4 @@ class CandidateData(object):
             self.dm[i],       \
             self.width[i] = OneLine(l)
 
-def PrometheusExporter(group, cdata, path):
-    import prometheus_client as pc
-    '''
-    Function to generate prometheus prom files
-    in nodes
-
-    Arguments
-    ---------
-    group: str
-        Group of the observation
-    cdata: str
-        candidate data 
-        either an object of CandidateData or NullCandidateData
-    path: str
-        Path where prom files are dumped
-    '''
-    if isinstance(cdata, NullCandidateData):
-        pass
 

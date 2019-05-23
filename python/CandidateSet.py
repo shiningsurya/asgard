@@ -118,7 +118,7 @@ class CandidateSet(dict):
             ( I1 - I0 ) * TSAMP
         4. DM
     '''
-    def __init__(self, cpath, group, fpath=None, antenna=None):
+    def __init__(self, cpath, group, fpath=None, antenna=None, fromdict=None, gl=0.0, gb=0.0):
         '''
         Creates a CandidateSet object where 
         all the candidates belong to a single group.
@@ -129,10 +129,20 @@ class CandidateSet(dict):
             Path to candidates
         group: str
             Groups to consider
+        fromdict: dict
+            Save from crawl
+        gl: Galactic coordinates : Latitude
+        gb: Galactic coordinates : Longitude 
         '''
-        self.group = group
-        self.cpath = cpath
-        self.__group_action(cpath, group, fpath)
+        if fromdict is None:
+            self.group = group
+            self.cpath = cpath
+            self.__group_action(cpath, group, fpath)
+        else:
+            dict.copy(self, fromdict)
+            self.gl = 0.0
+            self.gb = 0.0
+
 
     def __group_action(self, cpath, group, fpath):
         # walk logic
@@ -146,10 +156,7 @@ class CandidateSet(dict):
                 dict.__setitem__(self, cant, CandidateData(fcfile.readlines()))
         # location
         self.fpath = fpath
-        if fpath is None:
-            self.gl = 0.0       # Galactic Longitude
-            self.gb = 0.0       # Galactic Latitude
-        else:
+        if fpath is not None:
             # read from filterbank header
             # TODO make a asgard variant of pysigproc
             # until then use pysigproc

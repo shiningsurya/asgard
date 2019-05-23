@@ -224,7 +224,7 @@ class CoaddMPI {
 						DoubleVector tstarts, tstops;
 						timeslice nsteps, numelems, boundcheck, i0, tstep;
 						PtrFloat inptr = nullptr, outptr = nullptr;
-						double timenow;
+						double timenow, dtimenow;
 						bool inptr_all_zeros = false;
 						// read filterbank into f
 						Filterbank f;
@@ -243,7 +243,10 @@ class CoaddMPI {
 						duration = 86400.0f * ( maxtstop - mintstart );
 						// offset .. tsteps later when filterbank starts
 						timeslice offset;
-						offset = std::ceil( ( f.tstart - mintstart ) / param.loadsecs  );
+						dtimenow = ( f.tstart - mintstart ) / param.loadsecs;
+						offset = std::ceil( dtimenow  );
+						// differential offset
+						timeslice doffset = std::ceil( (dtimenow - offset)*f.tsamp );
 						// write fb header logic
 						if(world.rank() == root) {
 								boundcheck = fbw.Initialize(param.outfile, f,  duration, mintstart);
@@ -265,6 +268,13 @@ class CoaddMPI {
 								/***
 								 * Current version is not generic. 
 								 * The granularity is fixed by loadsecs.
+								 * ---------
+								 *  To bring in arbitrary granularity
+								 *  doffset  <-- for the beginning
+								 *  dtimenow <-- need to be computed only once
+								 * ---------
+								 *  Need to worry only about beginning
+								 *  asgard already boundchecks it
 								 *
 								 * **/
 								mpi::broadcast(world, i, root);
@@ -284,7 +294,7 @@ class CoaddMPI {
 								 *  in our pipeline very often. Infact it is bad behavior.
 								***/
 								if(timenow >= f.tstart && timenow < tstop) {
-										f.Unpack(inptr, i0 - offset*tstep, tstep);
+										f.Unpack(inptr, i0 - offset*tstep - doffset, tstep);
 										inptr_all_zeros = false;
 								}
 								else{
