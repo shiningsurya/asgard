@@ -204,7 +204,7 @@ class CoaddMPI {
 				FilterbankReader fbr;
 				mpi::environment env;
 				mpi::communicator world;
-				PathList pfl;
+				StringVector pfl;
 				int root;
 				void work_one_group(const CoaddMPI_Params& param) {
 						// name resolution
@@ -223,7 +223,7 @@ class CoaddMPI {
 						mpi::gather(world, ifile, pfl, root);
 						if(world.rank() == root) {
 								for(auto& xxxx : pfl) 
-										std::cout << " I  " << xxxx.string() << std::endl;
+										std::cout << " I  " << xxxx << std::endl;
 						}
 						// coadd variables
 						double mintstart, tsamp, maxtstop, tstop, duration;
