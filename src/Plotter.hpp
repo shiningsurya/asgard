@@ -57,11 +57,32 @@ StringVector SVFromDE(DEList& x) {
 		for(fs::directory_entry& de : x) ret.push_back( de.path().string() );
 		return ret;
 }
+CandidateAntenna CAFromPL(const PathList& x) {
+		CandidateAntenna ret;
+		double zero = 0.0;
+		for(const auto& de : x) ret.push_back( ReadCandidates( de.string(), zero) );
+		return ret;
+}
 CandidateAntenna CAFromDE(DEList& x) {
 		CandidateAntenna ret;
 		double zero = 0.0;
 		for(fs::directory_entry& de : x) ret.push_back( ReadCandidates( de.path().string(), zero) );
 		return ret;
+}
+FilterbankList FLFromPL(const PathList& x) {
+		FilterbankList ret;
+		FilterbankReader fbr;
+		for(const auto& de : x) {
+				Filterbank xx;
+				fbr.Read(xx, de.string()); 
+				ret.push_back(xx);
+		}
+		return ret;
+		// I would like to take time to tell you that
+		// I took 10 mins into debugging why this function was 
+		// going haywire.
+		// And the reason is self explanatory:
+		// I forgot "return ret"
 }
 FilterbankList FLFromDE(DEList& x) {
 		FilterbankList ret;

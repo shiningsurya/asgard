@@ -8,7 +8,7 @@ namespace mpi = boost::mpi;
 int main() {
 		std::string s(TROOT);
 		std::string g = s + std::string("/fil/coaddtest");
-		std::string group("20180521_162250_muos_");
+		std::string group("20180521_162516_muos_");
 		AnalyzeFB f;
 		f.Crawl(g);
 		FilterbankList fl;
@@ -19,7 +19,7 @@ int main() {
 				fbr.Read(xx, de.string()); 
 				fl.push_back( xx );
 		}
-		std::string oname(s + std::string("/fil/") + group + std::string("ea00_kur.fil"));
+		std::string oname(s + std::string("/fil/") + group + std::string("ea99_kur.fil"));
 		// MPI_Param stuff
 		struct CoaddMPI_Params param;
 		param.same_for_all = true;
