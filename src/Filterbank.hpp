@@ -33,7 +33,7 @@ class Filterbank {
 				std::string source_name, antenna;
 				int telescope_id, data_type, nchans, nbits, nifs, barycentric; /* these two added Aug 20, 2004 DRL */
 				int b_per_spectrum;
-				double duration, tstart,tsamp,fch1,foff,src_raj,src_dej;
+				double duration, tstart,tsamp,fch1,foff,src_raj,src_dej, tstop;
 				int headersize;
 				long int datasize, totalsamp;
 				// printing
@@ -126,6 +126,7 @@ class FilterbankReader {
 						fb.antenna = GetAntenna(ifile);
 						fb.isKur = QueryKurtosis(ifile);
 						fb.group = GetGroup(ifile);
+						fb.tstop = fb.tstart + ( fb.duration / 86400.0f );
 						fclose(inputfile);
 						return 0;
 				}

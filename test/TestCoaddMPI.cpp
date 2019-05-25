@@ -19,11 +19,20 @@ int main() {
 				fbr.Read(xx, de.string()); 
 				fl.push_back( xx );
 		}
-		std::string oname(s + std::string("/fil/") + group + std::string("ea99_kur.fil"));
+		std::string oname(s + std::string("/fil/coaddtest/") + group + std::string("ea99_kur.fil"));
 		// MPI_Param stuff
 		struct CoaddMPI_Params param;
-		param.same_for_all = true;
-		param.rootpath.push_back(g);
+		param.same_for_all = false;
+		param.rootpath.push_back(g + std::string("/vd1/"));
+		param.rootpath.push_back(g + std::string("/vd2/"));
+		param.rootpath.push_back(g + std::string("/vd3/"));
+		param.rootpath.push_back(g + std::string("/vd4/"));
+		param.rootpath.push_back(g + std::string("/vd5/"));
+		param.rootpath.push_back(g + std::string("/vd6/"));
+		param.rootpath.push_back(g + std::string("/vd7/"));
+		param.rootpath.push_back(g + std::string("/vd8/"));
+		param.rootpath.push_back(g + std::string("/vd9/"));
+		param.rootpath.push_back(g + std::string("/vd10/"));
 		param.outfile = oname;
 		param.group_string = group;
 		param.loadsecs = 2.0f;

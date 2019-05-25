@@ -204,118 +204,118 @@ class CoaddMPI {
 				FilterbankReader fbr;
 				mpi::environment env;
 				mpi::communicator world;
-				StringVector pfl;
+				PathList filpathlist;
+				StringVector filstringlist;
+				std::vector<StringVector> All_filpathlist;
 				int root;
 				void work_one_group(const CoaddMPI_Params& param) {
+						// coadd variables
+						double mintstart, maxtstop, duration, tstart, tstop;
+						DoubleVector All_tstarts, All_tstops, l_tstarts, l_tstops;
+						timeslice nsteps, numelems, boundcheck, i0, tstep;
+						double timenow, dtimenow;
+						// data holding ptrs
+						PtrFloat outptr = nullptr;
+						std::vector<PtrFloat> inptrs;
+						// loop runner
+						int numants = 0;
+						timeslice i = 0;
 						// name resolution
-						PathList pl;
-						std::string ifile;
 						AnalyzeFB afb;	
 						if(param.same_for_all) afb.Crawl(param.rootpath[0]);
 						else afb.Crawl(param.rootpath[ world.rank() ]);
-						// TODO process slave affinity
-						if(param.kur) pl = afb.kfils[param.group_string];
-						else pl = afb.fils[param.group_string];
-						// assert(pl.size() == 1); // disabled during debug
-						ifile = pl[0].string();
-						//ifile = pl[world.rank()].string();
-						// aggregate in root
-						mpi::gather(world, ifile, pfl, root);
+						if(param.kur) filpathlist = afb.kfils[param.group_string];
+						else filpathlist = afb.fils[param.group_string];
+						for(auto& fpl : filpathlist) filstringlist.push_back(fpl.string());
+						// name resolution  END
+						/***
+						 * To account for nodes with multiple files, 
+						 * we add them in one process.
+						 * **/
+						// aggregate in root For debugging
+						mpi::gather(world, filstringlist , All_filpathlist, root);
 						if(world.rank() == root) {
-								for(auto& xxxx : pfl) 
-										std::cout << " I  " << xxxx << std::endl;
+								for(auto& vSv : All_filpathlist) 
+										for(auto& Sv : vSv)
+												std::cout << " I " << Sv << std::endl;
 						}
-						// coadd variables
-						double mintstart, tsamp, maxtstop, tstop, duration;
-						DoubleVector tstarts, tstops;
-						timeslice nsteps, numelems, boundcheck, i0, tstep;
-						PtrFloat inptr = nullptr, outptr = nullptr;
-						double timenow, dtimenow;
-						bool inptr_all_zeros = false;
-						// read filterbank into f
-						Filterbank f;
-						fbr.Read(f, ifile);
-						// tstart is in MJD
-						// duration is in seconds
-						tstop = f.tstart + ( f.duration/86400.0f );
-						// figure out start time and duration
-						// open-mpi docs say that order is guaranteed
-						// therefore no need to make pair
-						mpi::all_reduce(world, f.tstart, mintstart, mpi::minimum<double>());
+						FilterbankList f;
+						for(auto& xpl : filpathlist) {
+								// read filterbanks into f
+								Filterbank ffb;
+								fbr.Read(ffb, xpl.string());
+								f.push_back(ffb);
+								// keep times
+								l_tstops.push_back(ffb.tstop);
+								l_tstarts.push_back(ffb.tstart);
+								// initializing data pointers
+								inptrs.push_back(nullptr);
+						}
+						assert(f.size() != 0);
+						assert(f.size() == inptrs.size());
+						// figure out local mintstart, maxtstop
+						tstart = *std::min_element(l_tstarts.begin(), l_tstarts.end());
+						tstop  = *std::max_element(l_tstops.begin(), l_tstops.end());
+						// figure out global mintstart and maxtstart
+						// should I have all_reduce or reduce on root?
+						mpi::all_reduce(world, tstart, mintstart, mpi::minimum<double>());
 						mpi::all_reduce(world, tstop, maxtstop, mpi::maximum<double>());
-						mpi::gather(world, f.tstart, tstarts, root);
-						mpi::gather(world, tstop, tstops, root);
+						mpi::gather(world, tstart, All_tstarts, root);
+						mpi::gather(world, tstop, All_tstops, root);
 						// maxtstop - mintstart is in fractional mjd
+						// duration of the resultant filterbank
 						duration = 86400.0f * ( maxtstop - mintstart );
-						// offset .. tsteps later when filterbank starts
-						timeslice offset;
-						dtimenow = ( f.tstart - mintstart ) / param.loadsecs;
-						offset = std::ceil( dtimenow  );
-						// differential offset
-						timeslice doffset = std::ceil( (dtimenow - offset)*f.tsamp );
 						// write fb header logic
+						// reading f[0] lol
 						if(world.rank() == root) {
-								boundcheck = fbw.Initialize(param.outfile, f,  duration, mintstart);
+								boundcheck = fbw.Initialize(param.outfile, f[0],  duration, mintstart);
 						}
 						// figure out tstep(width)
-						tstep = param.loadsecs / f.tsamp;				
-						numelems = tstep * f.nchans;
+						tstep = param.loadsecs / f[0].tsamp;				
+						numelems = tstep * f[0].nchans;
 						nsteps = duration / param.loadsecs;
 						// initialize stuff
-						inptr = new float[numelems]();
+						for(auto& xin : inptrs) xin = new float[numelems]();
 						if(world.rank() == root) outptr = new float[numelems]();
-						inptr_all_zeros = true;
+						// timenow is current time
 						timenow = 0.0;
-						i0 = 0;
+						i = 0;
 						// coadd logic
-						int numants = 0;
-						timeslice i = 0;
 						while (true) {
-								/***
-								 * Current version is not generic. 
-								 * The granularity is fixed by loadsecs.
-								 * ---------
-								 *  To bring in arbitrary granularity
-								 *  doffset  <-- for the beginning
-								 *  dtimenow <-- need to be computed only once
-								 * ---------
-								 *  Need to worry only about beginning
-								 *  asgard already boundchecks it
-								 *
-								 * **/
+								// initialization
+								numants = 0;
+								// i is like loop index
 								mpi::broadcast(world, i, root);
 								if(i == nsteps) break;
-								numants = 0;
-								i0 = i * tstep;
-								timenow = mintstart + ( i0 * f.tsamp / 86400.0f );
+								// work start
+								timenow = mintstart + ( i * param.loadsecs / 86400.0f );
 								// read fbdata into inptr
-								/***
-								 * i0 is Bcasted.
-								 * each process either sends fbdata or zero'array.
-								 * this is bc MPI communicator is fixed
-								 * ----------
-								 *  The differential (offset) which remains is ignored bc current coadd logic 
-								 *  is in loadsecs steps 
-								 *  My rational is different tstarts is not something we expect 
-								 *  in our pipeline very often. Infact it is bad behavior.
-								***/
-								if(timenow >= f.tstart && timenow < tstop) {
-										f.Unpack(inptr, i0 - offset*tstep - doffset, tstep);
-										inptr_all_zeros = false;
-								}
-								else{
-										if(!inptr_all_zeros) {
-												std::fill(inptr, inptr + numelems, 0);
-												inptr_all_zeros = true;
+								for(int ifb = 0; ifb != f.size(); ifb++){
+										if(timenow >= f[ifb].tstart && timenow < f[ifb].tstop) {
+												i0 = ( timenow - f[ifb].tstart ) / f[ifb].tsamp;
+												f[ifb].Unpack(inptrs[ifb], i0, tstep);
+										}
+										else{
+												// this only happens in the beginning hence not optimized
+												std::fill(inptrs[ifb], inptrs[ifb] + numelems, 0);
 										}
 								}
+								// local coaddition
+								// result in inptrs[0]
+								for(int ipt = 1; ipt != inptrs.size(); ipt++) {
+										PtrFloat a_in = inptrs[0];
+										PtrFloat b_in = inptrs[ipt];
+#pragma omp parallel for
+										for(timeslice iii = 0; iii < numelems; iii++)
+												a_in[iii] += b_in[iii];
+								}
 								// actual MPI coadd call
-								mpi::reduce(world, inptr, numelems, outptr, std::plus<float>(), root);
+								mpi::reduce(world, inptrs[0], numelems, outptr, std::plus<float>(), root);
 								// divide logic
 								if(world.rank() == root) {
 										// count numant
 										for(int j = 0; j < world.size(); j++){
-												if(timenow <= tstops[j] && timenow >= tstarts[j]) numants++;
+												if(timenow <= All_tstops[j] && timenow >= All_tstarts[j]) numants++;
 										}
 										// write fb data logic
 										fbw.WriteFBdata(outptr, boundcheck, numelems, numants);
@@ -325,9 +325,10 @@ class CoaddMPI {
 										i++;
 								}
 						}
-						delete[] inptr;
+						// gracefully exiting
+						for(auto& ipf : inptrs) if(ipf != nullptr)  delete[] ipf;
 						if(world.rank() == root) {
-								delete[] outptr;
+								if(outptr != nullptr) delete[] outptr;
 								fbw.Close();
 						}
 				}
