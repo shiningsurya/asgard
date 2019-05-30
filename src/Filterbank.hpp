@@ -83,6 +83,8 @@ std::ostream& operator<< (std::ostream& os, const Filterbank& fb) {
 		os << "Filename: " << fb.filename << std::endl;
 		os << "Group: " << fb.group << std::endl;
 		os << "Source Name: " << fb.source_name << std::endl;
+		os << "RA (HH:MM:SS)" << fb.src_raj << std::endl;
+		os << "DEC (HH:MM:SS)" << fb.src_dej << std::endl;
 		os << "Header size: " << fb.headersize << std::endl;
 		os << "Num-chan: " << fb.nchans << std::endl;
 		os << "Tstart: " << fb.tstart << std::endl;

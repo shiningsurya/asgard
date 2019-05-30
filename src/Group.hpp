@@ -2,7 +2,6 @@
 #include "asgard.hpp"
 // 20180521_162511_muos_ea01_kur.fil
 // 20180521_162511_muos_ea01.fil
-const std::string efil(".fil"), ecand(".cand"), edelim("_"), emuos("muos"), ekur("kur");
 class Group {
 		public:
 				Group(fs::path pat_, std::string date_, std::string ant_, int kflag_, std::string ext_)

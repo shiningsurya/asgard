@@ -18,6 +18,7 @@
 #define TROOT "/home/shining/study/MS/vLITE/mkerr"
 //#define TROOT "/home/shining/mega/vLITE-data/R20"
 #define TGROUP "20181213_015843_muos"
+const std::string efil(".fil"), ecand(".cand"), edelim("_"), emuos("muos"), ekur("kur");
 // namespace
 namespace fs = boost::filesystem;
 
