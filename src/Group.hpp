@@ -18,8 +18,8 @@ class Group {
 						std::string sp;
 						sp     += date + edelim;
 						sp     += emuos+ edelim;
-						sp     += ant  + edelim;
-						if(kflag) sp += ekur;
+						sp     += ant;
+						if(kflag) sp += edelim + ekur;
 						sp     += ext;
 						return p.append(sp);
 				}

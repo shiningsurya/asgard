@@ -292,7 +292,7 @@ class CoaddMPI {
 								// read fbdata into inptr
 								for(int ifb = 0; ifb != f.size(); ifb++){
 										if(timenow >= f[ifb].tstart && timenow < f[ifb].tstop) {
-												i0 = ( timenow - f[ifb].tstart ) / f[ifb].tsamp;
+												i0 = ( timenow - f[ifb].tstart ) * 86400.0f / f[ifb].tsamp;
 												f[ifb].Unpack(inptrs[ifb], i0, tstep);
 										}
 										else{
