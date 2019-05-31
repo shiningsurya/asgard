@@ -27,10 +27,11 @@ int main(int ac, char * av[]){
 		opd.add("files",-1);
 		// parsing
 		try {
-				po::store(po::command_line_parser(ac,av).options(opt).run(), vm);
+				po::store(po::command_line_parser(ac,av).options(opt).positional(opd).run(), vm);
 				po::notify(vm);
 				if(ac == 1 || vm.count("files") == 0 || vm.count("help")) {
 						std::cout << opt << std::endl;
+						return 0;
 				}
 		}
 		catch(std::exception& e) {
