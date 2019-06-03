@@ -1,0 +1,65 @@
+#!/usr/bin/python
+### constants begin
+FILROOT = "/home/shining/study/MS/vLITE/mkerr/fil"
+ROOT = 0
+### constants end
+import os
+import pysigproc as psp
+from numpy import unique
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+import gc
+def ParseArgs():
+    import argparse
+    ap = argparse.ArgumentParser(prog='aghist', description='Asgard tool for step-wise histogram filterbank analysis', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('fils', help='Filterbank',nargs='*')
+    add('-n', help='Number of steps',default=10, type=int)
+    add('-p', help='Output plot file', default=None)
+    return ap.parse_args()
+if __name__ == "__main__":
+    args = ParseArgs()
+    # no edits
+    rn = range(args.n)
+    rbn = range(4)
+    # plots
+    yaxis = [1, 2, 3, 4]
+    tyaxis = [1.5, 2.5, 3.5, 4.5]
+    lyaxis = ['00', '01', '10', '11']
+    with PdfPages(args.p) as pdf:
+        # file
+        for fff in args.fils:
+            plt.figure(dpi=300)
+            fil = psp.SigprocFile(fff)
+            dur_secs = (fil.tend - fil.tstart) * 86400.0
+            n_secs   = dur_secs / args.n
+            wid = int(n_secs / fil.tsamp)
+            # work
+            for i in rn:
+                # gc
+                i0 = int(fil.tsamp * i * n_secs)
+                read = fil.unpack(i0, wid)[:,0,:]
+                # we know nifs=1
+                bits, counts = unique(read.ravel(), return_counts=True)
+                assert bits[0] ==  0.0
+                assert bits[1] ==  1.0
+                assert bits[2] ==  2.0
+                assert bits[3] ==  3.0
+                counts = 1.0 * counts / counts.sum()
+                # plot
+                plt.barh(yaxis, counts, left=i)
+                # txt
+                for j in rbn:
+                    plt.text(i + counts[j] + 0.05, tyaxis[j], "{0:2.1f}%".format(100*counts[j]), fontsize='x-small', fontweight='ultralight')
+                gc.collect()
+            # plot labels
+            plt.ylabel('Sample')
+            plt.xlabel('ISUBINT (zero based)')
+            plt.tight_layout()
+            plt.grid(True)
+            plt.title(os.path.basename(fff))
+            plt.yticks(tyaxis, lyaxis)
+            plt.xticks(rn)
+            pdf.attach_note(os.path.basename(fff))
+            pdf.savefig()
+            plt.close()
