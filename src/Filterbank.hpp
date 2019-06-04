@@ -299,7 +299,7 @@ struct FilterbankHeader {
 		double fch1, foff, tsamp;
 		int nchans, nbits, nifs;
 };
-
+#include <Redigitizer.hpp>
 class FilterbankWriter {
 		private:
 				unsigned char A, B, C, D, ucval;
@@ -307,23 +307,14 @@ class FilterbankWriter {
 				unsigned char * dd;
 				bios::mapped_file_sink fbdata;
 				timeslice it;
+				float alpha, beta, gamma, delta;
 				void _copy_fbdata(PtrFloat ret, timeslice datasamps, int nant) {
 						for(timeslice i = 0; i < datasamps;) {
-								ival = static_cast<int>(ret[i++] / nant);
-								A = (unsigned char) (ival & 0x03) << 6;
-								ival = static_cast<int>(ret[i++] / nant);
-								B = (unsigned char) (ival & 0x03) << 4;
-								ival = static_cast<int>(ret[i++] / nant);
-								C = (unsigned char) (ival & 0x03) << 2;
-								ival = static_cast<int>(ret[i++] / nant);
-								D = (unsigned char) (ival & 0x03) << 0;
-								//
-								//A = (unsigned char) ret[i++] & 0x03;
-								//B = (unsigned char) ret[i++] & 0x03 << 2;
-								//C = (unsigned char) ret[i++] & 0x03 << 4;
-								//D = (unsigned char) ret[i++] & 0x03 << 6;
-								ucval = A|B|C|D;	
-								dd[it++] = ucval;
+								alpha = ret[i++] / nant;
+								beta  = ret[i++] / nant;
+								gamma = ret[i++] / nant;
+								delta = ret[i++] / nant;
+								dd[it++] = dig2bit(alpha, beta, gamma, delta, nant); 
 						}
 				}
 				void _copy_header(Filterbank& from, double tst) {
