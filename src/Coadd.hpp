@@ -6,13 +6,13 @@
 #include "Filterbank.hpp"
 #include "xRFI.hpp"
 #include "Group.hpp"
-
-FilterbankList FLFromDE(DEList& x) {
+#include <iomanip>
+FilterbankList FLFromPL(PathList& x) {
 		FilterbankList ret;
 		FilterbankReader fbr;
-		for(fs::directory_entry& de : x) {
+		for(auto& de : x) {
 				Filterbank xx;
-				fbr.Read(xx, de.path().string()); 
+				fbr.Read(xx, de.string()); 
 				ret.push_back(xx);
 		}
 		return ret;
@@ -30,7 +30,7 @@ class Coadd {
 				std::string filename;
 				double load_secs;
 				float tfac, ffac;
-				float mintstart, maxdur;
+				double mintstart, maxdur, maxtstop;
 				timeslice retsize, i0, ddit;
 				FilterbankWriter fbw;
 				int method;
@@ -89,35 +89,31 @@ class Coadd {
 						std::size_t tdat_memsize = tdat_size * sizeof(float);
 						PtrFloat tdat = new float[tdat_size](); // uniform initialization
 						PtrFloat fbdat = new float[tdat_size](); // uniform initialization
-						float currTime = 0.0f;
+						double currTime = 0.0f;
 						for(timeslice i = 0; i < nsteps; i++) {
 								NumAnt = 0;
 								for(Filterbank& f : fl) {
 										// i0 * f.tsamp <-- timestep
-										currTime = i0 * f.tsamp;
-										if(currTime < f.duration && currTime >= (f.tstart - mintstart) ) {  
+										currTime = mintstart + ( i * load_secs / 86400.0f );
+										if(currTime < f.tstop && currTime >= f.tstart  ) {  
+												i0 = ( currTime - f.tstart ) * 86400.0f / f.tsamp;
 												f.Unpack(fbdat, i0, tstep);
 												// <--------------------->
 												// this is where you put your xrfi logic
 												// call here
-												if(!xxinitialized) _init_xxer(tstep, f.nchans);
-												if(!method)	_xxer(fbdat, tstep, f.nchans);
+												if(!xxinitialized && method) _init_xxer(tstep, f.nchans);
+												if(method)	_xxer(fbdat, tstep, f.nchans);
 												// <--------------------->
 												NumAnt++;
+#pragma omp parallel for
 												for(timeslice j = 0; j < tdat_size; j++) {
 														tdat[j] += fbdat[j]; 
 														fbdat[j] = 0.0f;
 												}
 										}
 								}
-								for(timeslice j = 0; j < tdat_size; j++) {
-										if(NumAnt == 0) tdat[j] = 0.0f;
-										else tdat[j] = std::floor(tdat[j] / NumAnt);
-										//else tdat[j] = std::floor(tdat[j]);
-								}
-								bw.WriteFBdata(tdat,ddit, tdat_size);
+								bw.WriteFBdata(tdat,ddit, tdat_size, NumAnt);
 								for(timeslice j = 0; j < tdat_size; j++) tdat[j] = 0.0f;
-								i0 += tstep;
 								ddit += tdat_size/4;
 								// * 4 bc 1 byte = 4 samples
 						}	
@@ -138,29 +134,30 @@ class Coadd {
 								tfac = 0.0f;
 								ffac = 0.0f;
 								//
-								bandshape = timeshape =  NULL;
-								bandflags = timeflags = NULL;
+								bandshape = timeshape =  nullptr;
+								bandflags = timeflags = nullptr;
 								method = 0;
 						}
-				void flagger(DEList& x) {
+				void flagger(PathList& x) {
 						FilterbankList fl; 
-						fl = FLFromDE(x);
+						fl = FLFromPL(x);
 						flagger( fl );
 				}
 				void flagger(FilterbankList& fl) {
 						// TODO
 				}
-				void coadd(DEList& x) {
+				void coadd(PathList& x) {
 						FilterbankList fl; 
-						fl = FLFromDE(x);
+						fl = FLFromPL(x);
 						coadd( fl );
 				}
 				void coadd(FilterbankList& fl) {
 						// compute max duration here
-						FloatVector duration_l, tstart_l;
-						std::for_each(fl.begin(), fl.end(), [&duration_l, &tstart_l](Filterbank& bf) { duration_l.push_back( (float)bf.duration ); tstart_l.push_back( (float) bf.tstart );  });
-						maxdur = *(std::max_element(duration_l.begin(), duration_l.end()));
+						DoubleVector tstop_l, tstart_l;
+						std::for_each(fl.begin(), fl.end(), [&tstop_l, &tstart_l](Filterbank& bf) { tstop_l.push_back( bf.tstop); tstart_l.push_back( bf.tstart );  });
+						maxtstop = *(std::max_element(tstop_l.begin(), tstop_l.end()));
 						mintstart = *(std::min_element(tstart_l.begin(), tstart_l.end()));
+						maxdur = 86400.0f * ( maxtstop - mintstart );
 						ddit = fbw.Initialize(filename, fl[0], maxdur, mintstart);
 						// until writing to filterbank is done in steps
 						_serial(fl, fbw);

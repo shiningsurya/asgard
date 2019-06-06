@@ -16,6 +16,12 @@ static inline int quant2bit_3(float a) {
 		else if(a <= 2.14) return 2;
 		else return 3;
 }
+static inline int quant2bit_4(float a) {
+		if(a <= 1.31) return 0;
+		else if(a <= 1.77) return 1;
+		else if(a <= 2.37) return 2;
+		else return 3;
+}
 static inline int quant2bit_5(float a) {
 		if(a <= 1.40) return 0;
 		else if(a <= 2.00) return 1;
@@ -82,13 +88,12 @@ static inline int quant2bit_15(float a) {
 		else if(a <= 2.87) return 2;
 		else return 3;
 }
-static inline int quant2bit_10(float a) {
+static inline int quant2bit_16(float a) {
 		if(a <= 2.45) return 0;
 		else if(a <= 2.71) return 1;
 		else if(a <= 2.88) return 2;
 		else return 3;
 }
-
 
 static inline int quant2bit(int nant, float a) {
 		if(nant == 1)       return quant2bit_1(a);
@@ -127,8 +132,8 @@ unsigned char dig2bit(float a, float b, float c, float d, int numant) {
 unsigned char dig4bit(float a, float b) {
 		unsigned char A, B;	
 		A = (unsigned char) (quant4bit(a) & 0x07) << 4;
-		std::cout << " a =  " << a << " A =  " << std::bitset<8>(A) << std::endl;
+		//std::cout << " a =  " << a << " A =  " << std::bitset<8>(A) << std::endl;
 		B = (unsigned char) (quant4bit(b) & 0x07) << 0;
-		std::cout << " b =  " << b << " B =  " << std::bitset<8>(B) << std::endl;
+		//std::cout << " b =  " << b << " B =  " << std::bitset<8>(B) << std::endl;
 		return A|B;
 }
