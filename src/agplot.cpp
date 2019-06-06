@@ -96,7 +96,7 @@ int main(int ac, char * av[]){
 				return 1;
 		}
 		std::string strcs("candsummary"), strd("dplot"), strwf("waterfall"), strcwf("coarse_waterfall");
-		if(!fildirs.size() || !candirs.size()){
+		if(!fildirs.empty() || !candirs.empty()){
 				// files given manually
 				// fildir --> FilterbankList
 				// candirs --> CandidateAntenna
@@ -110,20 +110,12 @@ int main(int ac, char * av[]){
 						if(! fs::exists(xp)) fs::create_directory(xp);
 						if(pin == 's') {
 								// candidate summary plot
-								if(!clist.size()) {
-										std::cerr << "Requested Candidate Summary Plot but no candidates specified\n";
-										return -1;
-								}
 								FCGroup = clist[0][0].group;
 								CandSummary cs((xp / (FCGroup + std::string("_candsummary.png/png"))).string(), tsamp);
 								cs.Plot(clist);
 						}
 						else if(pin == 'd') {
 								// dplot
-								if(!flist.size()) {
-										std::cerr << "Requested DPlot but no Filterbanks specified\n";
-										return -1;
-								}
 								for(auto& ff : flist) {
 										FCGroup = ff.group;
 										DPlot cp( (xp / (FCGroup+ std::string("_") + ff.antenna + std::string("_dplot.png/png"))).string(),timestep, fschanout , ffac, tfac);
@@ -132,29 +124,19 @@ int main(int ac, char * av[]){
 						}
 						else if(pin == 'w') {
 								// waterfall plot
-								if(!flist.size()) {
-										std::cerr << "Requested Waterfall Plot but no Filterbanks specified\n";
-										return -1;
-								}
 								FCGroup = flist[0].group;
 								Waterfall wf( (xp / (FCGroup + std::string("waterfall.png/png"))).string(), timestep, fschanout);
 								wf.Plot(flist);
 						}
 						else if(pin == 'q') {
 								// coarse waterfall plot
-								if(!flist.size()) {
-										std::cerr << "Requested Coarse Waterfall Plot but no Filterbanks specified\n";
-										return -1;
-								}
 								FCGroup = flist[0].group;
 								Waterfall wf( (xp / (FCGroup + std::string("_waterfall.png/png"))).string(), timestep, ctimestep, fschanout);
 								wf.Plot(flist);
 						}
 				}
-
 		}
-#if 0
-		else if(!fdirs.size() || !cdirs.size()) {
+		else if(!fdirs.empty() || !cdirs.empty()) {
 				// This is Crawling and plotting logic
 				AnalyzeFB fb;
 				int imin = fdirs.size() < cdirs.size() ? fdirs.size() : cdirs.size();
@@ -188,12 +170,14 @@ int main(int ac, char * av[]){
 										if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 												// nokur
 												CandSummary cs((pxp / (groups[gin] + std::string("_candsummary.png/png"))).string(), tsamp);
-												cs.Plot(fb.cands[groups[gin]]);	
+												auto clist = CAFromPL(fb.cands[groups[gin]]);
+												cs.Plot(clist);	
 										}
 										if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 												// kur
 												CandSummary cs( (pxp / (groups[gin] + std::string("_kur_candsummary.png/png"))).string(), tsamp);
-												cs.Plot(fb.kcands[groups[gin]]);	
+												auto clist = CAFromPL(fb.kcands[groups[gin]]);
+												cs.Plot(clist);
 										}
 								}
 								else if(pin == 'd') {
@@ -203,7 +187,7 @@ int main(int ac, char * av[]){
 										if(rfiflag[gin] == 0 || rfiflag[gin] == 2) {
 												// nokur
 												for(auto ff : fb.fils[groups[gin]]) {
-														DPlot cp( (pxp / (groups[gin] + std::string("_") + GetAntenna(ff.path().string()) + std::string("_dplot.png/png"))).string(),timestep, fschanout , ffac, tfac);
+														DPlot cp( (pxp / (groups[gin] + std::string("_") + GetAntenna(ff.string()) + std::string("_dplot.png/png"))).string(),timestep, fschanout , ffac, tfac);
 														cp.Plot(ff, xrfimet);	
 
 												}
@@ -211,7 +195,7 @@ int main(int ac, char * av[]){
 										if(rfiflag[gin] == 1 || rfiflag[gin] == 2) {
 												// kur
 												for(auto ff : fb.kfils[groups[gin]]) {
-														DPlot cp( (pxp / (groups[gin] + std::string("_")+GetAntenna(ff.path().string()) + std::string("_kur_dplot.png/png"))).string(),timestep, fschanout, ffac, tfac );
+														DPlot cp( (pxp / (groups[gin] + std::string("_")+GetAntenna(ff.string()) + std::string("_kur_dplot.png/png"))).string(),timestep, fschanout, ffac, tfac );
 														cp.Plot(ff, xrfimet);	
 
 												}
@@ -250,8 +234,6 @@ int main(int ac, char * av[]){
 						}
 				}
 		}
-#endif  // fix this code later
-		// Should there be a need
 		else {
 				std::cerr << "No files given\n";
 				return -1;
