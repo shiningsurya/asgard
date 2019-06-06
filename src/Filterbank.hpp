@@ -16,6 +16,8 @@
 #define UPMED2BITS 48
 #define LOMED2BITS 12
 #define LO2BITS 3
+#define LO4BITS 15 
+#define UP4BITS 240
 namespace bios = boost::iostreams;
 //#include <fstream>
 //typedef long unsigned int timeslice;
@@ -36,6 +38,7 @@ class Filterbank {
 				double duration, tstart,tsamp,fch1,foff,src_raj,src_dej, tstop;
 				int headersize;
 				long int datasize, totalsamp;
+				unsigned bmin, bmax;
 				// printing
 				friend std::ostream& operator<< (std::ostream& os, const Filterbank& fb);
 				// Read data
@@ -61,11 +64,23 @@ class Filterbank {
 						dd = fbdata.data(); // <-- this is data
 						for(timeslice it = b0; it < b1; it++) {
 								dc = dd[it]; // read one character
-								// one character has 4 samples
-								fbf[ii++] = (float) (dc & LO2BITS); 
-								fbf[ii++] = (float) ((dc & LOMED2BITS) >> 2); 
-								fbf[ii++] = (float) ((dc & UPMED2BITS) >> 4); 
-								fbf[ii++] = (float) ((dc & HI2BITS) >> 6); 
+								if(nbits == 2) {
+										// one character has 4 samples
+										fbf[ii++] = (float) (dc & LO2BITS); 
+										fbf[ii++] = (float) ((dc & LOMED2BITS) >> 2); 
+										fbf[ii++] = (float) ((dc & UPMED2BITS) >> 4); 
+										fbf[ii++] = (float) ((dc & HI2BITS) >> 6); 
+								}
+								else if(nbits == 4) {
+										// one character has 2 samples
+										fbf[ii++] = (float) ((dc & LO4BITS) >> 0); 
+										fbf[ii++] = (float) ((dc & UP4BITS) >> 4); 
+								}
+								else if(nbits == 8) {
+										// one character has 1 samples
+										fbf[ii++] = (float) dc;
+								}
+
 						}
 						// return is 2d array of size td * nchans
 				}
@@ -129,6 +144,8 @@ class FilterbankReader {
 						fb.isKur = QueryKurtosis(ifile);
 						fb.group = GetGroup(ifile);
 						fb.tstop = fb.tstart + ( fb.duration / 86400.0f );
+						fb.bmin = 0;
+						fb.bmax = (2^fb.nbits) - 1;
 						fclose(inputfile);
 						return 0;
 				}
@@ -314,7 +331,7 @@ class FilterbankWriter {
 								beta  = ret[i++] / nant;
 								gamma = ret[i++] / nant;
 								delta = ret[i++] / nant;
-								dd[it++] = dig2bit(alpha, beta, gamma, delta, nant); 
+								dd[it++] = dig2bit(alpha, beta, gamma, delta, 0); 
 						}
 				}
 				void _copy_header(Filterbank& from, double tst) {

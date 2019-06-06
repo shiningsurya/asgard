@@ -116,6 +116,11 @@ class Waterfall : protected Plotter {
 						fl = FLFromDE(x);
 						Plot( fl );
 				}
+				void Plot(PathList& x) {
+						FilterbankList fl; 
+						fl = FLFromPL(x);
+						Plot( fl );
+				}
 				void Plot(FilterbankList& fl) {
 						std::sort(fl.begin(), fl.end(), FCompare); 
 						std::string idx;
@@ -204,7 +209,7 @@ class Waterfall : protected Plotter {
 										operations::Crunch(juice, f.nchans, wid, chanout, widout, juice2);
 										cpgsfs(1);
 										cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
-										cpgimag(juice2, chanout,  widout, 1, chanout, 1, widout, 0, 3, tr);
+										cpgimag(juice2, chanout,  widout, 1, chanout, 1, widout, f.bmin, f.bmax, tr);
 										//cpgimag(juice.data(), f.nchans, wid, 1, f.nchans, 1, wid, 0, 3, trf);
 										cpgmtxt("RV",2,.5,0.5,f.antenna.c_str());
 										ymin = ymax + 0.02;
@@ -238,6 +243,11 @@ class DPlot : protected Plotter {
 				void Plot(fs::directory_entry ff, int method) {
 						Filterbank xx;
 						fbr.Read(xx, ff.path().string()); 
+						Plot(xx, method);
+				}
+				void Plot(fs::path ff, int method) {
+						Filterbank xx;
+						fbr.Read(xx, ff.string()); 
 						Plot(xx, method);
 				}
 				void Plot(Filterbank& f, int method) {
