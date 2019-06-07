@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python2.7
 ### constants begin
 FILROOT = "/home/shining/study/MS/vLITE/mkerr/fil"
 ROOT = 0
@@ -6,6 +6,8 @@ ROOT = 0
 import os
 import pysigproc as psp
 from numpy import unique
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import gc
@@ -60,6 +62,5 @@ if __name__ == "__main__":
             plt.title(os.path.basename(fff))
             plt.yticks(tyaxis, lyaxis)
             plt.xticks(rn)
-            pdf.attach_note(os.path.basename(fff))
             pdf.savefig()
             plt.close()
