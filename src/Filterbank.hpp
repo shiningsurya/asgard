@@ -18,6 +18,10 @@
 #define LO2BITS 3
 #define LO4BITS 15 
 #define UP4BITS 240
+#ifdef _DEBUG
+#include<bitset>
+#include<fstream>
+#endif
 namespace bios = boost::iostreams;
 //#include <fstream>
 //typedef long unsigned int timeslice;
@@ -319,6 +323,11 @@ struct FilterbankHeader {
 #include <Redigitizer.hpp>
 class FilterbankWriter {
 		private:
+#ifdef _DEBUG
+				std::ofstream debug_file;
+				long debnum;
+				// debug 
+#endif // _DEBUG
 				unsigned char A, B, C, D, ucval;
 				int ival;
 				unsigned char * dd;
@@ -347,6 +356,10 @@ class FilterbankWriter {
 								for(timeslice i = 0; i < datasamps;) {
 										alpha = ret[i++] / nant;
 										dd[it++] = dig8bit(alpha, 0); 
+#ifdef _DEBUG
+if(debnum-- && debug_file.good())
+		debug_file << alpha << "  " << std::bitset<8>(dig8bit(alpha,0)) << std::endl;
+#endif  // _DEBUG
 								}
 						}
 				}
@@ -421,6 +434,10 @@ class FilterbankWriter {
 		public:
 				FilterbankWriter() {
 						// chill empty initialization
+#ifdef _DEBUG
+						debug_file.open("debug.file");
+						debnum = 2048L;
+#endif // _DEBUG
 				}
 				timeslice Initialize(std::string fname, Filterbank& takeHeader, double dur, double tstrt, int nbits) {
 						// dur is the length
@@ -468,6 +485,9 @@ class FilterbankWriter {
 				void Close() {
 						// close the mmap file here
 						fbdata.close();
+#ifdef _DEBUG
+						debug_file.close();
+#endif  // _DEBUG
 				}
 };
 #endif
