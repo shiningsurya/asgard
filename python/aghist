@@ -5,9 +5,9 @@ ROOT = 0
 ### constants end
 import os
 import pysigproc as psp
-from numpy import unique
 import matplotlib
 matplotlib.use('Agg')
+from numpy import unique, arange, zeros
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_pdf import PdfPages
 import gc
@@ -23,16 +23,15 @@ if __name__ == "__main__":
     args = ParseArgs()
     # no edits
     rn = range(args.n)
-    rbn = range(4)
     # plots
-    yaxis = [1, 2, 3, 4]
-    tyaxis = [1.5, 2.5, 3.5, 4.5]
-    lyaxis = ['00', '01', '10', '11']
     with PdfPages(args.p) as pdf:
         # file
         for fff in args.fils:
             plt.figure(dpi=300)
             fil = psp.SigprocFile(fff)
+            bmin, bmax = 0, ( 2 ** fil.nbits ) - 1
+            brange = arange(bmin, bmax+1)
+            bcount = zeros(brange.size)
             dur_secs = (fil.tend - fil.tstart) * 86400.0
             n_secs   = dur_secs / args.n
             wid = int(n_secs / fil.tsamp)
@@ -43,16 +42,19 @@ if __name__ == "__main__":
                 read = fil.unpack(i0, wid)[:,0,:]
                 # we know nifs=1
                 bits, counts = unique(read.ravel(), return_counts=True)
-                assert bits[0] ==  0.0
-                assert bits[1] ==  1.0
-                assert bits[2] ==  2.0
-                assert bits[3] ==  3.0
                 counts = 1.0 * counts / counts.sum()
+                # scaling
+                fac = counts.max() - counts.min()
+                counts = counts - counts.min()
+                counts = counts / fac
+                for b, c in zip(bits, counts):
+                    bcount[brange == b] = c
                 # plot
-                plt.barh(yaxis, counts, left=i)
+                plt.barh(brange+1, bcount, left=i, color='b')
                 # txt
-                for j in rbn:
-                    plt.text(i + counts[j] + 0.05, tyaxis[j], "{0:2.1f}%".format(100*counts[j]), fontsize='x-small', fontweight='ultralight')
+                for j in brange:
+                    if fil.nbits < 8:
+                        plt.text(i + bcount[j] + 0.05, brange[j] + 2, "{0:2.1f}%".format(100*bcount[j]), fontsize='x-small', fontweight='ultralight')
                 gc.collect()
             # plot labels
             plt.ylabel('Sample')
@@ -60,7 +62,12 @@ if __name__ == "__main__":
             plt.tight_layout()
             plt.grid(True)
             plt.title(os.path.basename(fff))
-            plt.yticks(tyaxis, lyaxis)
+            plt.ylim([bmin, bmax])
+            plt.xlim([0,args.n])
+            if fil.nbits > 2:
+                plt.yticks(brange[::5]+1.5, map(lambda xx: "{0:02d}".format(xx),brange[::5]))
+            else:
+                plt.yticks(brange+1.5, map(lambda xx: "{0:02d}".format(xx),brange))
             plt.xticks(rn)
             pdf.savefig()
             plt.close()
