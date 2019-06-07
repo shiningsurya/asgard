@@ -16,7 +16,8 @@ int main(int ac, char * av[]) {
 		bool kur;
 		float loadsecs;
 		StringVector groups;
-		std::string dofile("/home/vlite-master/surya/dankspace"), ofile, dpre("/mnt/ssd/fildata/"), prefix;
+		std::string dodir("/home/vlite-master/surya/dankspace/"), odir, dpre("/mnt/ssd/fildata/"), prefix;
+		std::string ekfil("ea99_kur.fil"), efil("ea99.fil");
 		// po
 		po::variables_map vm;
 		po::options_description opt("Options");
@@ -26,7 +27,7 @@ int main(int ac, char * av[]) {
 				("group,g", po::value<StringVector>(&groups)->composing(), "Groups")
 				("loadsecs", po::value<float>(&loadsecs)->default_value(2.0f), "Timestep (s)")
 				("xrfi,r", po::value<bool>(&kur)->default_value(true), "True for Kurtosis (def)\nOtherwise non kurtosis.")
-				("ofile,o", po::value<std::string>(&ofile)->default_value(dofile), "Output file")
+				("odir,o", po::value<std::string>(&odir)->default_value(dodir), "Output directory")
 				("prefix", po::value<std::string>(&prefix)->default_value(dpre), "Prefix for fildata.")
 				("help,h", "Prints help");
 		opd.add("group",-1);
@@ -48,8 +49,9 @@ int main(int ac, char * av[]) {
 		param.rootpath.push_back(prefix);
 		param.loadsecs = loadsecs;
 		param.kur = kur;
-		param.outfile = ofile;
 		param.group_string = groups[0];
+		if(param.kur) param.outfile = odir + eslash + param.group_string + ekfil;
+		else param.outfile = odir + eslash + param.group_string + efil;
 		// TODO multiple group work
 		CoaddMPI cd;
 		cd.Work(param);

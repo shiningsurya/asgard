@@ -158,7 +158,7 @@ class Coadd {
 						maxtstop = *(std::max_element(tstop_l.begin(), tstop_l.end()));
 						mintstart = *(std::min_element(tstart_l.begin(), tstart_l.end()));
 						maxdur = 86400.0f * ( maxtstop - mintstart );
-						ddit = fbw.Initialize(filename, fl[0], maxdur, mintstart);
+						ddit = fbw.Initialize(filename, fl[0], maxdur, mintstart, fl[0].nbits);
 						// until writing to filterbank is done in steps
 						_serial(fl, fbw);
 				}
@@ -202,9 +202,9 @@ class CoaddMPI {
 				mpi::environment env;
 				mpi::communicator world;
 				PathList filpathlist;
-				StringVector filstringlist;
+				StringVector filstringlist, All_hostnames;
 				std::vector<StringVector> All_filpathlist;
-				int root;
+				int root, nbits;
 				void work_one_group(const CoaddMPI_Params& param) {
 						// coadd variables
 						double mintstart, maxtstop, duration, tstart, tstop;
@@ -231,10 +231,14 @@ class CoaddMPI {
 						 * **/
 						// aggregate in root For debugging
 						mpi::gather(world, filstringlist , All_filpathlist, root);
+						mpi::gather(world, env.processor_name(), All_hostnames, root);
 						if(world.rank() == root) {
-								for(auto& vSv : All_filpathlist) 
-										for(auto& Sv : vSv)
-												std::cout << " I " << Sv << std::endl;
+								for(int iii = 0; iii !=  All_filpathlist.size(); iii++)
+										for(auto& Sv : All_filpathlist[iii]) {
+												std::cout << " I " << Sv << " @ " << All_hostnames[iii];
+												if(All_hostnames[iii] == env.processor_name()) std::cout << "*";
+												std::cout << std::endl;
+										}
 						}
 						FilterbankList f;
 						for(auto& xpl : filpathlist) {
@@ -265,8 +269,10 @@ class CoaddMPI {
 						// write fb header logic
 						// reading f[0] lol
 						if(world.rank() == root) {
-								boundcheck = fbw.Initialize(param.outfile, f[0],  duration, mintstart);
+								nbits = f[0].nbits;
+								boundcheck = fbw.Initialize(param.outfile, f[0],  duration, mintstart, nbits);
 						}
+						mpi::broadcast(world, nbits, root);
 						// figure out tstep(width)
 						tstep = param.loadsecs / f[0].tsamp;				
 						numelems = tstep * f[0].nchans;
@@ -318,7 +324,7 @@ class CoaddMPI {
 										fbw.WriteFBdata(outptr, boundcheck, numelems, numants);
 										// incrementing as in serial
 										// NB see comments in serial code
-										boundcheck += numelems/4;
+										boundcheck += (numelems * nbits / 8);
 										i++;
 								}
 						}

@@ -117,6 +117,9 @@ static inline int quant2bit(int nant, float a) {
 static inline int quant4bit(float a) {
 		return static_cast<int>(a);
 }
+static inline int quant8bit(float a) {
+		return static_cast<int>(a);
+}
 unsigned char dig2bit(float a, float b, float c, float d, int numant) {
 		unsigned char A, B, C, D;	
 		A = (unsigned char) (quant2bit(numant, a) & 0x03) << 6;
@@ -129,11 +132,14 @@ unsigned char dig2bit(float a, float b, float c, float d, int numant) {
 		//std::cout << " d =  " << d << " D =  " << std::bitset<8>(D) << std::endl;
 		return A|B|C|D;
 }
-unsigned char dig4bit(float a, float b) {
+unsigned char dig4bit(float a, float b, int numant) {
 		unsigned char A, B;	
 		A = (unsigned char) (quant4bit(a) & 0x07) << 4;
 		//std::cout << " a =  " << a << " A =  " << std::bitset<8>(A) << std::endl;
 		B = (unsigned char) (quant4bit(b) & 0x07) << 0;
 		//std::cout << " b =  " << b << " B =  " << std::bitset<8>(B) << std::endl;
 		return A|B;
+}
+unsigned char dig8bit(float a, int numant) {
+		return (unsigned char) quant8bit(a);
 }

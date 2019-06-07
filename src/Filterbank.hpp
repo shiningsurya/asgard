@@ -38,7 +38,7 @@ class Filterbank {
 				double duration, tstart,tsamp,fch1,foff,src_raj,src_dej, tstop;
 				int headersize;
 				long int datasize, totalsamp;
-				unsigned bmin, bmax;
+				unsigned int bmin, bmax;
 				// printing
 				friend std::ostream& operator<< (std::ostream& os, const Filterbank& fb);
 				// Read data
@@ -325,13 +325,29 @@ class FilterbankWriter {
 				bios::mapped_file_sink fbdata;
 				timeslice it;
 				float alpha, beta, gamma, delta;
+				int nbits;
 				void _copy_fbdata(PtrFloat ret, timeslice datasamps, int nant) {
-						for(timeslice i = 0; i < datasamps;) {
-								alpha = ret[i++] / nant;
-								beta  = ret[i++] / nant;
-								gamma = ret[i++] / nant;
-								delta = ret[i++] / nant;
-								dd[it++] = dig2bit(alpha, beta, gamma, delta, 0); 
+						if(nbits == 2) {
+								for(timeslice i = 0; i < datasamps;) {
+										alpha = ret[i++] / nant;
+										beta  = ret[i++] / nant;
+										gamma = ret[i++] / nant;
+										delta = ret[i++] / nant;
+										dd[it++] = dig2bit(alpha, beta, gamma, delta, 0); 
+								}
+						}
+						else if(nbits == 4) {
+								for(timeslice i = 0; i < datasamps;) {
+										alpha = ret[i++] / nant;
+										beta  = ret[i++] / nant;
+										dd[it++] = dig4bit(alpha, beta, 0); 
+								}
+						}
+						else if(nbits == 8) {
+								for(timeslice i = 0; i < datasamps;) {
+										alpha = ret[i++] / nant;
+										dd[it++] = dig8bit(alpha, 0); 
+								}
 						}
 				}
 				void _copy_header(Filterbank& from, double tst) {
@@ -349,6 +365,7 @@ class FilterbankWriter {
 						send_double("foff",from.foff);
 						send_int("nchans",from.nchans);
 						send_int("nbits",from.nbits);
+						nbits = from.nbits;
 						send_double("tstart",tst);
 						send_double("tsamp",from.tsamp);
 						send_int("nifs",from.nifs);
@@ -370,6 +387,7 @@ class FilterbankWriter {
 						send_double("foff",from.foff);
 						send_int("nchans",from.nchans);
 						send_int("nbits",from.nbits);
+						nbits = from.nbits;
 						send_double("tstart",tst);
 						send_double("tsamp",from.tsamp);
 						send_int("nifs",from.nifs);
@@ -404,13 +422,13 @@ class FilterbankWriter {
 				FilterbankWriter() {
 						// chill empty initialization
 				}
-				timeslice Initialize(std::string fname, Filterbank& takeHeader, double dur, double tstrt) {
+				timeslice Initialize(std::string fname, Filterbank& takeHeader, double dur, double tstrt, int nbits) {
 						// dur is the length
 						// tstrt is the starting time
 						// take headers from f and account for dur and tstrt
 						//
 						//outputfile = fopen(fname.c_str(),"wb");
-						std::size_t flength = takeHeader.headersize + (dur/takeHeader.tsamp *takeHeader.nchans)/4;
+						std::size_t flength = takeHeader.headersize + (dur/takeHeader.tsamp *takeHeader.nchans * nbits)/8;
 						// by 4 because one byte yields 4 samples
 						bios::mapped_file_params param;
 						param.path = fname;
@@ -442,6 +460,7 @@ class FilterbankWriter {
 						ret.foff = from.foff;
 						ret.nchans = from.nchans;
 						ret.nbits = from.nbits;
+						nbits = from.nbits;
 						ret.tsamp = from.tsamp;
 						ret.nifs = from.nifs;
 						return ret;
