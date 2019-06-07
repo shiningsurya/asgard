@@ -15,6 +15,7 @@ namespace po = boost::program_options;
 
 int main(int ac, char * av[]){
 		PathList files;
+		timeslice unpack;
 		FilterbankReader fbr;
 		// po
 		po::variables_map vm;
@@ -23,6 +24,7 @@ int main(int ac, char * av[]){
 		// adding options
 		opt.add_options()
 				("files,f", po::value<PathList>(&files)->composing(), "Filterbank file(s).")
+				("unpack,u", po::value<timeslice>(&unpack), "Data sample requested.")
 				("help,h", "Prints help");
 		opd.add("files",-1);
 		// parsing
@@ -42,7 +44,16 @@ int main(int ac, char * av[]){
 		for(auto& x : files) {
 				Filterbank fb;
 				fbr.Read(fb, x.string());
-				std::cout << fb;
+				if(vm.count("unpack")) {
+						PtrFloat da = new float [ unpack * fb.nchans  ];
+						fb.Unpack(da, 1L, unpack);
+						for(timeslice ii = 0; ii < unpack*fb.nchans; ii++) std::cout << da[ii] << "  ";
+						std::cout << std::endl;
+						delete[] da;
+				}
+				else {
+						std::cout << fb;
+				}
 		}
 		return 0;
 }

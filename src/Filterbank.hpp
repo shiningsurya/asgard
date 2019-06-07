@@ -66,32 +66,37 @@ class Filterbank {
 						timeslice b0 = (nstart * b_per_spectrum) + headersize;
 						timeslice b1 = (nsamp * b_per_spectrum) + b0;
 						dd = fbdata.data(); // <-- this is data
-						for(timeslice it = b0; it < b1; it++) {
-								dc = dd[it]; // read one character
-								if(nbits == 2) {
+						if(nbits == 2) {
+								for(timeslice it = b0; it < b1;it++) {
+										dc = (unsigned char) dd[it];
 										// one character has 4 samples
 										fbf[ii++] = (float) (dc & LO2BITS); 
 										fbf[ii++] = (float) ((dc & LOMED2BITS) >> 2); 
 										fbf[ii++] = (float) ((dc & UPMED2BITS) >> 4); 
 										fbf[ii++] = (float) ((dc & HI2BITS) >> 6); 
 								}
-								else if(nbits == 4) {
+						}
+						else if(nbits == 4) {
+								for(timeslice it = b0; it < b1;it++) {
+										dc = (unsigned char) dd[it];
 										// one character has 2 samples
 										fbf[ii++] = (float) ((dc & LO4BITS) >> 0); 
 										fbf[ii++] = (float) ((dc & UP4BITS) >> 4); 
 								}
-								else if(nbits == 8) {
+						}
+						else if(nbits == 8) {
+								for(timeslice it = b0; it < b1;it++) {
+										dc = (unsigned char) dd[it];
 										// one character has 1 samples
 										fbf[ii++] = (float) dc;
 								}
-
 						}
 						// return is 2d array of size td * nchans
 				}
 		private:
 				bool mmap;
 				const char *dd; 
-				char dc;
+				unsigned char dc;
 				bios::mapped_file_source fbdata;
 				void OneTimeMMap() {
 						fbdata.open(filename);		
