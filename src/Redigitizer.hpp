@@ -1,3 +1,10 @@
+#define HI2BITS 192
+#define UPMED2BITS 48
+#define LOMED2BITS 12
+#define LO2BITS 3
+#define LO4BITS 15 
+#define UP4BITS 240
+
 static inline int quant2bit_1(float a) {
 		if(a <= 0.09) return 0;
 		else if(a <= 0.38) return 1;
@@ -11,8 +18,7 @@ static inline int quant2bit_2(float a) {
 		else return 3;
 }
 static inline int quant2bit_3(float a) {
-		if(a <= 0.81) return 0;
-		else if(a <= 1.44) return 1;
+		if(a <= 0.81) return 0; else if(a <= 1.44) return 1;
 		else if(a <= 2.14) return 2;
 		else return 3;
 }
