@@ -118,31 +118,31 @@ class CandidateSet(dict):
             ( I1 - I0 ) * TSAMP
         4. DM
     '''
-    def __init__(self, cpath, group, fpath=None, antenna=None, fromdict=None, gl=0.0, gb=0.0):
+    def __init__(self, cpath, group=None, fpath=None, antenna=None, gl=0.0, gb=0.0):
         '''
         Creates a CandidateSet object where 
         all the candidates belong to a single group.
 
         Arguments
         ---------
-        cpath : str
-            Path to candidates
+        cpath : str, list
+            Path to candidates str
+            list of CandidateData
         group: str
             Groups to consider
-        fromdict: dict
-            Save from crawl
         gl: Galactic coordinates : Latitude
         gb: Galactic coordinates : Longitude 
         '''
-        if fromdict is None:
+        if isinstance(cpath, str):
             self.group = group
             self.cpath = cpath
             self.__group_action(cpath, group, fpath)
-        else:
-            dict.copy(self, fromdict)
-            self.gl = 0.0
-            self.gb = 0.0
-
+        elif isinstance(cpath, list):
+            for x in cpath:
+                self.__setitem__(x.ant, x)
+            self.gl = gl 
+            self.gb = gb
+            self.group = group
 
     def __group_action(self, cpath, group, fpath):
         # walk logic

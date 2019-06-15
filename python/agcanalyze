@@ -3,12 +3,14 @@
 CANDROOT = "/mnt/ssd/cand"
 CANDROOT = "/home/shining/study/MS/vLITE/mkerr/cands"
 ROOT = 0
+TESTDIRMAP = ['ea05', 'ea08', 'ea10', 'ea14', 'ea26']
+TESTGROUP = '20180321_003823_muos'
 ### constants end
 '''
     asgard::agcanalyze
     ------------------
     Python code to candidate aggregation for post data analysis. 
-    Makes use of boost.mpi python library for it's MPI tasks.
+    Makes use of mpi4py python library for it's MPI tasks.
     MO:
         - Group is decided.
         - A `CandidateData` object is created at each node which is brought 
@@ -21,8 +23,10 @@ ROOT = 0
         TODO
 '''
 import os
-import boost.mpi as bm
+from mpi4py import MPI as mp
+comm = mp.COMM_WORLD
 import CandidateData as cd
+import CandidateSet as cs
 ## variables for Bcast
 group = None
 enable_prom = False
@@ -31,18 +35,19 @@ def ParseArgs():
     '''For argument parsing'''
     ap = argparse.ArgumentParser(prog='agcanalyze', description='Asgard tool for quasi real time distributed candidate analysis.', epilog='Part of Asgard')
     add = ap.add_argument
-    add('group', help = 'Group to work on.')
+    add('group', help = 'Group to work on.', type=str)
     # begin
     # aggreate to a file
     add('-o', help = 'Aggregate to a CandidateSet pickle in ROOT.', dest = 'ofile')
     # aggreate to a file with auto name
-    add('-O', help = 'Same as -o but filename is group.', action='store_true')
+    add('-O', help = 'Same as -o but filename is group.', dest='Ofile')
     # plot 
     add('-p', help = 'Plot options.\nPlot will be made in ROOT.', dest = 'plot')
     # prometheus exporter
     add('-P', action='store_true', help = 'Enable prometheus exporter at all nodes.', dest='prometheus')
     # coincider
     add('-c', action='store_true', help = 'Run coincider on ROOT.', dest='coincide')
+    add('--prefix', help = 'Directory prefix.', default='/mnt/ssd/cand/', dest='prefix')
     # done
     return ap.parse_args()
 def GetAntenna(x):
@@ -58,21 +63,23 @@ def GetAntenna(x):
     if len(toks) >= 4 and ext == '.cand':
         return toks[3]
 
-
+SIZE = comm.Get_size()
+RANK = comm.Get_rank()
 if __name__ == '__main__':
-    if bm.world.rank == ROOT:
+    if RANK == ROOT:
         args = ParseArgs()
         enable_prom = args.prometheus
         group = args.group
         print args
     ## Housekeeping
     ## Bcasts
-    group =  bm.broadcast(bm.world, group, ROOT)
-    enable_prom = bm.broadcast(bm.world, enable_prom, ROOT)
+    group =  comm.bcast(group, root=ROOT)
+    enable_prom = comm.bcast(enable_prom, root=ROOT)
     ## Actual work
     ### NB ROOT=vlite-nrl 
     try:
-        cfiles = [x for x in os.listdir(CANDROOT) if group in os.path.basename(x)]
+        # cfiles = [x for x in os.listdir(args.prefix) if group in os.path.basename(x)]
+        cfiles = [x for x in os.listdir(os.path.join(CANDROOT,"test_agcanalyze",TESTDIRMAP[RANK])) if os.path.basename(x).startswith(group)]
     except:
         cfiles = []
     if len(cfiles) > 1:
@@ -86,17 +93,26 @@ if __name__ == '__main__':
             g_cands = cd.CandidateData(f.readlines(), ant = GetAntenna(candfile))
     elif len(cfiles) == 0 :
         # Create a NullCandidateData
-        g_cands = cd.NullCandidateData(bm.processor_name)
+        g_cands = cd.NullCandidateData(os.uname()[1])
     else:
         # perfect world case
         candfile = cfiles[0]
         with open(os.path.join(CANDROOT, candfile), 'r') as f:
             g_cands = cd.CandidateData(f.readlines(), ant = GetAntenna(candfile))
     ### gather in ROOT
-    group_cands = bm.gather(bm.world, g_cands, ROOT)
-    if bm.world.rank == ROOT:
-        print group_cands
-        print map(lambda x : x.ant, group_cands)
+    if args.ofile or args.Ofile:
+        group_cands = comm.gather(g_cands, root=ROOT)
+        if RANK == ROOT:
+            print group_cands
+            print map(lambda x : x.ant, group_cands)
+            candset = cs.CandidateSet(group_cands,group=group,gl=0,gb=0)
+                import pickle as pkl
+                if args.Ofile:
+                    filename = os.path.join( args.Ofile, candset.group + "_candset.pkl" )
+                else:
+                    filename = args.ofile
+                with open(filename, "wb") as f:
+                    pkl.dump(candset, f)
     ## Prometheus exporter
     if enable_prom:
         pass
