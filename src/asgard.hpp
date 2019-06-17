@@ -80,6 +80,7 @@ typedef std::vector<double> DoubleVector;
  */
 typedef std::unique_ptr<float*> PtrFloatUnique;
 typedef float* PtrFloat;
+typedef unsigned char * PtrByte;
 typedef std::unique_ptr<char*> PtrCharUnique;
 typedef std::vector<Filterbank> FilterbankList;
 typedef std::vector<Candidate>  CandidateList;

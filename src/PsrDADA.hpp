@@ -1,6 +1,5 @@
 #pragma once
 #include <asgard.hpp>
-#include <bitset>
 // psrdada stuff
 #include "dada_def.h"
 #include "dada_hdu.h"
@@ -88,35 +87,6 @@ class PsrDADA {
 								}
 						}
 				}
-		public:
-				PsrDADA() {
-						dada_error = false;
-						hdu = nullptr;
-						isConnected = false;
-				}
-				PsrDADA(key_t idada) : dada_key(idada) {
-						utc_start_str[63] = '\0';
-						dada_error = false;
-						log = multilog_open ("process_baseband",0);
-						multilog_add (log, stdout);
-						// create
-						hdu = dada_hdu_create(log);
-						// set shmkey
-						dada_hdu_set_key(hdu, dada_key);
-						// states
-						isConnected = false;
-						// DEBUG
-						//nsamps = 32;
-						nchans = 4;
-						nbits = 4;
-				}
-				~PsrDADA() {
-						if(hdu) {
-								dada_hdu_unlock_write(hdu);
-								dada_hdu_disconnect(hdu);
-						}
-						hdu = nullptr;
-				}
 				bool Connect() {
 						dada_error = dada_hdu_connect(hdu) < 0;
 						if(dada_error) return false;
@@ -129,8 +99,38 @@ class PsrDADA {
 						if(dada_error) return false;
 						return true;
 				}
+		public:
+				PsrDADA(key_t dada_key_, timeslice nsamps_, int nchans_, int nbits_) : 
+						dada_key(dada_key_), 
+						nsamps(nsamps_),
+						nchans(nchans_), 
+						nbits(nbits)					
+		{
+						utc_start_str[63] = '\0';
+						dada_error = false;
+						log = multilog_open ("dadadada",0);
+						multilog_add (log, stdout);
+						// create
+						hdu = dada_hdu_create(log);
+						// set shmkey
+						dada_hdu_set_key(hdu, dada_key);
+						// states
+						isConnected = false;
+						Connect();
+						// DEBUG
+				}
+				~PsrDADA() {
+						Disconnect();
+				}
+				bool ReadLock(bool x) {
+						if(x) return dada_hdu_lock_read(hdu);
+						else return dada_hdu_unlock_read(hdu);
+				}
+				bool WriteLock(bool x) {
+						if(x) return dada_hdu_lock_write(hdu);
+						else return dada_hdu_unlock_write(hdu);
+				}
 				bool ReadHeader() {
-						dada_hdu_lock_read(hdu);
 						if(!isConnected) return false;
 						// blocking read
 						header = ipcbuf_get_next_read(hdu->header_block, &header_size);
@@ -196,17 +196,15 @@ class PsrDADA {
 						if(dada_error) return false;
 						// mark buffer clear
 						ipcbuf_mark_cleared(hdu->header_block);	
-						dada_hdu_unlock_read(hdu);
 						return true;
 				}
-				bool ReadData(timeslice nsamps, PtrFloat data) {
-						dada_hdu_lock_read(hdu);
+				timeslice ReadData(PtrFloat data, PtrByte packin) {
 						uint64_t bytes_to_read = (nsamps * nchans * nbits) / 8;
 						uint64_t bytes_read = 0;
 						if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return false;
 						if(!isConnected) return false;
 						// actual read call
-						unsigned char * packin = (unsigned char*) new char[bytes_to_read];
+						if(packin == nullptr) packin = ( PtrByte ) new char[bytes_to_read];
 						bytes_read = ipcio_read(hdu->data_block, (char*)packin, bytes_to_read);
 						if(bytes_read < 0) {
 								std::cerr << "PsrDADA::ReadData ipcio_read fail." << std::endl;
@@ -222,9 +220,7 @@ class PsrDADA {
 						// unpack to floats
 						if(data == nullptr) data = new float[nsamps * nchans];
 						unpack(packin, bytes_read, data);
-						delete[] packin;
-						dada_hdu_unlock_read(hdu);
-						return true;
+						return bytes_read;
 				}
 				bool WriteHeader() {
 						if(!isConnected) return false;
@@ -279,14 +275,14 @@ class PsrDADA {
 						ipcbuf_mark_filled (hdu->header_block, 4096);
 						dada_hdu_unlock_write(hdu);
 				}
-				bool WriteData(timeslice nsamps, PtrFloat data) {
+				bool WriteData(PtrFloat data, PtrByte packout) {
 						dada_hdu_lock_write(hdu);
 						uint64_t bytes_to_write = (nsamps * nchans * nbits)/8;
 						uint64_t bytes_written  = 0;
 						if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return false;
 						if(!isConnected) return false;
 						// actual write call
-						unsigned char * packout = (unsigned char*) new char[bytes_to_write];
+						if(packout == nullptr) packout = ( PtrByte ) new char[bytes_to_write];
 						pack(data, nsamps*nchans, packout);
 						bytes_written = ipcio_write(hdu->data_block, (char*)packout, bytes_to_write);
 						if(bytes_written < 0) {
