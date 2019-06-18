@@ -12,12 +12,10 @@
 
 class PsrDADA {
 		private:   
+				// logging
 				multilog_t * log;
-				// states
-				bool isConnected;
-				// key
+				// DADA
 				key_t dada_key;
-				// hdu
 				dada_hdu_t *hdu;
 				timeslice it;
 				// error state?
@@ -26,13 +24,15 @@ class PsrDADA {
 				char * header;
 				timeslice header_size;
 				// header params
+				timeslice nsamps;
 				double fch1, foff, tsamp, cfreq, bandwidth;
 				int nchans, nbits, nifs, npol;
-				double ra, dec;
-				timeslice stride;
 				char utc_start_str[64], source_str[10];
-				time_t utc_start;
-				//
+				double ra, dec;
+				// sizes
+				timeslice stride, bytes_chunk, bytes_stride;
+				timeslice sample_chunk;
+				// PACK/UNPACK
 				float alpha, beta, gamma, delta;
 				void pack(PtrFloat in, timeslice nsamps, unsigned char * dd) {
 						timeslice ii = 0;
@@ -59,7 +59,7 @@ class PsrDADA {
 								}
 						}
 				}
-				void unpack(unsigned char * dd, timeslice nsamps, PtrFloat fbf) {
+				void unpack(PtrByte dd, timeslice nsamps, PtrFloat fbf) {
 						timeslice ii = 0;
 						unsigned char dc;
 						if(nbits == 2) {
@@ -90,11 +90,9 @@ class PsrDADA {
 				bool Connect() {
 						dada_error = dada_hdu_connect(hdu) < 0;
 						if(dada_error) return false;
-						isConnected = true;
 						return true;
 				}
 				bool Disconnect() {
-						if(not isConnected) return true;
 						dada_error = dada_hdu_disconnect(hdu)  < 0;
 						if(dada_error) return false;
 						return true;
@@ -104,23 +102,30 @@ class PsrDADA {
 						dada_key(dada_key_), 
 						nsamps(nsamps_),
 						nchans(nchans_), 
-						nbits(nbits)					
+						nbits(nbits_)					
 		{
-						utc_start_str[63] = '\0';
 						dada_error = false;
+						sample_chunk = nsamps * nchans;
+						bytes_chunk = nsamps * nchans * nbits / 8;
+						bytes_stride = (nchans * nbits) / 8;
+						// logging
 						log = multilog_open ("dadadada",0);
 						multilog_add (log, stdout);
-						// create
+						// DADA
 						hdu = dada_hdu_create(log);
-						// set shmkey
 						dada_hdu_set_key(hdu, dada_key);
-						// states
-						isConnected = false;
+						// Connection
 						Connect();
-						// DEBUG
 				}
 				~PsrDADA() {
+						// Disconnection
 						Disconnect();
+				}
+				const timeslice GetByteChunkSize() const {
+						return bytes_chunk;
+				}
+				const timeslice GetStride() const {
+						return bytes_stride;
 				}
 				bool ReadLock(bool x) {
 						if(x) return dada_hdu_lock_read(hdu);
@@ -131,7 +136,7 @@ class PsrDADA {
 						else return dada_hdu_unlock_write(hdu);
 				}
 				bool ReadHeader() {
-						if(!isConnected) return false;
+						std::cerr << "PsrDADA::ReadHeader " << std::endl;
 						// blocking read
 						header = ipcbuf_get_next_read(hdu->header_block, &header_size);
 						if(!header) {
@@ -188,9 +193,7 @@ class PsrDADA {
 								std::cerr << "PsrDADA::ReadHeader UTC_START read fail" << std::endl;
 								dada_error = true;
 						}
-						else utc_start = str2utctime(utc_start_str);// tmutil.h
 						// read params
-						stride = (nchans * nbits) / 8;
 						tsamp /= 1e6f;
 						// exit if no error
 						if(dada_error) return false;
@@ -199,32 +202,37 @@ class PsrDADA {
 						return true;
 				}
 				timeslice ReadData(PtrFloat data, PtrByte packin) {
-						uint64_t bytes_to_read = (nsamps * nchans * nbits) / 8;
-						uint64_t bytes_read = 0;
-						if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return false;
-						if(!isConnected) return false;
-						// actual read call
-						if(packin == nullptr) packin = ( PtrByte ) new char[bytes_to_read];
-						bytes_read = ipcio_read(hdu->data_block, (char*)packin, bytes_to_read);
-						if(bytes_read < 0) {
+						if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return -1;
+						// Initialization
+						if(packin == nullptr) packin = ( PtrByte ) new unsigned char[bytes_chunk];
+						// READ
+						timeslice chunk_read = ipcio_read(hdu->data_block, (char*)packin, bytes_chunk);
+						if(chunk_read < 0) {
 								std::cerr << "PsrDADA::ReadData ipcio_read fail." << std::endl;
-								return false;
+								return -1;
 						}
-						size_t nsamps_read = 8 * bytes_read / (nchans * nbits);
+						timeslice nsamps_read = chunk_read / bytes_stride;
+						// Initialization
+						if(data == nullptr) data = new float[nsamps_read * nchans];
+						if(chunk_read != bytes_chunk)
+								std::cerr << "PsrDADA::ReadData read " 
+												<< chunk_read 
+												<< " bytes while expected "
+												<< bytes_chunk
+												<< " bytes."
+												<< std::endl;
 						if(nsamps_read != nsamps)
 								std::cerr << "PsrDADA::ReadData read " 
 												<< nsamps_read 
-												<< " while expected "
+												<< " samples while expected "
 												<< nsamps
+												<< " samples."
 												<< std::endl;
 						// unpack to floats
-						if(data == nullptr) data = new float[nsamps * nchans];
-						unpack(packin, bytes_read, data);
-						return bytes_read;
+						unpack(packin, chunk_read, data);
+						return chunk_read;
 				}
 				bool WriteHeader() {
-						if(!isConnected) return false;
-						dada_hdu_lock_write(hdu);
 						header = ipcbuf_get_next_write(hdu->header_block);
 						if(!header) {
 								std::cerr << "PsrDADA::WriteHeader fail" << std::endl;
@@ -272,23 +280,28 @@ class PsrDADA {
 								std::cerr << "PsrDADA::WriteHeader UTC_START write fail" << std::endl;
 								dada_error = true;
 						}
-						ipcbuf_mark_filled (hdu->header_block, 4096);
-						dada_hdu_unlock_write(hdu);
+						ipcbuf_mark_filled (hdu->header_block, header_size);
 				}
-				bool WriteData(PtrFloat data, PtrByte packout) {
-						dada_hdu_lock_write(hdu);
-						uint64_t bytes_to_write = (nsamps * nchans * nbits)/8;
-						uint64_t bytes_written  = 0;
-						if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return false;
-						if(!isConnected) return false;
-						// actual write call
-						if(packout == nullptr) packout = ( PtrByte ) new char[bytes_to_write];
-						pack(data, nsamps*nchans, packout);
-						bytes_written = ipcio_write(hdu->data_block, (char*)packout, bytes_to_write);
+				timeslice WriteData(PtrFloat data, PtrByte packout) {
+						if(packout == nullptr) packout = ( PtrByte ) new unsigned char[bytes_chunk];
+						// NOT SURE ABOUT EOD while WRITING?
+						//if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return -1;
+						// PACK and WRITE
+						pack(data, sample_chunk,  packout);
+						timeslice bytes_written = ipcio_write(hdu->data_block, (char*)packout, bytes_chunk);
 						if(bytes_written < 0) {
 								std::cerr << "PsrDADA::WriteData ipcio_write fail." << std::endl;
 								return false;
 						}
-						dada_hdu_unlock_write(hdu);
+						return bytes_written;
+				}
+				void PrintHeader() {
+						std::cout << "RA     " << ra  << std::endl;
+						std::cout << "DEC    " << dec << std::endl;
+						std::cout << "TSAMP  " << tsamp << std::endl;
+						std::cout << "NCHANS " << nchans<< std::endl;
+						std::cout << "NBITS  " << nbits << std::endl;
+						std::cout << "CFREQ  " << cfreq << std::endl;
+						std::cout << "UTC    " << utc_start_str << std::endl;
 				}
 };
