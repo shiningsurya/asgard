@@ -78,17 +78,9 @@ class DADACoadd  {
 						// READING
 						if( inswitch ){
 							read_chunk = dadain1.ReadData(data_f, data_b);
-							// FLIP switch if EOD reached
-							if( dadain1.EOD() ) {
-								inswitch = not inswitch;
-							}
 						}
 						else {
 							read_chunk = dadain2.ReadData(data_f, data_b);
-							// FLIP switch if EOD reached
-							if( dadain2.EOD() ) {
-								inswitch = not inswitch;
-							}
 						}
 						// SWITCHING
 						if( read_chunk < 0 ) {
@@ -96,6 +88,8 @@ class DADACoadd  {
 							// EOD read fail
 							std::fill(data_f, data_f + sample_chunk, 0.0f);
 							vote = false;
+							// FLIP switch
+							inswitch = not inswitch;
 						}
 						else if( read_chunk < sample_chunk ) {
 							// fill zeros at the end
@@ -126,7 +120,7 @@ class DADACoadd  {
 								fbw.WriteFBdata(outptr, boundcheck, sample_chunk, addcomm.size());
 								// incrementing as in serial
 								// NB see comments in serial code
-								boundcheck += (numelems * nbits / 8);
+								boundcheck += (sample_chunk * nbits / 8);
 							}
 						}
 						// KEEPGOING
