@@ -7,7 +7,7 @@ using std::endl;
 int main() {
   PtrFloat f = nullptr;
   PtrByte  b = nullptr;
-  key_t kk = 0x52;
+  key_t kk = 0x56;
   PsrDADA my(kk, 10240, 4096, 2);  
   bool going = false;
   //
@@ -18,6 +18,7 @@ int main() {
 		if(xx == -1) {
 				going = false;
 				cout << "EOD" << endl;
+				break;
 		}
 		else if(xx != my.GetByteChunkSize()) {
 				// incomplete case

@@ -10,6 +10,19 @@
 // digitization stuff
 #include <Redigitizer.hpp>
 
+struct DADAHeader {
+		// positions
+		double ra, dec;
+		// frequency
+		double fch1, foff, cfreq, bandwidth;
+		// time
+		double tsamp;
+		// memory
+		int nbits, nchans, nifs, npol;
+		// strings
+		char utc_start_str[64], source_str[10];
+};
+
 class PsrDADA {
 		private:   
 				// logging
@@ -18,8 +31,11 @@ class PsrDADA {
 				key_t dada_key;
 				dada_hdu_t *hdu;
 				timeslice it;
-				// error state?
+				// error state
 				bool dada_error;
+				// states
+				bool read_lock;
+				bool write_lock;
 				// Read header 
 				char * header;
 				timeslice header_size;
@@ -34,27 +50,27 @@ class PsrDADA {
 				timeslice sample_chunk;
 				// PACK/UNPACK
 				float alpha, beta, gamma, delta;
-				void pack(PtrFloat in, timeslice nsamps, unsigned char * dd) {
+				void pack(PtrFloat in, int numants, timeslice nsamps, unsigned char * dd) {
 						timeslice ii = 0;
 						if(nbits == 2) {
 								for(it = 0; it < nsamps;) {
-										alpha = in[it++];
-										beta  = in[it++];
-										gamma = in[it++];
-										delta = in[it++];
+										alpha = in[it++] / numants;
+										beta  = in[it++] / numants;
+										gamma = in[it++] / numants;
+										delta = in[it++] / numants;
 										dd[ii++] = dig2bit(alpha, beta, gamma, delta,0);
 								}
 						}
 						else if(nbits == 4) {
 								for(it = 0; it < nsamps;) {
-										alpha = in[it++];
-										beta  = in[it++];
+										alpha = in[it++] / numants;
+										beta  = in[it++] / numants;
 										dd[ii++] = dig4bit(alpha, beta,0);
 								}
 						}
 						else if(nbits == 8) {
 								for(it = 0; it < nsamps;) {
-										alpha = in[it++];
+										alpha = in[it++] / numants;
 										dd[ii++] = dig8bit(alpha,0);
 								}
 						}
@@ -93,17 +109,22 @@ class PsrDADA {
 						return true;
 				}
 				bool Disconnect() {
+						if(hdu == nullptr) return true;
 						dada_error = dada_hdu_disconnect(hdu)  < 0;
 						if(dada_error) return false;
 						return true;
 				}
 		public:
+				PsrDADA() {
+						// chill
+				}
 				PsrDADA(key_t dada_key_, timeslice nsamps_, int nchans_, int nbits_) : 
 						dada_key(dada_key_), 
 						nsamps(nsamps_),
 						nchans(nchans_), 
 						nbits(nbits_)					
 		{
+						std::cerr << "PsrDADA::ctor key=" << dada_key << std::endl;
 						dada_error = false;
 						sample_chunk = nsamps * nchans;
 						bytes_chunk = nsamps * nchans * nbits / 8;
@@ -116,10 +137,44 @@ class PsrDADA {
 						dada_hdu_set_key(hdu, dada_key);
 						// Connection
 						Connect();
+						// state initialize
+						read_lock = false;
+						write_lock = false;
 				}
-				~PsrDADA() {
+				PsrDADA& operator=(PsrDADA&& other) {
+						std::cerr << "PsrDADA::move_assignment key=" << other.dada_key << std::endl;
+						// ctor args
+						nsamps = other.nsamps;
+						nchans = other.nchans;
+						nbits  = other.nbits;
+						// sharing
+						sample_chunk = other.sample_chunk;
+						bytes_chunk  = other.bytes_chunk;
+						bytes_stride = other.bytes_stride;
+						// logging
+						log = multilog_open ("dadadadada",0);
+						multilog_add (log, stdout);
+						// DADA
+						hdu = other.hdu;
+						other.hdu = nullptr;
+						dada_key = other.dada_key;
+						other.dada_key = 0;
+						// state initialize
+						read_lock = other.read_lock;
+						write_lock = other.write_lock;
+						other.read_lock = false;
+						other.write_lock = false;
+						return *this;
+				}
+				~PsrDADA() { 
+						std::cerr << "PsrDADA::dtor key=" << dada_key << std::endl;
+						// unlocks
+						ReadLock(false);
+						WriteLock(false);
 						// Disconnection
 						Disconnect();
+						// log close
+						multilog_close(log);
 				}
 				const timeslice GetByteChunkSize() const {
 						return bytes_chunk;
@@ -128,15 +183,43 @@ class PsrDADA {
 						return bytes_stride;
 				}
 				bool ReadLock(bool x) {
-						if(x) return dada_hdu_lock_read(hdu);
-						else return dada_hdu_unlock_read(hdu);
+						bool ret;
+						std::cerr << "PsrDADA::ReadLock before key=" << dada_key << std::endl;
+						if(x) {
+						   // Requested lock
+						   if(read_lock) ret =  true;
+						   else ret = dada_hdu_lock_read(hdu);
+						   read_lock = true;
+						}
+						else {
+						   // Requested unlock
+						   if(read_lock) ret = dada_hdu_unlock_read(hdu);
+						   else ret = true;
+						   read_lock = false;
+						}
+						std::cerr << "PsrDADA::ReadLock after key=" << dada_key << std::endl;
+						return ret;
 				}
 				bool WriteLock(bool x) {
-						if(x) return dada_hdu_lock_write(hdu);
-						else return dada_hdu_unlock_write(hdu);
+						bool ret;
+						std::cerr << "PsrDADA::WriteLock before key=" << dada_key << std::endl;
+						if(x) {
+						   // Requested lock
+						   if(write_lock) ret = true;
+						   else ret = dada_hdu_lock_write(hdu);
+						   write_lock = true;
+						}
+						else {
+						   // Requested unlock
+						   if(write_lock) ret = dada_hdu_unlock_write(hdu);
+						   else ret = true;
+						   write_lock = false;
+						}
+						std::cerr << "PsrDADA::WriteLock after key=" << dada_key << std::endl;
+						return ret;
 				}
 				bool ReadHeader() {
-						std::cerr << "PsrDADA::ReadHeader " << std::endl;
+						std::cerr << "PsrDADA::ReadHeader key=" << dada_key << std::endl;
 						// blocking read
 						header = ipcbuf_get_next_read(hdu->header_block, &header_size);
 						if(!header) {
@@ -202,6 +285,7 @@ class PsrDADA {
 						return true;
 				}
 				timeslice ReadData(PtrFloat data, PtrByte packin) {
+						std::cerr << "PsrDADA::ReadData key=" << dada_key << std::endl;
 						if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return -1;
 						// Initialization
 						if(packin == nullptr) packin = ( PtrByte ) new unsigned char[bytes_chunk];
@@ -233,6 +317,7 @@ class PsrDADA {
 						return chunk_read;
 				}
 				bool WriteHeader() {
+						std::cerr << "PsrDADA::WriteHeader key=" << dada_key << std::endl;
 						header = ipcbuf_get_next_write(hdu->header_block);
 						if(!header) {
 								std::cerr << "PsrDADA::WriteHeader fail" << std::endl;
@@ -244,18 +329,21 @@ class PsrDADA {
 								std::cerr << "PsrDADA::WriteHeader NCHAN write fail" << std::endl;
 								dada_error = true;
 						}
+						std::cerr << "PsrDADA::WriteHeader nchan"  << std::endl;
 						if(ascii_header_set(header, "BANDWIDTH", "%lf", bandwidth) < 0) {
 								if(ascii_header_set(header, "BW", "%lf", bandwidth) < 0) {
 										std::cerr << "PsrDADA::WriteHeader BANDWIDTH write fail" << std::endl;
 										dada_error = true;
 								}
 						}
+						std::cerr << "PsrDADA::WriteHeader bandwidth"  << std::endl;
 						if(ascii_header_set(header, "CFREQ", "%lf", cfreq) < 0) {
 								if(ascii_header_set(header, "FREQ", "%lf", cfreq) < 0) {
 										std::cerr << "PsrDADA::WriteHeader FREQUENCY write fail" << std::endl;
 										dada_error = true;
 								}
 						}
+						std::cerr << "PsrDADA::WriteHeader cfreq"  << std::endl;
 						if(ascii_header_set(header, "NPOL", "%d", npol) < 0) {
 								std::cerr << "PsrDADA::WriteHeader NPOL write fail" << std::endl;
 								dada_error = true;
@@ -280,14 +368,16 @@ class PsrDADA {
 								std::cerr << "PsrDADA::WriteHeader UTC_START write fail" << std::endl;
 								dada_error = true;
 						}
+						std::cerr << "PsrDADA::WriteHeader UTC"  << std::endl;
 						ipcbuf_mark_filled (hdu->header_block, header_size);
 				}
-				timeslice WriteData(PtrFloat data, PtrByte packout) {
+				timeslice WriteData(PtrFloat data, PtrByte packout, int numants) {
+						std::cerr << "PsrDADA::WriteData key=" << dada_key << std::endl;
 						if(packout == nullptr) packout = ( PtrByte ) new unsigned char[bytes_chunk];
 						// NOT SURE ABOUT EOD while WRITING?
 						//if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return -1;
 						// PACK and WRITE
-						pack(data, sample_chunk,  packout);
+						pack(data, numants, sample_chunk,  packout);
 						timeslice bytes_written = ipcio_write(hdu->data_block, (char*)packout, bytes_chunk);
 						if(bytes_written < 0) {
 								std::cerr << "PsrDADA::WriteData ipcio_write fail." << std::endl;
@@ -303,5 +393,37 @@ class PsrDADA {
 						std::cout << "NBITS  " << nbits << std::endl;
 						std::cout << "CFREQ  " << cfreq << std::endl;
 						std::cout << "UTC    " << utc_start_str << std::endl;
+				}
+				struct DADAHeader GetHeader() {
+						struct DADAHeader ret;
+						ret.ra       = ra;
+						ret.dec      = dec;
+						ret.tsamp    = tsamp;
+						ret.nchans   = nchans;
+						ret.nbits    = nbits;
+						ret.nifs     = nifs;
+						ret.npol     = npol;
+						ret.fch1     = fch1;
+						ret.foff     = foff;
+						ret.cfreq    = cfreq;
+						ret.bandwidth = bandwidth;
+						strcpy(ret.utc_start_str, utc_start_str);
+						strcpy(ret.source_str, source_str);
+				}
+				bool SetHeader(const struct DADAHeader& in) {
+						ra       = in.ra;
+						dec      = in.dec;
+						tsamp    = in.tsamp;
+						nchans   = in.nchans;
+						nbits    = in.nbits;
+						nifs     = in.nifs;
+						npol     = in.npol;
+						fch1     = in.fch1;
+						foff     = in.foff;
+						cfreq    = in.cfreq;
+						bandwidth = in.bandwidth;
+						strcpy(utc_start_str, in.utc_start_str);
+						strcpy(source_str, in.source_str);
+						return true;
 				}
 };

@@ -1,3 +1,6 @@
+#pragma once
+#ifndef _REDIGIT_H_
+#define _REDIGIT_H_
 #define HI2BITS 192
 #define UPMED2BITS 48
 #define LOMED2BITS 12
@@ -149,3 +152,4 @@ unsigned char dig4bit(float a, float b, int numant) {
 unsigned char dig8bit(float a, int numant) {
 		return (unsigned char) quant8bit(a);
 }
+#endif // _REDIGIT_H_

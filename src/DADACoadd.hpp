@@ -1,8 +1,8 @@
 #pragma once
 #include <asgard.hpp>
+#include <Filterbank.hpp>
 // DADA
 #include <PsrDADA.hpp>
-#include "Group.hpp"
 // MPI
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
@@ -15,7 +15,7 @@ class DADACoadd  {
 				FilterbankWriter fbw;
 				timeslice boundcheck;
 				// MPI
-				int root;
+				int world_root, addcomm_root;
 				mpi::environment env;
 				mpi::communicator world;
 				mpi::communicator addcomm;
@@ -36,6 +36,7 @@ class DADACoadd  {
 				timeslice bytes_chunk;
 				// sample chunk
 				timeslice sample_chunk;
+				timeslice read_chunk;
 				// Buffers
 				PtrFloat data_f;
 				PtrFloat o_data_f;
@@ -43,14 +44,19 @@ class DADACoadd  {
 				PtrByte o_data_b;
 				// DADA Objects
 				PsrDADA dadain1, dadain2, dadaout;
+				struct DADAHeader dHead;
 				// coadder
 				void coadder() {
 					keepgoing = false;
 					// ONLY reads from dadains
 					dadain1.ReadLock(true);
 					dadain2.ReadLock(true);
+					// ONLY writes in dadaout
+					if(world.rank() == world_root) 
+						dadaout.WriteLock(true);
 					// run indefinitely
 					// blocks on inswitch dadain Read Header
+					std::cout << "LOOPING" << std::endl;
 					while( 
 							( keepgoing )
 							||
@@ -76,58 +82,76 @@ class DADACoadd  {
 						 * --------------------------------------------------------------------------
 						 * *************************************************************************/
 						// READING
+						std::cerr << "DADACoadd::READING" << std::endl;
 						if( inswitch ){
 							read_chunk = dadain1.ReadData(data_f, data_b);
+							// if Read header for the first time
+						    if(!keepgoing) dHead = std::move(dadain1.GetHeader());
 						}
 						else {
 							read_chunk = dadain2.ReadData(data_f, data_b);
+							// if Read header for the first time
+						    if(!keepgoing) dHead = std::move(dadain2.GetHeader());
 						}
 						// SWITCHING
-						if( read_chunk < 0 ) {
+						if( read_chunk == -1 ) {
 							// fill zeros because read failed
 							// EOD read fail
 							std::fill(data_f, data_f + sample_chunk, 0.0f);
 							vote = false;
+							keepgoing = false;
 							// FLIP switch
 							inswitch = not inswitch;
+						    std::cerr << "DADACoadd::SWITCHING" << std::endl;
 						}
 						else if( read_chunk < sample_chunk ) {
 							// fill zeros at the end
 							std::fill(data_f + sample_chunk - read_chunk, data_f + sample_chunk, 0.0f);
 							vote = true;
+							keepgoing = true;
 						}
 						else if( read_chunk == sample_chunk ) {
 							// perfect world case
 							vote = true;
+							keepgoing = true;
 						}
 						// VOTING
-						addcomm = world.split(vote);
-						// TODO root resolution
-						if(world.rank() == root) {
-							root = addcomm.rank();
+						addcomm = std::move(world.split(vote));
+						// root resolution and broadcasting
+						if(world.rank() == world_root) {
+							addcomm_root = addcomm.rank();
 						}
+						mpi::broadcast(world, addcomm_root, world_root);
 						// actual MPI coadd call
-						mpi::reduce(addcomm, data_f, sample_chunk, o_data_f, std::plus<float>(), root);
+						mpi::reduce(addcomm, data_f, sample_chunk, o_data_f, std::plus<float>(), addcomm_root);
 						// WRITING
-						if(addcomm.rank() == root) {
+						if(addcomm.rank() == addcomm_root) {
+						    // set Header
+						    dadaout.SetHeader(dHead);
+						    std::cerr << "DADACoadd::WRITING HEADER" << std::endl;
+							// should I WriteLock(true) here?
+							// dadaout.WriteLock(true);
 							// write out Header
 							dadaout.WriteHeader();
+						    std::cerr << "DADACoadd::WRITING DATA" << std::endl;
 							// write data
-							dadaout.WriteData(nsamps, o_data_f, o_data_b, addcomm.size());
+							dadaout.WriteData(o_data_f, o_data_b, addcomm.size());
 							// Filterbankwrite
 							if(filout) {
 								// write filterbank 
-								fbw.WriteFBdata(outptr, boundcheck, sample_chunk, addcomm.size());
+								fbw.WriteFBdata(o_data_f, boundcheck, sample_chunk, addcomm.size());
 								// incrementing as in serial
 								// NB see comments in serial code
 								boundcheck += (sample_chunk * nbits / 8);
 							}
+							// should I WriteLock(false) here?
+							// dadaout.WriteLock(false);
 						}
-						// KEEPGOING
-						keepgoing = true;
 					}
 					dadain1.ReadLock(false);
 					dadain2.ReadLock(false);
+					if(world.rank() == world_root)
+					  dadaout.WriteLock(false);
 				}
 		public:
 				DADACoadd(key_t key_in_1, 
@@ -139,7 +163,7 @@ class DADACoadd  {
 						int nbits_,
 						int root_) 
 					:
-						key_in1(key_in_2), 
+						key_in1(key_in_1), 
 						key_in2(key_in_2), 
 						key_out(key_out_),
 						filout(filout_),
@@ -149,7 +173,7 @@ class DADACoadd  {
 						dadain1(key_in1, nsamps, nchans, nbits),
 						dadain2(key_in2, nsamps, nchans, nbits),
 						inswitch(true),
-						root(root_) {
+						world_root(root_) {
 										// common ground work
 										sample_stride = nchans * nbits / 8;
 										bytes_chunk = nsamps * nchans * nbits / 8;
@@ -160,19 +184,25 @@ class DADACoadd  {
 										o_data_b = nullptr;
 										o_data_f = nullptr;
 										// ground work in root
-										if(world.rank() == root) {
+										if(world.rank() == world_root) {
 												// initialize output buffers
 												o_data_b = new unsigned char[bytes_chunk];
 												o_data_f = new float[sample_chunk];
 												// dadaout in root
-												dadaout(key_out, nsamps);
+												dadaout = PsrDADA(key_out, nsamps, nchans, nbits);
 												// FilterbankWriter in root
+										#if 0
 												if(filout) boundcheck = fbw.Initialize();
-
+										#endif 
 										}
 						}
 				~DADACoadd() {
 					delete[] data_b;
 					delete[] data_f;
+					if(o_data_b != nullptr) delete[] o_data_b;
+					if(o_data_f != nullptr) delete[] o_data_f;
+				}
+				void Work() {
+						coadder();
 				}
 };

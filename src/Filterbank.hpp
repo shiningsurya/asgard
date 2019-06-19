@@ -6,6 +6,7 @@
  * I am going to shamelessly copy from sigproc code 
  * and put it here after C++-izing the code
  */
+#pragma once
 #ifndef ASGARD_H
 #include "asgard.hpp"
 #endif
@@ -22,6 +23,7 @@
 #include<bitset>
 #include<fstream>
 #endif
+#include <Redigitizer.hpp>
 namespace bios = boost::iostreams;
 //#include <fstream>
 //typedef long unsigned int timeslice;
@@ -325,7 +327,6 @@ struct FilterbankHeader {
 		double fch1, foff, tsamp;
 		int nchans, nbits, nifs;
 };
-#include <Redigitizer.hpp>
 class FilterbankWriter {
 		private:
 #ifdef _DEBUG
