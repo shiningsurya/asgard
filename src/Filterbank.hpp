@@ -116,6 +116,8 @@ std::ostream& operator<< (std::ostream& os, const Filterbank& fb) {
 		os << "Tstart: " << fb.tstart << std::endl;
 		os << "Tsamp: " << fb.tsamp << std::endl;
 		os << "Nbits: " << fb.nbits << std::endl;
+		os << "BMin:" << fb.bmin << std::endl;
+		os << "BMax:" << fb.bmax << std::endl;
 		os << "Nifs: " << fb.nifs << std::endl;
 		os << "Nsamples: " << fb.totalsamp << std::endl;
 		os << "Duration:(s) " << fb.duration << std::endl;
@@ -156,7 +158,7 @@ class FilterbankReader {
 						fb.group = GetGroup(ifile);
 						fb.tstop = fb.tstart + ( fb.duration / 86400.0f );
 						fb.bmin = 0;
-						fb.bmax = (2^fb.nbits) - 1;
+						fb.bmax = pow(2, fb.nbits) - 1;
 						fclose(inputfile);
 						return 0;
 				}
