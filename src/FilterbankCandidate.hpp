@@ -58,6 +58,7 @@ class FilterbankCandidate {
 						return true;
 				}
 		public:
+				unsigned int bmin, bmax;
 				std::string group, antenna;
 				bool isKur;
 				float sn, dm;
@@ -67,43 +68,28 @@ class FilterbankCandidate {
 				timeslice i0,i1, maxdelay;
 				double fch1, foff, tsamp;
 				int nchans;
-				float *d_fb=NULL, *dd_fb=NULL, *dd_tim=NULL;
+				PtrFloat d_fb, dd_fb, dd_tim;
 				// d_fb -> dispersed filterbank
 				// dd_fb > de-dispersed filterbank
-				// dd-tim> de-dispersed time series
+				// dd_tim> de-dispersed time series
 				FloatVector cldm, clsn, clwd;
 				FloatVector frequency_table;
 				std::vector<timeslice> delay_table;
 				timeslice istart, istop, nsamps; 
-				/*
-				 *FilterbankCandidate(Filterbank& f, CandidateList& c) : ddm(f.nchans, f.tsamp, f.fch1, f.foff) {
-				 *        group = f.group;
-				 *        antenna = f.antenna;
-				 *        isKur = f.isKur;
-				 * should I do it this way?
-				 *        fb = f;
-				 *        cl = c; 
-				 *        nchans = fb.nchans;
-				 *        fch1 = fb.fch1;
-				 *        foff = fb.foff;
-				 *        tsamp = f.tsamp;
-				 *        // initializing
-				 *        // reading
-				 *        read();	
-				 *        }
-				 */
 				FilterbankCandidate(std::string f, std::string c) {
 						// read filterbank
 						fbr.Read(fb, f);
-						group = fb.group;
+						group   = fb.group;
 						antenna = fb.antenna;
-						isKur = fb.isKur;
+						isKur   = fb.isKur;
+						bmin    = fb.bmin;
+						bmax    = fb.bmax;
 						// read candidates
 						cl = ReadCandidates(c, fb.tsamp);
 						nchans = fb.nchans;
-						fch1 = fb.fch1;
-						foff = fb.foff;
-						tsamp = fb.tsamp;
+						fch1   = fb.fch1;
+						foff   = fb.foff;
+						tsamp  = fb.tsamp;
 						// initialize
 						curr = 0;
 						std::for_each(cl.begin(), cl.end(), [this](Candidate& x) { cldm.push_back( (float) x.dm ); clsn.push_back( (float) x.sn ); clwd.push_back( (float) (x.filterwidth * tsamp )); });
@@ -114,12 +100,15 @@ class FilterbankCandidate {
 				}
 				~FilterbankCandidate() {
 						// I will have to use smart pointers at one point 
+						if(d_fb != nullptr) {delete[] d_fb; d_fb = nullptr;}
+						if(dd_fb != nullptr) {delete[] dd_fb; dd_fb = nullptr;}
+						if(dd_tim != nullptr) {delete[] dd_tim; dd_tim = nullptr;}
 				}
 				timeslice size() { return (timeslice) cl.size(); }
 				bool Next() {
-						if(d_fb != NULL) {delete[] d_fb; d_fb = NULL;}
-						if(dd_fb != NULL) {delete[] dd_fb; dd_fb = NULL;}
-						if(dd_tim != NULL) {delete[] dd_tim; dd_tim = NULL;}
+						if(d_fb != nullptr) {delete[] d_fb; d_fb = nullptr;}
+						if(dd_fb != nullptr) {delete[] dd_fb; dd_fb = nullptr;}
+						if(dd_tim != nullptr) {delete[] dd_tim; dd_tim = nullptr;}
 						return read();
 				}
 };

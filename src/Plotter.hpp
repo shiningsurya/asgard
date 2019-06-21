@@ -57,6 +57,11 @@ StringVector SVFromDE(DEList& x) {
 		for(fs::directory_entry& de : x) ret.push_back( de.path().string() );
 		return ret;
 }
+StringVector SVFromPL(PathList& x) {
+		StringVector ret;
+		for(auto& de : x) ret.push_back( de.string() );
+		return ret;
+}
 CandidateAntenna CAFromPL(const PathList& x) {
 		CandidateAntenna ret;
 		double zero = 0.0;
