@@ -4,14 +4,6 @@
 #include "Operations.hpp"
 #include "xRFI.hpp"
 #include "Plotter.hpp"
-#include <sstream>
-#include <iomanip>
-
-inline const char* dmtxt(float x) {
- std::stringstream ss;
- ss << std::fixed << std::setprecision(2) << x;
- return ss.str().c_str();
-}
 
 class CandSummary : protected Plotter {
  protected:
@@ -107,6 +99,7 @@ class CandSummary : protected Plotter {
 class Waterfall : protected Plotter {
  private:
 	int chanout;
+    char txt[8];
 	float timestep;
 	float ctimestep;
 	bool coarse;
@@ -358,10 +351,12 @@ class Waterfall : protected Plotter {
 				cpgline(2,xlin, ylin);
 				// DM at top
 				cpgsci(3);
-				cpgmtxt("T", 0.0f, cid, 0.5f, dmtxt(c.dm));
+				snprintf(txt, 8, "%3.2f", c.dm);
+				cpgmtxt("T", 0.0f, cid, 0.5f, txt);
 				// S/N at bottom 
 				cpgsci(5);
-				cpgmtxt("B", 0.0f, cid, 0.5f, dmtxt(c.sn));
+				snprintf(txt, 8, "%3.2f", c.sn);
+				cpgmtxt("B", 0.0f, cid, 0.5f, txt);
 			 }
 			 cpgsci(1);
 			}

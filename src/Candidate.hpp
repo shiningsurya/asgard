@@ -16,25 +16,24 @@ class Candidate {
 				group = gp;
 				std::vector<std::string> b;
 				boost::split(b, line, boost::is_any_of(" \t"),boost::token_compress_on);
-				if(b.size() < 9) {
-						std::cerr << "Unable to read Candidate!" << std::endl;
-						std::cerr << "Was only able to get " << b.size() << "/9 parameters!"<< std::endl;
-						for(std::string x : b) std::cerr << "Read : " << x << std::endl;
-						exit(1);
+				if(b.size() ==  2) {
+						sn = 0;
 				}
-				//
-				if(b[0] == std::string("inf")) sn = 1e5;
-				else sn = std::stof(b[0]);
-				peak_index = std::stoul(b[1]);
-				peak_time = std::stod(b[2]);
-				filterwidth = std::stoi(b[3]);
-				dm_index = std::stoul(b[4]);
-				dm = std::stof(b[5]);
-				ngiant = std::stoi(b[6]);
-				i0 = std::stoul(b[7]);
-				i1 = std::stoul(b[8]);
-				ts = tsamp;
-				width = tsamp * (i1 - i0);
+				else {
+						//
+						if(b[0] == std::string("inf")) sn = 1e5;
+						else sn = std::stof(b[0]);
+						peak_index = std::stoul(b[1]);
+						peak_time = std::stod(b[2]);
+						filterwidth = std::stoi(b[3]);
+						dm_index = std::stoul(b[4]);
+						dm = std::stof(b[5]);
+						ngiant = std::stoi(b[6]);
+						i0 = std::stoul(b[7]);
+						i1 = std::stoul(b[8]);
+						ts = tsamp;
+						width = tsamp * (i1 - i0);
+						}
 		}
 		// printing
 		friend std::ostream& operator<< (std::ostream& os, const Filterbank& fb);

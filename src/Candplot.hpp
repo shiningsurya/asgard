@@ -8,6 +8,7 @@ class CandPlot : protected Plotter {
 		protected:
 						int imin, imax;
 						float xlin[2], ylin[2];
+						char txt[16];
 		public:
 				CandPlot(std::string fn) : Plotter(fn) {
 						cpgpap (0.0,0.618); //10.0, width and aspect ratio
@@ -214,8 +215,11 @@ class CandPlot : protected Plotter {
 						std::string str;
 						int twindow;
 						FloatVector freqs, taxis;
-						float min, max, xxmin, xxmax;
-						for(int cx = 0; cx < fcl.size(); cx++) {
+						float min, max, xxmin, xxmax, dd_range;
+						while(fcl.Next()) {
+								// put selection logic here
+								if(fcl.sn < 10) continue;
+								// end selection logic
 								if(count != 0) {
 										cpgpage();
 								}
@@ -229,7 +233,7 @@ class CandPlot : protected Plotter {
 								tr[2] = (float)fcl.tsamp;
 								tr[4] = 1.f*(float)fcl.foff; 
 								//cpgsci(1); // color index
-								cpgsvp(0.08, 0.33, 0.1, 0.45); // de-dispersed waterfall
+								cpgsvp(0.1, 0.45, 0.1, 0.5); // de-dispersed waterfall
 								cpgswin(taxis[0], taxis[twindow-1], freqs.front(),  freqs.back());
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
@@ -237,12 +241,15 @@ class CandPlot : protected Plotter {
 								// fsrunching
 								ffddw = new float[twindow * chanout](); // uniform initialization, c++11
 								operations::Fscrunch(fcl.dd_fb, fcl.nchans, twindow, chanout, ffddw);
+								// array ops
+								//
+								// array ops
 								tr[4] *= (4096/chanout);
-								cpgimag(ffddw, chanout, twindow, 1, chanout, 1, twindow, 0, 3, tr);
+								cpgimag(ffddw, chanout, twindow, 1, chanout, 1, twindow, fcl.bmin, fcl.bmax, tr);
 								//cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
 								cpgmtxt("B",2.5,.5,0.5,"Time (s)"); // group at middle
 								cpgmtxt("L",4,0.5,0.5,"Freq (MHz)");
-								cpgmtxt("T",.3,.5,0.5, "De-Dispersed Waterfall");
+								//cpgmtxt("T",.3,.5,0.5, "De-Dispersed Waterfall");
 								// start line
 								cpgsci(6);
 								cpgsls(2);
@@ -261,7 +268,7 @@ class CandPlot : protected Plotter {
 								//chanout = 4096;
 								//trf[4] = 1.f*(float)fcl.foff * fcl.nchans / chanout;
 								cpgsci(1); // color index
-								cpgsvp(0.42, 0.67, 0.1, 0.45); // dispersed waterfall
+								cpgsvp(0.55, 0.95, 0.1, 0.45); // dispersed waterfall
 								cpgswin(taxis[0], taxis[fcl.nsamps-1], freqs.front(),  freqs.back());
 								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 								cpgsfs(1);
@@ -277,21 +284,22 @@ class CandPlot : protected Plotter {
 								delete[] ffddw;
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
-								cpgsvp(0.08, 0.33, 0.55, 0.9); // fscrunched profile 
+								cpgsvp(0.1, 0.45, 0.5, 0.9); // fscrunched profile 
 								//cpgswin(76, 78.5, 0..0, 0.2 );
 								min = *std::min_element(fcl.dd_tim, fcl.dd_tim + twindow);
 								max = *std::max_element(fcl.dd_tim, fcl.dd_tim + twindow);
-								xxmin = min - .1 * min;
-								xxmax = max + .1 * min;
+								dd_range = max - min;
+								xxmin = min - .1 * dd_range * min;
+								xxmax = max + .1 * dd_range * min;
 								//std::cout << "Plotter limits: " << xlin[0] << " " << xlin[1] << std::endl;
 								cpgswin(taxis[0],taxis[twindow -1], xxmin, xxmax );
-								cpgbox("BCN",0.0,0,"BCNV",0.0,0);
+								cpgbox("BC",0.0,0,"BCNV",0.0,0);
 								cpgline(twindow, taxis.data(), fcl.dd_tim); 
 								//cpglab("", "Intensity (a.u)", "De-dispersed Integrated Profile");
-								cpgmtxt("L",4,0.5,0.5,"Intensity (a.u.)");
-								cpgmtxt("T",.3,.5,0.5, "De-Dispersed Integrated Profile");
-								str = std::string("S/N: ") + std::to_string(fcl.sn);
-								cpgmtxt("T",-1.5*charh, .99, 1.0, str.c_str());
+								cpgmtxt("R",0,0.5,0.5,"Intensity (a.u.)");
+								cpgmtxt("T",.3,.5,0.5, "De-Dispersed Integrated Profile and Waterfall");
+								snprintf(txt, 16, "S/N: %3.2f", fcl.sn);
+								cpgmtxt("T",-1.5*charh, .99, 1.0, txt);
 								cpgmtxt("T",2.0,1.0,0.3,fcl.group.c_str());
 								// start line
 								cpgsci(6);
@@ -309,8 +317,8 @@ class CandPlot : protected Plotter {
 								cpgsci(1);
 								//////////////////////////////////////////////////
 								cpgsci(1); // color index
-								cpgsvp(0.42, 0.67, 0.55, 0.9); // Scatter 
-								cpgswin(0.,2., 1, 3);
+								cpgsvp(0.55, 0.95, 0.55, 0.90); // Scatter 
+								cpgswin(0.,1., 2, 3);
 								for(int i = 0; i < fcl.size(); i++) cpgcirc(log10(1e3f*fcl.clwd[i]), log10(fcl.cldm[i]), fac*log10(fcl.clsn[i]));
 								// yline
 								ylin[0] = log10((float)fcl.dm);
@@ -329,10 +337,10 @@ class CandPlot : protected Plotter {
 								cpgmtxt("B",2.5,.5,0.5,"Width (ms)"); // group at middle
 								cpgmtxt("L",4,0.5,0.5,"DM (pc/cc)");
 								cpgmtxt("T",.3,.5,0.5, "Scatter");
-								str = std::string("DM: ") + std::to_string(fcl.dm); 
-								cpgmtxt("T",-1.5*charh, 0.99, 1.0, str.c_str());
-								str = std::string("Width: ") + std::to_string(fcl.tsamp * fcl.filterwidth * 1e3f);
-								cpgmtxt("T",-3*charh, 0.99, 1.0, str.c_str());
+								snprintf(txt, 16, "DM: %3.2f", fcl.dm);
+								cpgmtxt("T",-1.5*charh, 0.99, 1.0, txt);
+								snprintf(txt, 16, "Width: %3.2f", fcl.tsamp*fcl.filterwidth*1e3f);
+								cpgmtxt("T",-3*charh, 0.99, 1.0, txt);
 								cpgmtxt("T",1.5,1.0,0.0,fcl.antenna.c_str());
 								count++;
 								//break;
