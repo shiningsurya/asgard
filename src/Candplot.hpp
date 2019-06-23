@@ -277,18 +277,21 @@ class CandPlot : protected Plotter {
 		cpgsci(1); // color index
 		cpgsvp(0.45, 0.80, 0.1, 0.5); // bandshape
 		ffddw = new float[fcl.nchans]();
+		std::fill(freqs_bshape, freqs_bshape + fcl.nchans, 0.0f);
 		operations::FreqShape(fcl.dd_fb, twindow, fcl.nchans, freqs_bshape);
+		for(int i = 0; i < fcl.nchans; i++) freqs_bshape[i] = log10(freqs_bshape[i]);
+		//operations::Whiten(freqs_bshape, fcl.nchans);
 		min = *std::min_element(freqs_bshape, freqs_bshape + fcl.nchans);
 		max = *std::max_element(freqs_bshape, freqs_bshape + fcl.nchans);
 		dd_range = max - min;
 		xxmin = min - .1 * dd_range * min;
-		xxmax = max + .1 * dd_range * min;
-		std::cout << " xx: " << xxmin << " " << xxmax << std::endl;
+		xxmax = max + .1 * dd_range * max;
+		std::cout << " : " << xxmin << "  " << xxmax << std::endl;
 		cpgswin(xxmin, xxmax, freqs_ptr[0],  freqs_ptr[fcl.nchans-1]);
 		cpgbox("BCN",0.0,0,"BCV",0.0,0);
 		cpgsfs(1);
 		cpgline(fcl.nchans, freqs_bshape, freqs_ptr);
-		cpgmtxt("B",2.5,.5,0.5,"Intensity (a.u)"); // group at middle
+		cpgmtxt("B",2.5,.5,0.5,"Intensity (a.u.)"); // group at middle
 		cpgmtxt("T",.3,.5,0.5, "Bandshape");
 		delete[] ffddw;
 		//////////////////////////////////////////////////
@@ -299,7 +302,7 @@ class CandPlot : protected Plotter {
 		max = *std::max_element(fcl.dd_tim, fcl.dd_tim + twindow);
 		dd_range = max - min;
 		xxmin = min - .1 * dd_range * min;
-		xxmax = max + .1 * dd_range * min;
+		xxmax = max + .1 * dd_range * max;
 		//std::cout << "Plotter limits: " << xlin[0] << " " << xlin[1] << std::endl;
 		cpgswin(taxis[0],taxis[twindow -1], xxmin, xxmax );
 		cpgbox("BC",0.0,0,"BCNV",0.0,0);
@@ -331,6 +334,8 @@ class CandPlot : protected Plotter {
 		snprintf(txt, 256, "DM: %3.2f pc/cc", fcl.dm);
 		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
 		snprintf(txt, 256, "Width: %3.2f ms", fcl.tsamp*fcl.filterwidth*1e3f);
+		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		snprintf(txt, 256, "Peak Time: %4.3f s", fcl.peak_time);
 		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
 		snprintf(txt, 256, "Antenna: %s", fcl.antenna.c_str());
 		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
