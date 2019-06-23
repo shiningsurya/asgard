@@ -2,15 +2,52 @@
 #ifndef OPERATIONS_H
 #define OPERATIONS_H
 namespace operations {
+    void Float2Ptr(FloatVector in, PtrFloat out) {
+		 for(int i = 0; i < in.size(); i++) out[i] = in[i];
+    }
 		void FreqShape(float * in, timeslice nsamps, int nchans, float * out);
 		void TimeShape(float * in, timeslice nsamps, int nchans, float * out);
 		void Fscrunch(float * in, int nchans_in, timeslice nsamps, int nchans_out, float * ret);
 		void Crunch(float * in, const int nchans_in, const timeslice nsamps_in, const int nchans_out, const timeslice nsamps_out, float * ret); 
 	 	FloatVector FreqTable(Filterbank& f);
 	 	FloatVector FreqTable(float fch1, float foff, int nchans);
+	 	void FreqTable(float fch1, float foff, int nchans, PtrFloat out);
 		std::vector<timeslice> Delays(FloatVector freqs, double dm, double tsamp);
 		FloatVector TimeAxis(float dt, timeslice start, timeslice stop); 
 		auto Delay = [](float f1, float f2, double dm) ->  double {return(4148.741601*((1.0/f1/f1)-(1.0/f2/f2))*dm);};
+		void DynamicColor(PtrFloat inp, timeslice nsamps, int nchans, int csize);
+}
+void operations::FreqTable(float fch1, float foff, int nchans, PtrFloat out) {
+		for(int i = 0; i < nchans; i++) out[i] = ( fch1 + i * foff );
+}
+void operations::DynamicColor(PtrFloat inp, timeslice nsamps, int nchans, int csize) {
+if(csize != 6) 
+std::cerr << "opertions::DynamicColor csize " << csize << " not supported!" << std::endl;
+ // inplace changing the input array to 
+ // -1 ---> csize-1
+ // to have dynamic color scheme
+ // estimate mean and variance
+ double mean=0.0f, variance=0.0f, sd=0.0f;
+ float M = 3.0f, L = 1.0f, temp = 0.0f;
+ unsigned int fac = 3;
+ float slope, intercept;
+ timeslice tnsamp = nsamps * nchans;
+ // mean
+ for(timeslice i = 0; i < tnsamp; i++) mean += inp[i];
+ mean /= tnsamp;
+ // variance
+ for(timeslice i = 0; i < tnsamp; i++) variance += pow(inp[i] - mean, 2);
+ sd = sqrt(variance/tnsamp);
+ // mapping
+ slope = M - L;
+ intercept = M;
+ for(timeslice i = 0; i < tnsamp; i++) {
+ temp = (inp[i] - mean) / sd;
+	if(i < 10) std::cout << inp[i] << " -> " << temp << " -> ";
+	inp[i] = (slope * temp) - intercept;
+	if(i < 10) std::cout <<  inp[i] << std::endl;
+ }
+ std::cout << " mean: " << mean << " sd: " << sd << std::endl;
 }
 void operations::FreqShape(float * in, timeslice nsamps, int nchans, float * out) {
 		for(int ichan = 0; ichan < nchans; ichan++) {

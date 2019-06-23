@@ -58,8 +58,10 @@ class FilterbankCandidate {
 	 return true;
 	}
  public:
+  double duration, tstart;
+  int nbits;
 	unsigned int bmin, bmax;
-	std::string group, antenna;
+	std::string group, antenna, source_name;
 	bool isKur;
 	float sn, dm;
 	long unsigned peak_index;
@@ -84,6 +86,10 @@ class FilterbankCandidate {
 	 isKur   = fb.isKur;
 	 bmin    = fb.bmin;
 	 bmax    = fb.bmax;
+	 source_name = fb.source_name;
+	 duration = fb.duration;
+	 nbits = fb.nbits;
+	 tstart = fb.tstart;
 	 // read candidates
 	 cl = ReadCandidates(c, fb.tsamp);
 	 nchans = fb.nchans;
