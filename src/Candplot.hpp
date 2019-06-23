@@ -220,16 +220,17 @@ class CandPlot : protected Plotter {
 	 float blue[]  = {0.0f, 0.5f, 0.0f, 0.0f, 0.3f, 1.0f};
 	 constexpr int chanout = 512;
 	 PtrFloat ffddw = nullptr;
-	 PtrFloat freqs_ptr = new float[fcl.nchans]();
-	 PtrFloat freqs_bshape = new float[fcl.nchans]();
+	 PtrFloat freqs_ptr = new float[chanout]();
+	 PtrFloat freqs_bshape = new float[chanout]();
 	 std::string str;
 	 int twindow;
 	 FloatVector taxis;
 	 float min, max, xxmin, xxmax, dd_range;
-	 operations::FreqTable((float)fcl.fch1, (float)fcl.foff, fcl.nchans, freqs_ptr);
-	 while(fcl.Next()) {
+	 operations::FreqTable((float)fcl.fch1, (float)fcl.foff*fcl.nchans/chanout, chanout, freqs_ptr);
+	 do {
 		// put selection logic here
 		if(fcl.sn < 10) continue;
+		//if(fcl.dm < 100) continue;
 		// end selection logic
 		if(count != 0) {
 		 cpgpage();
@@ -244,14 +245,14 @@ class CandPlot : protected Plotter {
 		tr[4] = 1.f*(float)fcl.foff; 
 		tr[4] *= (4096/chanout);
 		//cpgsci(1); // color index
-		cpgsvp(0.1, 0.45, 0.1, 0.5); // de-dispersed waterfall
-		cpgswin(taxis[0], taxis[twindow-1], freqs_ptr[0],  freqs_ptr[fcl.nchans-1]);
+		cpgsvp(0.1, 0.65, 0.1, 0.65); // de-dispersed waterfall
+		cpgswin(taxis[0], taxis[twindow-1], freqs_ptr[0],  freqs_ptr[chanout-1]);
 		cpgbox("BCN",0.0,0,"BCNV",0.0,0);
 		cpgsfs(1);
 		// fsrunching
 		ffddw = new float[twindow * chanout](); // uniform initialization, c++11
 		operations::Fscrunch(fcl.dd_fb, fcl.nchans, twindow, chanout, ffddw);
-		operations::DynamicColor(ffddw, twindow, chanout, csize);
+		operations::DynamicColor(ffddw, twindow, chanout, fcl.nbits);
 		cpgctab (light, red, green, blue, csize, contrast, brightness);
 		cpgimag(ffddw, chanout, twindow, 1, chanout, 1, twindow, -1, csize-1, tr);
 		//cpglab("Time (s)", "Freq (MHz)", "De-Dispersed Waterfall");
@@ -263,46 +264,48 @@ class CandPlot : protected Plotter {
 		cpgsls(2);
 		xlin[0] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
 		xlin[1] = fcl.tsamp*(fcl.i0 - 3.5 * fcl.filterwidth);
-		ylin[0] = freqs_ptr[fcl.nchans-1];
+		ylin[0] = freqs_ptr[chanout-1];
 		ylin[1] = freqs_ptr[0];
 		cpgline(2,xlin, ylin);
 		// end line
 		xlin[0] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
 		xlin[1] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
 		cpgline(2,xlin, ylin);
+		// peak line
+		cpgsci(5);
+		cpgsls(4);
+		xlin[0] = fcl.peak_time;
+		xlin[1] = fcl.peak_time;
+		cpgline(2, xlin, ylin);
 		cpgsls(1);
-		delete[] ffddw;
 		//////////////////////////////////////////////////
 		// change dispersed waterfall (which we don't see anyway to bandshape)
 		cpgsci(1); // color index
-		cpgsvp(0.45, 0.80, 0.1, 0.5); // bandshape
-		ffddw = new float[fcl.nchans]();
-		std::fill(freqs_bshape, freqs_bshape + fcl.nchans, 0.0f);
-		operations::FreqShape(fcl.dd_fb, twindow, fcl.nchans, freqs_bshape);
-		for(int i = 0; i < fcl.nchans; i++) freqs_bshape[i] = log10(freqs_bshape[i]);
+		cpgsvp(0.65, 0.90, 0.1, 0.65); // bandshape
+		std::fill(freqs_bshape, freqs_bshape + chanout, 0.0f);
+		operations::FreqShape(ffddw, twindow, chanout, freqs_bshape);
 		//operations::Whiten(freqs_bshape, fcl.nchans);
-		min = *std::min_element(freqs_bshape, freqs_bshape + fcl.nchans);
-		max = *std::max_element(freqs_bshape, freqs_bshape + fcl.nchans);
+		min = *std::min_element(freqs_bshape, freqs_bshape + chanout);
+		max = *std::max_element(freqs_bshape, freqs_bshape + chanout);
 		dd_range = max - min;
-		xxmin = min - .1 * dd_range * min;
-		xxmax = max + .1 * dd_range * max;
-		std::cout << " : " << xxmin << "  " << xxmax << std::endl;
-		cpgswin(xxmin, xxmax, freqs_ptr[0],  freqs_ptr[fcl.nchans-1]);
+		xxmin = min - .1 * dd_range;
+		xxmax = max + .1 * dd_range;
+		//cpgswin(xxmin, xxmax, freqs_ptr[fcl.nchans-1],  freqs_ptr[0]);
+		cpgswin(xxmin, xxmax, freqs_ptr[0],  freqs_ptr[chanout-1]);
 		cpgbox("BCN",0.0,0,"BCV",0.0,0);
 		cpgsfs(1);
-		cpgline(fcl.nchans, freqs_bshape, freqs_ptr);
+		cpgline(chanout, freqs_bshape, freqs_ptr);
 		cpgmtxt("B",2.5,.5,0.5,"Intensity (a.u.)"); // group at middle
-		cpgmtxt("T",.3,.5,0.5, "Bandshape");
-		delete[] ffddw;
+		cpgmtxt("T",-1*charh,.5,0.5, "Bandshape");
 		//////////////////////////////////////////////////
 		cpgsci(1); // color index
-		cpgsvp(0.1, 0.45, 0.5, 0.9); // fscrunched profile 
+		cpgsvp(0.1, 0.65, 0.65, 0.9); // fscrunched profile 
 		//cpgswin(76, 78.5, 0..0, 0.2 );
 		min = *std::min_element(fcl.dd_tim, fcl.dd_tim + twindow);
 		max = *std::max_element(fcl.dd_tim, fcl.dd_tim + twindow);
 		dd_range = max - min;
-		xxmin = min - .1 * dd_range * min;
-		xxmax = max + .1 * dd_range * max;
+		xxmin = min - .1 * dd_range;
+		xxmax = max + .1 * dd_range;
 		//std::cout << "Plotter limits: " << xlin[0] << " " << xlin[1] << std::endl;
 		cpgswin(taxis[0],taxis[twindow -1], xxmin, xxmax );
 		cpgbox("BC",0.0,0,"BCNV",0.0,0);
@@ -310,7 +313,7 @@ class CandPlot : protected Plotter {
 		//cpglab("", "Intensity (a.u)", "De-dispersed Integrated Profile");
 		cpgmtxt("R",1.2,0.5,0.5,"Intensity (a.u.)");
 		cpgmtxt("T",.3,.5,0.5, "De-Dispersed Integrated Profile and Waterfall");
-		cpgmtxt("T",2.0,1.0,0.3,fcl.group.c_str());
+		cpgmtxt("T",2.0,0.0,0.5,fcl.group.c_str());
 		// start line
 		cpgsci(6);
 		cpgsls(2);
@@ -323,36 +326,43 @@ class CandPlot : protected Plotter {
 		xlin[0] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
 		xlin[1] = fcl.tsamp*(fcl.i1 + 3.5 * fcl.filterwidth);
 		cpgline(2,xlin, ylin);
+		// peak line
+		cpgsci(5);
+		cpgsls(4);
+		xlin[0] = fcl.peak_time;
+		xlin[1] = fcl.peak_time;
+		cpgline(2, xlin, ylin);
 		cpgsls(1);
 		cpgsci(1);
 		//////////////////////////////////////////////////
 		cpgsci(1); // color index
-		cpgsvp(0.50, 0.95, 0.55, 0.90); // Meta data
+		cpgsvp(0.65, 0.90, 0.65, 0.9); // Meta data
 		txtrow = 0;
 		snprintf(txt, 256, "S/N: %3.2f", fcl.sn);
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		snprintf(txt, 256, "DM: %3.2f pc/cc", fcl.dm);
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		snprintf(txt, 256, "Width: %3.2f ms", fcl.tsamp*fcl.filterwidth*1e3f);
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		snprintf(txt, 256, "Peak Time: %4.3f s", fcl.peak_time);
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		snprintf(txt, 256, "Antenna: %s", fcl.antenna.c_str());
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		snprintf(txt, 256, "Source: %s", fcl.source_name.c_str());
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		snprintf(txt, 256, "Total time: %3.2f s", fcl.duration);
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		snprintf(txt, 256, "Tstart(MJD): %3.2f", fcl.tstart);
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		snprintf(txt, 256, "NBits: %d", fcl.nbits);
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		snprintf(txt, 256, "NChans: %d", fcl.nchans);
-		cpgmtxt("T",txtheight * txtrow++, 0.0, 0.0, txt);
+		cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
 		//////////////////////////////////////////////////
 		//break;
 		count++;
-	 }
+	 } while(fcl.Next());
 	 delete[] freqs_ptr;
+	 delete[] freqs_bshape;
 	}
 };

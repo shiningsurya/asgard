@@ -33,17 +33,16 @@ void operations::Whiten(PtrFloat inp, timeslice tnsamp) {
 void operations::FreqTable(float fch1, float foff, int nchans, PtrFloat out) {
  for(int i = 0; i < nchans; i++) out[i] = ( fch1 + i * foff );
 }
-void operations::DynamicColor(PtrFloat inp, timeslice nsamps, int nchans, int csize) {
- if(csize != 6) 
-	std::cerr << "opertions::DynamicColor csize " << csize << " not supported!" << std::endl;
+void operations::DynamicColor(PtrFloat inp, timeslice nsamps, int nchans, int nbits) {
  // inplace changing the input array to 
  // -1 ---> csize-1
  // to have dynamic color scheme
  // estimate mean and variance
  double mean=0.0f, variance=0.0f, sd=0.0f;
- float M = 3.0f, L = 1.0f, temp = 0.0f;
- unsigned int fac = 3;
- float slope, intercept;
+ float cL = pow(2,nbits)-1, bwL = 0.0f, temp = 0.0f;
+ float bwslope, bwintercept;
+ float cslope, cintercept;
+ float bpoint;
  timeslice tnsamp = nsamps * nchans;
  // mean
  for(timeslice i = 0; i < tnsamp; i++) mean += inp[i];
@@ -52,11 +51,21 @@ void operations::DynamicColor(PtrFloat inp, timeslice nsamps, int nchans, int cs
  for(timeslice i = 0; i < tnsamp; i++) variance += pow(inp[i] - mean, 2);
  sd = sqrt(variance/tnsamp);
  // mapping
- slope = M - L;
- intercept = M;
+ bpoint = mean - 1*sd;
+ bwslope     = 1.0f / (bpoint - bwL);
+ bwintercept = 0.0f - (bpoint*bwslope);
+ cslope     = 5.0f / (cL - bpoint);
+ cintercept = 5.0f - (cL*cslope);
  for(timeslice i = 0; i < tnsamp; i++) {
-	temp = (inp[i] - mean) / sd;
-	inp[i] = (slope * temp) - intercept;
+  temp = inp[i];
+	if(temp >= bpoint) {
+	 // color
+	 inp[i] = (temp * cslope) + cintercept;
+	}
+	else {
+	 // black and white
+	 inp[i] = (temp * bwslope) + bwintercept;
+	}
  }
 }
 void operations::FreqShape(float * in, timeslice nsamps, int nchans, float * out) {
