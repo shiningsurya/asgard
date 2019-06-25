@@ -114,6 +114,48 @@ class PsrDADA {
 						if(dada_error) return false;
 						return true;
 				}
+				/********************************************
+				 * Rationale for making Lock functions private.
+				 * All locking/unlocking happens internally now.
+				 * lock at the start of function and 
+				 * unlock at the end.
+				 * ******************************************/
+				bool ReadLock(bool x) {
+						bool ret;
+						std::cerr << "PsrDADA::ReadLock before key=" << dada_key << std::endl;
+						if(x) {
+						   // Requested lock
+						   if(read_lock) ret =  true;
+						   else ret = dada_hdu_lock_read(hdu);
+						   read_lock = true;
+						}
+						else {
+						   // Requested unlock
+						   if(read_lock) ret = dada_hdu_unlock_read(hdu);
+						   else ret = true;
+						   read_lock = false;
+						}
+						std::cerr << "PsrDADA::ReadLock after key=" << dada_key << std::endl;
+						return ret;
+				}
+				bool WriteLock(bool x) {
+						bool ret;
+						std::cerr << "PsrDADA::WriteLock before key=" << dada_key << std::endl;
+						if(x) {
+						   // Requested lock
+						   if(write_lock) ret = true;
+						   else ret = dada_hdu_lock_write(hdu);
+						   write_lock = true;
+						}
+						else {
+						   // Requested unlock
+						   if(write_lock) ret = dada_hdu_unlock_write(hdu);
+						   else ret = true;
+						   write_lock = false;
+						}
+						std::cerr << "PsrDADA::WriteLock after key=" << dada_key << std::endl;
+						return ret;
+				}
 		public:
 				PsrDADA() {
 						// chill
@@ -182,43 +224,8 @@ class PsrDADA {
 				const timeslice GetStride() const {
 						return bytes_stride;
 				}
-				bool ReadLock(bool x) {
-						bool ret;
-						std::cerr << "PsrDADA::ReadLock before key=" << dada_key << std::endl;
-						if(x) {
-						   // Requested lock
-						   if(read_lock) ret =  true;
-						   else ret = dada_hdu_lock_read(hdu);
-						   read_lock = true;
-						}
-						else {
-						   // Requested unlock
-						   if(read_lock) ret = dada_hdu_unlock_read(hdu);
-						   else ret = true;
-						   read_lock = false;
-						}
-						std::cerr << "PsrDADA::ReadLock after key=" << dada_key << std::endl;
-						return ret;
-				}
-				bool WriteLock(bool x) {
-						bool ret;
-						std::cerr << "PsrDADA::WriteLock before key=" << dada_key << std::endl;
-						if(x) {
-						   // Requested lock
-						   if(write_lock) ret = true;
-						   else ret = dada_hdu_lock_write(hdu);
-						   write_lock = true;
-						}
-						else {
-						   // Requested unlock
-						   if(write_lock) ret = dada_hdu_unlock_write(hdu);
-						   else ret = true;
-						   write_lock = false;
-						}
-						std::cerr << "PsrDADA::WriteLock after key=" << dada_key << std::endl;
-						return ret;
-				}
 				bool ReadHeader() {
+						ReadLock(true);
 						std::cerr << "PsrDADA::ReadHeader key=" << dada_key << std::endl;
 						// blocking read
 						header = ipcbuf_get_next_read(hdu->header_block, &header_size);
@@ -281,17 +288,18 @@ class PsrDADA {
 						// exit if no error
 						if(dada_error) return false;
 						// mark buffer clear
-						ipcbuf_mark_cleared(hdu->header_block);	
+						//ipcbuf_mark_cleared(hdu->header_block);	
+						ReadLock(false);
 						return true;
 				}
 				timeslice ReadData(PtrFloat data, PtrByte packin) {
+						ReadLock(true);
 						std::cerr << "PsrDADA::ReadData key=" << dada_key << std::endl;
-						if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return -1;
 						// Initialization
 						if(packin == nullptr) packin = ( PtrByte ) new unsigned char[bytes_chunk];
 						// READ
 						timeslice chunk_read = ipcio_read(hdu->data_block, (char*)packin, bytes_chunk);
-						if(chunk_read < 0) {
+						if(chunk_read == -1) {
 								std::cerr << "PsrDADA::ReadData ipcio_read fail." << std::endl;
 								return -1;
 						}
@@ -314,9 +322,11 @@ class PsrDADA {
 												<< std::endl;
 						// unpack to floats
 						unpack(packin, chunk_read, data);
+						ReadLock(false);
 						return chunk_read;
 				}
 				bool WriteHeader() {
+						WriteLock(true);
 						std::cerr << "PsrDADA::WriteHeader key=" << dada_key << std::endl;
 						header = ipcbuf_get_next_write(hdu->header_block);
 						if(!header) {
@@ -370,8 +380,11 @@ class PsrDADA {
 						}
 						std::cerr << "PsrDADA::WriteHeader UTC"  << std::endl;
 						ipcbuf_mark_filled (hdu->header_block, header_size);
+						WriteLock(false);
+						return true;
 				}
 				timeslice WriteData(PtrFloat data, PtrByte packout, int numants) {
+						WriteLock(true);
 						std::cerr << "PsrDADA::WriteData key=" << dada_key << std::endl;
 						if(packout == nullptr) packout = ( PtrByte ) new unsigned char[bytes_chunk];
 						// NOT SURE ABOUT EOD while WRITING?
@@ -383,16 +396,28 @@ class PsrDADA {
 								std::cerr << "PsrDADA::WriteData ipcio_write fail." << std::endl;
 								return false;
 						}
+						WriteLock(false);
 						return bytes_written;
 				}
 				void PrintHeader() {
+						// positions
 						std::cout << "RA     " << ra  << std::endl;
 						std::cout << "DEC    " << dec << std::endl;
+						// frequency
+						std::cout << "FCH1   " << fch1 << std::endl;
+						std::cout << "FOFF   " << foff << std::endl;
+						std::cout << "CFREQ  " << cfreq << std::endl;
+						std::cout << "BANDW  " << bandwidth<< std::endl;
+						// time
 						std::cout << "TSAMP  " << tsamp << std::endl;
+						// memory
 						std::cout << "NCHANS " << nchans<< std::endl;
 						std::cout << "NBITS  " << nbits << std::endl;
-						std::cout << "CFREQ  " << cfreq << std::endl;
+						std::cout << "NIFS   " << nifs<< std::endl;
+						std::cout << "NPOL   " << npol << std::endl;
+						// strings
 						std::cout << "UTC    " << utc_start_str << std::endl;
+						std::cout << "SOURCE " << source_str << std::endl;
 				}
 				struct DADAHeader GetHeader() {
 						struct DADAHeader ret;
@@ -409,6 +434,7 @@ class PsrDADA {
 						ret.bandwidth = bandwidth;
 						strcpy(ret.utc_start_str, utc_start_str);
 						strcpy(ret.source_str, source_str);
+						return ret;
 				}
 				bool SetHeader(const struct DADAHeader& in) {
 						ra       = in.ra;
@@ -424,6 +450,9 @@ class PsrDADA {
 						bandwidth = in.bandwidth;
 						strcpy(utc_start_str, in.utc_start_str);
 						strcpy(source_str, in.source_str);
+						return true;
+				}
+				bool Scrub() {
 						return true;
 				}
 };

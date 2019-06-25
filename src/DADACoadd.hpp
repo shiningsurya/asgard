@@ -19,6 +19,7 @@ class DADACoadd  {
 				mpi::environment env;
 				mpi::communicator world;
 				mpi::communicator addcomm;
+				uint64_t running_index;
 				// data voting
 				bool vote;
 				unsigned int numants_votes;
@@ -48,15 +49,10 @@ class DADACoadd  {
 				// coadder
 				void coadder() {
 					keepgoing = false;
-					// ONLY reads from dadains
-					dadain1.ReadLock(true);
-					dadain2.ReadLock(true);
-					// ONLY writes in dadaout
-					if(world.rank() == world_root) 
-						dadaout.WriteLock(true);
+					// Locks were here. See Rationale in PsrDADA
 					// run indefinitely
 					// blocks on inswitch dadain Read Header
-					std::cout << "LOOPING" << std::endl;
+					std::cout << "DADACoadd::LOOPING" << std::endl;
 					while( 
 							( keepgoing )
 							||
@@ -87,11 +83,13 @@ class DADACoadd  {
 							read_chunk = dadain1.ReadData(data_f, data_b);
 							// if Read header for the first time
 						    if(!keepgoing) dHead = std::move(dadain1.GetHeader());
+						    if(!keepgoing) dadain1.PrintHeader();
 						}
 						else {
 							read_chunk = dadain2.ReadData(data_f, data_b);
 							// if Read header for the first time
 						    if(!keepgoing) dHead = std::move(dadain2.GetHeader());
+						    if(!keepgoing) dadain2.PrintHeader();
 						}
 						// SWITCHING
 						if( read_chunk == -1 ) {
@@ -99,10 +97,14 @@ class DADACoadd  {
 							// EOD read fail
 							std::fill(data_f, data_f + sample_chunk, 0.0f);
 							vote = false;
+						  // reset counter
 							keepgoing = false;
+						  running_index = 0;
 							// FLIP switch
 							inswitch = not inswitch;
-						    std::cerr << "DADACoadd::SWITCHING" << std::endl;
+						  std::cerr << "DADACoadd::SWITCHING" << std::endl;
+						  // go back to LOOPING
+						  continue;
 						}
 						else if( read_chunk < sample_chunk ) {
 							// fill zeros at the end
@@ -128,11 +130,13 @@ class DADACoadd  {
 						if(addcomm.rank() == addcomm_root) {
 						    // set Header
 						    dadaout.SetHeader(dHead);
-						    std::cerr << "DADACoadd::WRITING HEADER" << std::endl;
-							// should I WriteLock(true) here?
-							// dadaout.WriteLock(true);
-							// write out Header
-							dadaout.WriteHeader();
+							if(!running_index) {
+									// should I WriteLock(true) here?
+									// dadaout.WriteLock(true);
+									// write out Header
+									dadaout.WriteHeader();
+									std::cerr << "DADACoadd::WRITING HEADER" << std::endl;
+						    }
 						    std::cerr << "DADACoadd::WRITING DATA" << std::endl;
 							// write data
 							dadaout.WriteData(o_data_f, o_data_b, addcomm.size());
@@ -146,12 +150,9 @@ class DADACoadd  {
 							}
 							// should I WriteLock(false) here?
 							// dadaout.WriteLock(false);
+							running_index++;
 						}
 					}
-					dadain1.ReadLock(false);
-					dadain2.ReadLock(false);
-					if(world.rank() == world_root)
-					  dadaout.WriteLock(false);
 				}
 		public:
 				DADACoadd(key_t key_in_1, 
@@ -173,6 +174,7 @@ class DADACoadd  {
 						dadain1(key_in1, nsamps, nchans, nbits),
 						dadain2(key_in2, nsamps, nchans, nbits),
 						inswitch(true),
+						running_index(0),
 						world_root(root_) {
 										// common ground work
 										sample_stride = nchans * nbits / 8;

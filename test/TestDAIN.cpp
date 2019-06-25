@@ -11,7 +11,6 @@ int main() {
   PsrDADA my(kk, 10240, 4096, 2);  
   bool going = false;
   //
-  my.ReadLock(true);
   while(going || my.ReadHeader()) {
 		if(!going) my.PrintHeader();
 		auto xx = my.ReadData(f,b);
@@ -30,7 +29,6 @@ int main() {
 				  going = true;
 		}
   }
-  my.ReadLock(false);
   //
   delete[] f;
   delete[] b;

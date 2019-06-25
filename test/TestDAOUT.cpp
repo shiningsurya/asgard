@@ -20,13 +20,10 @@ int main() {
   dHead.nbits = 420;
   strcpy(dHead.utc_start_str, "060606060660606606");
   strcpy(dHead.source_str,  "J0420-0420");
-  my.WriteLock(true);
   // write Header
   my.SetHeader(dHead);
   my.WriteHeader();
   // write Data
   my.WriteData(f, b, 1);
-  // unlock write
-  my.WriteLock(false);
   return 0;
 }
