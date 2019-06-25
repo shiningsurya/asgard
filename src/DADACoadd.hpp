@@ -24,7 +24,7 @@ class DADACoadd  {
 				bool vote;
 				unsigned int numants_votes;
 				// DADA
-				key_t key_in1, key_in2, key_out;
+				key_t key_in, key_out;
 				bool filout;
 				bool inswitch;
 				bool keepgoing;
@@ -44,7 +44,7 @@ class DADACoadd  {
 				PtrByte data_b;
 				PtrByte o_data_b;
 				// DADA Objects
-				PsrDADA dadain1, dadain2, dadaout;
+				PsrDADA dadain, dadaout;
 				struct DADAHeader dHead;
 				// coadder
 				void coadder() {
@@ -53,12 +53,18 @@ class DADACoadd  {
 					// run indefinitely
 					// blocks on inswitch dadain Read Header
 					std::cout << "DADACoadd::LOOPING" << std::endl;
+					/********************************************
+					 * before Git commit "before CV"
+					 * I had blocking code in while condition.
+					 * It wasn't letting me switch.
+					 * Hence, coming on to conditional variable
+					 * two threads execute dadain?.ReadHeader()
+					 * inswitch is the conditional variable
+					 * *****************************************/
 					while( 
 							( keepgoing )
 							||
-							( inswitch   && dadain1.ReadHeader() )
-							||
-							( !inswitch  && dadain2.ReadHeader() )
+							( dadain.ReadHeader() )
 							) {
 						/****************************************************************************
 						 * Post MTK email 6162019
@@ -79,18 +85,10 @@ class DADACoadd  {
 						 * *************************************************************************/
 						// READING
 						std::cerr << "DADACoadd::READING" << std::endl;
-						if( inswitch ){
-							read_chunk = dadain1.ReadData(data_f, data_b);
-							// if Read header for the first time
-						    if(!keepgoing) dHead = std::move(dadain1.GetHeader());
-						    if(!keepgoing) dadain1.PrintHeader();
-						}
-						else {
-							read_chunk = dadain2.ReadData(data_f, data_b);
-							// if Read header for the first time
-						    if(!keepgoing) dHead = std::move(dadain2.GetHeader());
-						    if(!keepgoing) dadain2.PrintHeader();
-						}
+						read_chunk = dadain.ReadData(data_f, data_b);
+					  // if Read header for the first time
+						if(!keepgoing) dHead = std::move(dadain.GetHeader());
+						if(!keepgoing) dadain.PrintHeader();
 						// SWITCHING
 						if( read_chunk == -1 ) {
 							// fill zeros because read failed
@@ -101,18 +99,18 @@ class DADACoadd  {
 							keepgoing = false;
 						  running_index = 0;
 							// FLIP switch
-							inswitch = not inswitch;
-						  std::cerr << "DADACoadd::SWITCHING" << std::endl;
 						  // go back to LOOPING
 						  continue;
 						}
-						else if( read_chunk < sample_chunk ) {
+						else if( read_chunk < bytes_chunk) {
 							// fill zeros at the end
-							std::fill(data_f + sample_chunk - read_chunk, data_f + sample_chunk, 0.0f);
+							std::fill(data_f + sample_chunk - (read_chunk*sample_stride), data_f + sample_chunk, 0.0f);
 							vote = true;
-							keepgoing = true;
+						  // reset counter
+							keepgoing = false;
+						  running_index = 0;
 						}
-						else if( read_chunk == sample_chunk ) {
+						else if( read_chunk == bytes_chunk) {
 							// perfect world case
 							vote = true;
 							keepgoing = true;
@@ -155,8 +153,7 @@ class DADACoadd  {
 					}
 				}
 		public:
-				DADACoadd(key_t key_in_1, 
-						key_t key_in_2,
+				DADACoadd(key_t key_in_, 
 						key_t key_out_, 
 						bool filout_, 
 						timeslice nsamps_,
@@ -164,16 +161,13 @@ class DADACoadd  {
 						int nbits_,
 						int root_) 
 					:
-						key_in1(key_in_1), 
-						key_in2(key_in_2), 
+						key_in(key_in_), 
 						key_out(key_out_),
 						filout(filout_),
 						nsamps(nsamps_),
 						nchans(nchans_),
 						nbits(nbits_),
-						dadain1(key_in1, nsamps, nchans, nbits),
-						dadain2(key_in2, nsamps, nchans, nbits),
-						inswitch(true),
+						dadain(key_in, nsamps, nchans, nbits),
 						running_index(0),
 						world_root(root_) {
 										// common ground work

@@ -22,7 +22,8 @@ int main() {
 		else if(xx != my.GetByteChunkSize()) {
 				// incomplete case
 				cout << "Read " << xx << " bytes when requested " << my.GetByteChunkSize() << " bytes."<< endl;
-				going = true;
+				going = false;
+				cout << "incomplete!" << endl;
 		}
 		else {
 		// perfect case

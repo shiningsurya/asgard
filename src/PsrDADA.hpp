@@ -288,16 +288,17 @@ class PsrDADA {
 						// exit if no error
 						if(dada_error) return false;
 						// mark buffer clear
-						//ipcbuf_mark_cleared(hdu->header_block);	
+						ipcbuf_mark_cleared(hdu->header_block);	
 						ReadLock(false);
 						return true;
 				}
 				timeslice ReadData(PtrFloat data, PtrByte packin) {
 						ReadLock(true);
 						std::cerr << "PsrDADA::ReadData key=" << dada_key << std::endl;
+						if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return -1;
 						// Initialization
 						if(packin == nullptr) packin = ( PtrByte ) new unsigned char[bytes_chunk];
-						// READ
+						// READ -- this blocks
 						timeslice chunk_read = ipcio_read(hdu->data_block, (char*)packin, bytes_chunk);
 						if(chunk_read == -1) {
 								std::cerr << "PsrDADA::ReadData ipcio_read fail." << std::endl;
