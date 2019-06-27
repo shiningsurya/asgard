@@ -36,8 +36,8 @@ class PsrDADA {
 				// states
 				bool read_lock;
 				bool write_lock;
-				uint64_t h_readtimes, h_writetimes;
-				uint64_t d_readtimes, d_writetimes;
+				static uint64_t h_readtimes, h_writetimes;
+				static uint64_t d_readtimes, d_writetimes;
 				// Read header 
 				char * header;
 				timeslice header_size;
@@ -124,13 +124,9 @@ class PsrDADA {
 						dada_key(dada_key_), 
 						nsamps(nsamps_),
 						nchans(nchans_), 
-						nbits(nbits_),
-						h_readtimes(0),
-						h_writetimes(0),
-						d_readtimes(0),
-						d_writetimes(0)
+						nbits(nbits_)
 		{
-						std::cerr << "PsrDADA::ctor key=" << dada_key << std::endl;
+						std::cerr << "PsrDADA::ctor key=" << std::hex << dada_key << std::endl;
 						dada_error = false;
 						sample_chunk = nsamps * nchans;
 						bytes_chunk = nsamps * nchans * nbits / 8;
@@ -148,7 +144,7 @@ class PsrDADA {
 						write_lock = false;
 				}
 				PsrDADA& operator=(PsrDADA&& other) {
-						std::cerr << "PsrDADA::move_assignment key=" << other.dada_key << std::endl;
+						std::cerr << "PsrDADA::move_assignment key=" << std::hex << other.dada_key << std::endl;
 						// ctor args
 						nsamps = other.nsamps;
 						nchans = other.nchans;
@@ -177,7 +173,7 @@ class PsrDADA {
 						return *this;
 				}
 				~PsrDADA() { 
-						std::cerr << "PsrDADA::dtor key=" << dada_key << std::endl;
+						std::cerr << "PsrDADA::dtor key=" << std::hex << dada_key << std::endl;
 						// Disconnection
 						Disconnect();
 						// log close
@@ -185,7 +181,7 @@ class PsrDADA {
 				}
 				bool ReadLock(bool x) {
 						bool ret;
-						std::cerr << "PsrDADA::ReadLock before key=" << dada_key << std::endl;
+						std::cerr << "PsrDADA::ReadLock before key=" << std::hex << dada_key << std::endl;
 						if(x) {
 						   // Requested lock
 						   if(read_lock) ret =  true;
@@ -198,12 +194,12 @@ class PsrDADA {
 						   else ret = true;
 						   read_lock = false;
 						}
-						std::cerr << "PsrDADA::ReadLock after key=" << dada_key << std::endl;
+						std::cerr << "PsrDADA::ReadLock after key=" << std::hex << dada_key << std::endl;
 						return ret;
 				}
 				bool WriteLock(bool x) {
 						bool ret;
-						std::cerr << "PsrDADA::WriteLock before key=" << dada_key << std::endl;
+						std::cerr << "PsrDADA::WriteLock before key=" << std::hex << dada_key << std::endl;
 						if(x) {
 						   // Requested lock
 						   if(write_lock) ret = true;
@@ -216,7 +212,7 @@ class PsrDADA {
 						   else ret = true;
 						   write_lock = false;
 						}
-						std::cerr << "PsrDADA::WriteLock after key=" << dada_key << std::endl;
+						std::cerr << "PsrDADA::WriteLock after key=" << std::hex << dada_key << std::endl;
 						return ret;
 				}
 				const timeslice GetByteChunkSize() const {
@@ -226,8 +222,8 @@ class PsrDADA {
 						return bytes_stride;
 				}
 				bool ReadHeader() {
-						std::cerr << "PsrDADA::ReadHeader key=" << dada_key;
-						std::cerr << " h_readtimes=" << h_readtimes++ << std::endl;
+						std::cerr << "PsrDADA::ReadHeader key=" << std::hex << dada_key;
+						std::cerr << " h_readtimes=" << std::dec <<  h_readtimes++ << std::endl;
 						// blocking read
 						header = ipcbuf_get_next_read(hdu->header_block, &header_size);
 						if(!header) {
@@ -293,8 +289,8 @@ class PsrDADA {
 						return true;
 				}
 				timeslice ReadData(PtrFloat data, PtrByte packin) {
-						std::cerr << "PsrDADA::ReadData key=" << dada_key;
-						std::cerr << " d_readtimes=" << d_readtimes++ << std::endl;
+						std::cerr << "PsrDADA::ReadData key=" << std::hex << dada_key;
+						std::cerr << " d_readtimes=" << std::dec << d_readtimes++ << std::endl;
 						if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) {
 						 return -1;
 						}
@@ -328,8 +324,8 @@ class PsrDADA {
 						return chunk_read;
 				}
 				bool WriteHeader() {
-						std::cerr << "PsrDADA::WriteHeader key=" << dada_key;
-						std::cerr << " h_writetimes=" << h_writetimes++ << std::endl;
+						std::cerr << "PsrDADA::WriteHeader key=" << std::hex << dada_key;
+						std::cerr << " h_writetimes=" << std::dec << h_writetimes++ << std::endl;
 						header = ipcbuf_get_next_write(hdu->header_block);
 						if(!header) {
 								std::cerr << "PsrDADA::WriteHeader fail" << std::endl;
@@ -385,8 +381,8 @@ class PsrDADA {
 						return true;
 				}
 				timeslice WriteData(PtrFloat data, PtrByte packout, int numants) {
-						std::cerr << "PsrDADA::WriteData key=" << dada_key;
-						std::cerr << " d_writetimes=" << d_writetimes++ << std::endl;
+						std::cerr << "PsrDADA::WriteData key=" << std::hex << dada_key;
+						std::cerr << " d_writetimes=" << std::dec<< d_writetimes++ << std::endl;
 						if(packout == nullptr) packout = ( PtrByte ) new unsigned char[bytes_chunk];
 						// NOT SURE ABOUT EOD while WRITING?
 						//if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return -1;
@@ -456,3 +452,8 @@ class PsrDADA {
 						return true;
 				}
 };
+// static variable initialization
+uint64_t PsrDADA::d_readtimes = 0;
+uint64_t PsrDADA::h_readtimes = 0;
+uint64_t PsrDADA::d_writetimes = 0;
+uint64_t PsrDADA::h_writetimes = 0;

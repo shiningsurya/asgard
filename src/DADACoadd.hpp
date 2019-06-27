@@ -28,6 +28,7 @@ class DADACoadd  {
 				bool filout;
 				bool inswitch;
 				bool keepgoing;
+				bool incomplete;
 				// three important numbers
 				timeslice nsamps;
 				int nchans, nbits;
@@ -48,24 +49,27 @@ class DADACoadd  {
 				PsrDADA dadaout;
 				// coadder
 				void coadder() {
+					// connect to out buffer in root
+					if(world.rank() == world_root) {
+					 dadaout = PsrDADA(key_out, nsamps, nchans, nbits);
+					}
 					while(true) // for every observation
 					{
 					std::cerr << "DADACoadd::COADDER Beginning new observation" << std::endl;
 					PsrDADA dadain(key_in, nsamps, nchans, nbits);
 					keepgoing = false;
+					incomplete = false;
+					running_index = 0;
 					dadain.ReadLock(true);
-					if(world.rank() == world_root) {
-					 dadaout = PsrDADA(key_out, nsamps, nchans, nbits);
-					 dadaout.WriteLock(true);
-					}
+					if(world.rank() == world_root) dadaout.WriteLock(true);
 					 while (  keepgoing  ||  dadain.ReadHeader()  ) // for stretch of observation 
 					 {
 						 // READING
 						 std::cerr << "DADACoadd::READING" << std::endl;
 						 read_chunk = dadain.ReadData(data_f, data_b);
 						 // if Read header for the first time
-						 if(!keepgoing) dHead = std::move(dadain.GetHeader());
-						 if(!keepgoing) dadain.PrintHeader();
+						 if(!running_index) dHead = std::move(dadain.GetHeader());
+						 if(!running_index) dadain.PrintHeader();
 						 if( read_chunk == -1 ) {
 							 // fill zeros because read failed
 							 // EOD read fail
@@ -73,8 +77,7 @@ class DADACoadd  {
 							 vote = false;
 							 // reset counter
 							 keepgoing = false;
-							 running_index = 0;
-							 // go back to LOOPING
+							 // begin new observation
 							 break;
 						 }
 						 else if( read_chunk < bytes_chunk) {
@@ -83,7 +86,7 @@ class DADACoadd  {
 							 vote = true;
 							 // reset counter
 							 keepgoing = false;
-							 running_index = 0;
+							 incomplete = true;
 						 }
 						 else if( read_chunk == bytes_chunk) {
 							 // perfect world case
@@ -91,24 +94,26 @@ class DADACoadd  {
 							 keepgoing = true;
 						 }
 						 // VOTING
+						 #if 0
+						 // sanity checks like UTC is same
+						 // like # data reads in dadain == # writes in dadaout
 						 addcomm = std::move(world.split(vote));
 						 // root resolution and broadcasting
 						 if(world.rank() == world_root) {
 							 addcomm_root = addcomm.rank();
 						 }
 						 mpi::broadcast(world, addcomm_root, world_root);
+						 #endif
 						 // actual MPI coadd call
-						 mpi::reduce(addcomm, data_f, sample_chunk, o_data_f, std::plus<float>(), addcomm_root);
+						 mpi::reduce(world, data_f, sample_chunk, o_data_f, std::plus<float>(), world_root);
 						 // WRITING
-						 if(addcomm.rank() == addcomm_root) {
+						 if(world.rank() == world_root) {
 								 // set Header
-							 dadaout.SetHeader(dHead);
 							 if(!running_index) {
-									 // should I WriteLock(true) here?
-									 // dadaout.WriteLock(true);
 									 // write out Header
-									 dadaout.WriteHeader();
 									 std::cerr << "DADACoadd::WRITING HEADER" << std::endl;
+									 dadaout.SetHeader(dHead);
+									 dadaout.WriteHeader();
 								 }
 								 std::cerr << "DADACoadd::WRITING DATA" << std::endl;
 							 // write data
@@ -123,13 +128,18 @@ class DADACoadd  {
 							 }
 							 // should I WriteLock(false) here?
 							 // dadaout.WriteLock(false);
-							 running_index++;
+							 std::cerr << "DADACoadd::Running Index=" << running_index++ << std::endl;
 						 }
+						 if(incomplete) break;
 					 } // for stretch of observation
 					 dadain.ReadLock(false);
 					 if(world.rank() == world_root) dadaout.WriteLock(false);
 					} // for every observation
+
 					// dada objects should be destroyed here
+					// dadain goes out of scope
+					// dadaout dtor is called
+					if(world.rank() == world_root) dadaout.~PsrDADA();
 				}
 		public:
 				DADACoadd(key_t key_in_, 

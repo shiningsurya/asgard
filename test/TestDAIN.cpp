@@ -5,7 +5,7 @@ using std::cout;
 using std::endl;
 
 int main() {
- key_t kk = 0x56;
+ key_t kk = 0x60;
  uint64_t obs = 0;
  //
  while(true) // for every observation 
