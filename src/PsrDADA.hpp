@@ -166,10 +166,6 @@ class PsrDADA {
 						write_lock = other.write_lock;
 						other.read_lock = false;
 						other.write_lock = false;
-						h_readtimes = other.h_readtimes;
-						d_readtimes = other.d_readtimes;
-						h_writetimes = other.h_writetimes;
-						d_writetimes = other.d_writetimes;
 						return *this;
 				}
 				~PsrDADA() { 
