@@ -10,7 +10,7 @@ int main() {
  //
  while(true) // for every observation 
  {
-	PsrDADA my(kk, 10240, 4096, 2);  
+	PsrDADA my(kk, 10240, 4096, 2, "/home/vlite-master/surya/logs/dadain.log");  
 	my.ReadLock(true);
 	bool going = false;
 	PtrFloat f = nullptr;
