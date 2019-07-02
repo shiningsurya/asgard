@@ -61,6 +61,7 @@ class FilterbankSink{
 	 }
 	void Initialize(const struct Header& inhead) {
 	 filename = std::string(inhead.sigproc_file);
+	 std::cerr << "FilterbankSink::Initialize filename=" << filename << std::endl;
 	 fb_fp = fopen(filename.c_str(), "wb+");
 	 Header(inhead);
 	}
@@ -91,17 +92,18 @@ class FilterbankSink{
 	 send("nifs", 1);
 	 // time
 	 send("tstart",inhead.tstart);
-	 send("tsamp", inhead.tsamp);
+	 // division by 1e6 bc DADA tsamp unit is us
+	 send("tsamp", inhead.tsamp/1e6);
 	 send("HEADER_END");
 	}
 	void Data(const PtrByte in, timeslice bytes_chunk) {
 	 fwrite(in, 1, bytes_chunk, fb_fp);
 	}
 	void Close() {
-	 fclose(fb_fp);
+	// write duration
+	 if(fb_fp != NULL) fclose(fb_fp);
 	 fb_fp = NULL;
 	}
 	~FilterbankSink() {
-	 if(fb_fp != NULL) fclose(fb_fp);
 	}
 };

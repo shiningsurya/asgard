@@ -123,6 +123,8 @@ class PsrDADA {
  public:
 	PsrDADA() {
 	 // chill
+	 log_fp = NULL;
+	 log = NULL;
 	}
 	PsrDADA(key_t dada_key_, timeslice nsamps_, int nchans_, int nbits_, const char * logfile) : 
 	 dada_key(dada_key_), 
@@ -151,7 +153,7 @@ class PsrDADA {
 	write_lock = false;
  }
 	PsrDADA& operator=(PsrDADA&& other) {
-	 multilog(log, LOG_INFO,  "PsrDADA::move_assignment key=%x\n", other.dada_key);
+	 multilog(other.log, LOG_INFO,  "PsrDADA::move_assignment key=%x\n", other.dada_key);
 	 // ctor args
 	 nsamps = other.nsamps;
 	 nchans = other.nchans;
@@ -175,6 +177,8 @@ class PsrDADA {
 	 write_lock = other.write_lock;
 	 other.read_lock = false;
 	 other.write_lock = false;
+	 // destroy other
+	 other.~PsrDADA();
 	 return *this;
 	}
 	~PsrDADA() { 
@@ -182,8 +186,9 @@ class PsrDADA {
 	 // Disconnection
 	 Disconnect();
 	 // log close
-	 if(log != NULL)
-		multilog_close(log);
+	 if(log != NULL) multilog_close(log);
+	 // file close
+	 if(log_fp != NULL) fclose(log_fp);
 	}
 	bool ReadLock(bool x) {
 	 bool ret;
@@ -236,6 +241,10 @@ class PsrDADA {
 		return false;
 	 }
 	 // get params
+	 if(ascii_header_get(header, "STATIONID", "%d", &stationid) < 0) {
+		std::cerr << "PsrDADA::ReadHeader STATIONID write fail" << std::endl;
+		dada_error = true;
+	 }
 	 if(ascii_header_get(header, "NCHAN", "%d", &nchans) < 0) {
 		std::cerr << "PsrDADA::ReadHeader NCHAN read fail" << std::endl;
 		dada_error = true;
@@ -435,6 +444,8 @@ class PsrDADA {
 	 // strings
 	 std::cout << "UTC    " << utc_start_str << std::endl;
 	 std::cout << "SOURCE " << name << std::endl;
+	 std::cout << "SIGFIL " << sigproc_file << std::endl;
+	 std::cout << "STATID " << stationid << std::endl;
 	}
 	struct Header GetHeader() const {
 	 struct Header ret;
@@ -480,7 +491,7 @@ class PsrDADA {
 	 cfreq    = in.cfreq;
 	 bandwidth = in.bandwidth;
 	 // station
-	 stationid = stationid;
+	 stationid = in.stationid;
 	 // strings
 	 strcpy(utc_start_str, in.utc_start_str);
 	 strcpy(name, in.name);

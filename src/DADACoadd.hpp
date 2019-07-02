@@ -46,15 +46,21 @@ class DADACoadd  {
 	PsrDADA dadaout;
 	// Filterbank Writer
 	FilterbankSink fbout;
+	// debug
+	int numobs;
 	// coadder
 	void coadder() {
+	 numobs = 0;
 	 // connect to out buffer in root
 	 if(world.rank() == world_root) {
 		dadaout = PsrDADA(key_out, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadaout.log");
 	 }
-	 while(true) // for every observation
+	 while(++numobs) // for every observation
 	 {
-		std::cerr << "DADACoadd::COADDER Beginning new observation" << std::endl;
+		// Barrier to have all the nodes start new observation at the same time
+		world.barrier();
+		std::cerr << "DADACoadd::COADDER Beginning new observation"; 
+		std::cerr << " rank=" << world.rank() << std::endl;
 		PsrDADA dadain(key_in, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadain.log");
 		keepgoing = false;
 		incomplete = false;
@@ -64,7 +70,7 @@ class DADACoadd  {
 		while (  keepgoing  ||  dadain.ReadHeader()  ) // for stretch of observation 
 		{
 		 // READING
-		 std::cerr << "DADACoadd::READING" << std::endl;
+		 std::cerr << "DADACoadd::READING rank=" << world.rank() << std::endl;
 		 read_chunk = dadain.ReadData(data_f, data_b);
 		 // if Read header for the first time
 		 if(!running_index) dHead = std::move(dadain.GetHeader());
@@ -81,7 +87,7 @@ class DADACoadd  {
 		 }
 		 else if( read_chunk < bytes_chunk) {
 			// fill zeros at the end
-			std::fill(data_f + sample_chunk - (read_chunk/sample_stride), data_f + sample_chunk, 0.0f);
+			std::fill(data_f + sample_chunk - (read_chunk * 8 / nbits), data_f + sample_chunk, 0.0f);
 			vote = true;
 			// reset counter
 			keepgoing = false;
@@ -110,32 +116,36 @@ class DADACoadd  {
 			// set Header
 			if(!running_index) {
 			 // write out Header
-			 std::cerr << "DADACoadd::WRITING HEADER" << std::endl;
+			 std::cerr << "DADACoadd::WRITING HEADER";
+			 std::cerr << " rank=" << world.rank() << std::endl;
 			 dHead.stationid = 0;
 			 dadaout.SetHeader(dHead);
 			 dadaout.WriteHeader();
 			 // Filterbank Initialize
 			 if(filout) fbout.Initialize(dHead);
 			}
-			std::cerr << "DADACoadd::WRITING DATA" << std::endl;
+			std::cerr << "DADACoadd::WRITING DATA";
+			std::cerr << " rank=" << world.rank() << std::endl;
 			// write data
 			dadaout.WriteData(o_data_f, o_data_b, world.size());
 			// Filterbankwrite
 			if(filout) {
 			 fbout.Data(o_data_b, read_chunk); 
 			}
-			std::cerr << "DADACoadd::Running Index=" << running_index++ << std::endl;
+			std::cerr << "DADACoadd::Running Index=" << running_index++ ;
+			std::cerr << " rank=" << world.rank() << std::endl;
 		 }
 		 if(incomplete) break;
 		} // for stretch of observation
 		dadain.ReadLock(false);
-		if(world.rank() == world_root) dadaout.WriteLock(false);
+		if(world.rank() == world_root) {
+		 dadaout.WriteLock(false);
+		 fbout.Close();
+		}
 	 } // for every observation
-
 	 // dada objects should be destroyed here
 	 // dadain goes out of scope
-	 // dadaout dtor is called
-	 if(world.rank() == world_root) dadaout.~PsrDADA();
+	 // dadaout dtor is destroyed while mov_assign is called
 	}
  public:
 	DADACoadd(key_t key_in_, 
