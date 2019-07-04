@@ -8,6 +8,24 @@ Part of Asgard
 import os
 from CandidateData import CandidateData
 
+def GetGroup(cpath):
+    '''
+    Arguments
+    ---------
+    cpath: str
+        List files in all of cpath
+    '''
+    cret = []
+    cfilelist = [ix for ix in os.listdir(cpath) if os.path.isfile(os.path.join(cpath,ix))]
+    # group match and extension match
+    for fl in cfilelist:
+        fname, ext = os.path.splitext(fl)
+        # 20180521_162250_muos_ea02_kur.cand
+        # 20180521_162250_muos_ea02.cand
+        toks = fname.split('_')
+        cret.append( '_'.join(toks[:3])  )
+    return list(cret)
+
 def GetGroups(cpath, fpath):
     '''
     Arguments

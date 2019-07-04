@@ -1,0 +1,81 @@
+#!/usr/bin/python
+# constants
+ROOT = 0
+# imports
+import os
+from mpi4py import MPI as mp
+import pickle as pkl
+comm = mp.COMM_WORLD
+import CandidateData as cd
+import CandidateSet as cs
+#
+SIZE = comm.Get_size()
+RANK = comm.Get_rank()
+def ParseArgs():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='agather', description='Asgard tool for gathering candidates in one place.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('group', help = 'Group to work on. [def=all groups]', type=str, default=None)
+    # begin
+    # aggreate to a file
+    add('-o', help = 'Aggregate to a CandidateSet pickle in ROOT.', dest = 'odir')
+    add('--prefix', help = 'Directory prefix.', default='/mnt/ssd/cand/', dest='prefix')
+    # done
+    return ap.parse_args()
+def GetAntenna(x):
+    '''
+    Returns
+    -------
+    str: antenna
+    '''
+    fname, ext = os.path.splitext(x)
+    # 20180521_162250_muos_ea02_kur.cand
+    # 20180521_162250_muos_ea02.cand
+    toks = fname.split('_')
+    if len(toks) >= 4 and ext == '.cand':
+        return toks[3]
+if __name__ == '__main__':
+    if RANK == ROOT:
+        args = ParseArgs()
+        group = args.group
+        print args
+    CANDROOT = os.path.join(args.prefix, 'cands')
+    FILROOT  = os.path.join(args.prefix, 'fildata')
+    try:
+        if group:
+            cfiles = [x for x in os.listdir(CANDROOT) if group in os.path.basename(x)]
+        else:
+            cfiles = [x for x in os.listdir(CANDROOT) if x.endswith('.cand')]
+            lgroups = [cs.GetGroup(x) for x in cfiles]
+    except:
+        cfiles = []
+    if len(cfiles) > 1:
+        if group:
+            # this is weird case
+            g_cands = cd.CandidateData(os.path.join(CANDROOT, cfiles[0]))
+            gl, gb = cs.GetGLGB(FILROOT, group)
+        else:
+            # allgroup case
+            lcands = [cd.CandidateData(os.path.join(CANDROOT, x)) for x in cfiles]
+    elif len(cfiles) == 0 :
+        # Create a NullCandidateData
+        g_cands = cd.NullCandidateData(os.uname()[1])
+        gl,gb = None, None
+    else:
+        # perfect world case
+        g_cands = cd.CandidateData(os.path.join(CANDROOT, cfiles[0]))
+        gl, gb = cs.GetGLGB(FILROOT, group)
+    # gather in ROOT
+    if group:
+        group_cands = comm.gather(g_cands, root=ROOT)
+        if RANK == ROOT:
+            candset = cs.CandidateSet(group_cands, group=group, gl=gl, gb=gb)
+            filename = os.path.join(args.odir, candset.group + "_candset.pkl")
+            with open(filename, "wb") as f:
+                pkl.dump(candset, f)
+    else:
+        allg = comm.gather(lgroups, root=ROOT)
+        allc = comm.gather(g_cands, root=ROOT)
+        raise NotImplementedError('Hahahahhaha')
+
