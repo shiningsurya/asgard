@@ -1,4 +1,5 @@
 #pragma once
+#define __STDC_FORMAT_MACROS 1
 #include <asgard.hpp>
 // psrdada stuff
 #include "dada_def.h"
@@ -11,10 +12,14 @@
 #include <Redigitizer.hpp>
 // Header stuff
 #include <Header.hpp>
+#include <inttypes.h>
+
+constexpr char LOGDIR[] = "/home/vlite-master/surya/logs";
 
 class PsrDADA {
  private:   
 	// logging
+	FILE * log_fp;
 	multilog_t * log;
 	// DADA
 	key_t dada_key;
@@ -111,24 +116,33 @@ class PsrDADA {
 	}
 	bool Disconnect() {
 	 if(hdu == nullptr) return true;
-	 dada_error = dada_hdu_disconnect(hdu)  < 0;
+	 dada_error = dada_hdu_disconnect(hdu)  < 1;
 	 if(dada_error) return false;
 	 return true;
 	}
  public:
-	PsrDADA(key_t dada_key_, timeslice nsamps_, int nchans_, int nbits_) : 
+	PsrDADA() {
+	 // chill
+	 log_fp = NULL;
+	 log = NULL;
+	}
+	PsrDADA(key_t dada_key_, timeslice nsamps_, int nchans_, int nbits_, const char * logfile) : 
 	 dada_key(dada_key_), 
 	 nsamps(nsamps_),
 	 nchans(nchans_), 
-	 nbits(nbits_) {
-	std::cerr << "PsrDADA::ctor key=" << std::hex << dada_key << std::endl;
+	 nbits(nbits_)
+ {
+	// logging
+	log = multilog_open ("dadadada",0);
+	multilog_add (log, stdout);
+	log_fp = fopen(logfile, "w+");
+	multilog_add(log, log_fp);
+	// construction
+	multilog(log, LOG_INFO,  "PsrDADA::ctor key=%x\n", dada_key);
 	dada_error = false;
 	sample_chunk = nsamps * nchans;
 	bytes_chunk = nsamps * nchans * nbits / 8;
 	bytes_stride = (nchans * nbits) / 8;
-	// logging
-	log = multilog_open ("dadadada",0);
-	multilog_add (log, stdout);
 	// DADA
 	hdu = dada_hdu_create(log);
 	dada_hdu_set_key(hdu, dada_key);
@@ -139,7 +153,7 @@ class PsrDADA {
 	write_lock = false;
  }
 	PsrDADA& operator=(PsrDADA&& other) {
-	 std::cerr << "PsrDADA::move_assignment key=" << std::hex << other.dada_key << std::endl;
+	 multilog(other.log, LOG_INFO,  "PsrDADA::move_assignment key=%x\n", other.dada_key);
 	 // ctor args
 	 nsamps = other.nsamps;
 	 nchans = other.nchans;
@@ -149,8 +163,10 @@ class PsrDADA {
 	 bytes_chunk  = other.bytes_chunk;
 	 bytes_stride = other.bytes_stride;
 	 // logging
-	 log = multilog_open ("dadadadada",0);
-	 multilog_add (log, stdout);
+	 if(other.log_fp != NULL) log_fp = other.log_fp;
+	 other.log_fp = NULL;
+	 log = other.log;
+	 other.log = NULL;
 	 // DADA
 	 hdu = other.hdu;
 	 other.hdu = nullptr;
@@ -161,22 +177,22 @@ class PsrDADA {
 	 write_lock = other.write_lock;
 	 other.read_lock = false;
 	 other.write_lock = false;
-	 h_readtimes = other.h_readtimes;
-	 d_readtimes = other.d_readtimes;
-	 h_writetimes = other.h_writetimes;
-	 d_writetimes = other.d_writetimes;
+	 // destroy other
+	 other.~PsrDADA();
 	 return *this;
 	}
 	~PsrDADA() { 
-	 std::cerr << "PsrDADA::dtor key=" << std::hex << dada_key << std::endl;
+	 multilog(log, LOG_INFO,  "PsrDADA::dtor key=%x\n", dada_key);
 	 // Disconnection
 	 Disconnect();
 	 // log close
-	 multilog_close(log);
+	 if(log != NULL) multilog_close(log);
+	 // file close
+	 if(log_fp != NULL) fclose(log_fp);
 	}
 	bool ReadLock(bool x) {
 	 bool ret;
-	 std::cerr << "PsrDADA::ReadLock before key=" << std::hex << dada_key << std::endl;
+	 multilog(log,LOG_INFO,"PsrDADA::ReadLock key=%x Before\n",dada_key);
 	 if(x) {
 		// Requested lock
 		if(read_lock) ret =  true;
@@ -189,12 +205,12 @@ class PsrDADA {
 		else ret = true;
 		read_lock = false;
 	 }
-	 std::cerr << "PsrDADA::ReadLock after key=" << std::hex << dada_key << std::endl;
+	 multilog(log,LOG_INFO,"PsrDADA::ReadLock key=%x After\n",dada_key);
 	 return ret;
 	}
 	bool WriteLock(bool x) {
 	 bool ret;
-	 std::cerr << "PsrDADA::WriteLock before key=" << std::hex << dada_key << std::endl;
+	 multilog(log,LOG_INFO,"PsrDADA::WriteLock key=%x Before\n",dada_key);
 	 if(x) {
 		// Requested lock
 		if(write_lock) ret = true;
@@ -207,7 +223,7 @@ class PsrDADA {
 		else ret = true;
 		write_lock = false;
 	 }
-	 std::cerr << "PsrDADA::WriteLock after key=" << std::hex << dada_key << std::endl;
+	 multilog(log,LOG_INFO,"PsrDADA::WriteLock key=%x After\n",dada_key);
 	 return ret;
 	}
 	const timeslice GetByteChunkSize() const {
@@ -217,18 +233,16 @@ class PsrDADA {
 	 return bytes_stride;
 	}
 	bool ReadHeader() {
-	 std::cerr << "PsrDADA::ReadHeader key=" << std::hex << dada_key;
-	 std::cerr << " h_readtimes=" << std::dec <<  h_readtimes++ << std::endl;
 	 // blocking read
 	 header = ipcbuf_get_next_read(hdu->header_block, &header_size);
 	 if(!header) {
-		std::cerr << "PsrDADA::ReadHeader fail" << std::endl;
+		multilog(log,LOG_INFO,"PsrDADA::ReadHeader key=%x GetNextRead failed\n",dada_key);
 		dada_error = true;
 		return false;
 	 }
 	 // get params
 	 if(ascii_header_get(header, "STATIONID", "%d", &stationid) < 0) {
-		std::cerr << "PsrDADA::ReadHeader STATIONID read fail" << std::endl;
+		std::cerr << "PsrDADA::ReadHeader STATIONID write fail" << std::endl;
 		dada_error = true;
 	 }
 	 if(ascii_header_get(header, "NCHAN", "%d", &nchans) < 0) {
@@ -236,13 +250,13 @@ class PsrDADA {
 		dada_error = true;
 	 }
 	 if(ascii_header_get(header, "BANDWIDTH", "%lf", &bandwidth) < 0) {
-		if(ascii_header_get(header, "BW", "%lf", &bandwidth) < 0) {
+		if(ascii_header_get(header, "BW", "%f", &bandwidth) < 0) {
 		 std::cerr << "PsrDADA::ReadHeader BANDWIDTH read fail" << std::endl;
 		 dada_error = true;
 		}
 	 }
 	 if(ascii_header_get(header, "CFREQ", "%lf", &cfreq) < 0) {
-		if(ascii_header_get(header, "FREQ", "%lf", &cfreq) < 0) {
+		if(ascii_header_get(header, "FREQ", "%f", &cfreq) < 0) {
 		 std::cerr << "PsrDADA::ReadHeader FREQUENCY read fail" << std::endl;
 		 dada_error = true;
 		}
@@ -251,7 +265,6 @@ class PsrDADA {
 		double start_freq = cfreq - (bandwidth / 2);
 		double chan_width = bandwidth / nchans;
 		double first_chan_cfreq = start_freq + (chan_width / 2);
-
 		fch1 = first_chan_cfreq;
 		foff = chan_width;
 	 }
@@ -291,17 +304,12 @@ class PsrDADA {
 		std::cerr << "PsrDADA::ReadHeader SIGPROC_FILE read fail" << std::endl;
 		dada_error = true;
 	 }
-	 // read params
-	 tsamp *= 1e6f;
-	 // exit if no error
-	 if(dada_error) return false;
 	 // mark buffer clear
 	 ipcbuf_mark_cleared(hdu->header_block);	
+	 multilog(log,LOG_INFO,"PsrDADA::ReadHeader key=%x h_readtimes=%" PRIu64 "\n",dada_key,h_readtimes++);
 	 return true;
 	}
 	timeslice ReadData(PtrFloat data, PtrByte packin) {
-	 std::cerr << "PsrDADA::ReadData key=" << std::hex << dada_key;
-	 std::cerr << " d_readtimes=" << std::dec << d_readtimes++ << std::endl;
 	 if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) {
 		return -1;
 	 }
@@ -310,7 +318,7 @@ class PsrDADA {
 	 // READ -- this blocks
 	 timeslice chunk_read = ipcio_read(hdu->data_block, (char*)packin, bytes_chunk);
 	 if(chunk_read == -1) {
-		std::cerr << "PsrDADA::ReadData ipcio_read fail." << std::endl;
+		multilog(log,LOG_INFO,"PsrDADA::ReadData key=%x ipcio_read failed\n");
 		return -1;
 	 }
 	 timeslice nsamps_read = chunk_read / bytes_stride;
@@ -332,14 +340,13 @@ class PsrDADA {
 		 << std::endl;
 	 // unpack to floats
 	 unpack(packin, chunk_read, data);
+	 multilog(log,LOG_INFO,"PsrDADA::ReadData key=%x d_readtimes=%" PRIu64 "\n",dada_key,d_readtimes++);
 	 return chunk_read;
 	}
 	bool WriteHeader() {
-	 std::cerr << "PsrDADA::WriteHeader key=" << std::hex << dada_key;
-	 std::cerr << " h_writetimes=" << std::dec << h_writetimes++ << std::endl;
 	 header = ipcbuf_get_next_write(hdu->header_block);
 	 if(!header) {
-		std::cerr << "PsrDADA::WriteHeader fail" << std::endl;
+		multilog(log,LOG_INFO,"PsrDADA::WriteHeader key=%x GetNextWrite failed\n",dada_key);
 		dada_error = true;
 		return false;
 	 }
@@ -376,8 +383,8 @@ class PsrDADA {
 		std::cerr << "PsrDADA::WriteHeader TSAMP write fail" << std::endl;
 		dada_error = true;
 	 }
-	 if(ascii_header_set(header, "TSTART", "%lf", tstart) < 0) {
-		std::cerr << "PsrDADA::WriteHeader TSAMP write fail" << std::endl;
+	 if(ascii_header_set(header, "SCANSTART", "%lf", tstart) < 0) {
+		std::cerr << "PsrDADA::WriteHeader SCANSTART write fail" << std::endl;
 		dada_error = true;
 	 }
 	 if(ascii_header_set(header, "RA", "%lf", ra) < 0) {
@@ -401,11 +408,10 @@ class PsrDADA {
 		dada_error = true;
 	 }
 	 ipcbuf_mark_filled (hdu->header_block, header_size);
+	 multilog(log,LOG_INFO,"PsrDADA::WriteHeader key=%x h_writetimes=%" PRIu64 "\n",dada_key,h_writetimes++);
 	 return true;
 	}
 	timeslice WriteData(PtrFloat data, PtrByte packout, int numants) {
-	 std::cerr << "PsrDADA::WriteData key=" << std::hex << dada_key;
-	 std::cerr << " d_writetimes=" << std::dec<< d_writetimes++ << std::endl;
 	 if(packout == nullptr) packout = ( PtrByte ) new unsigned char[bytes_chunk];
 	 // NOT SURE ABOUT EOD while WRITING?
 	 //if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return -1;
@@ -413,9 +419,10 @@ class PsrDADA {
 	 pack(data, numants, sample_chunk,  packout);
 	 timeslice bytes_written = ipcio_write(hdu->data_block, (char*)packout, bytes_chunk);
 	 if(bytes_written < 0) {
-		std::cerr << "PsrDADA::WriteData ipcio_write fail." << std::endl;
+		multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x ipcio_write failed\n",dada_key);
 		return false;
 	 }
+	 multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x d_writetimes=%" PRIu64 "\n",dada_key,d_writetimes++);
 	 return bytes_written;
 	}
 	void PrintHeader() {
@@ -437,6 +444,8 @@ class PsrDADA {
 	 // strings
 	 std::cout << "UTC    " << utc_start_str << std::endl;
 	 std::cout << "SOURCE " << name << std::endl;
+	 std::cout << "SIGFIL " << sigproc_file << std::endl;
+	 std::cout << "STATID " << stationid << std::endl;
 	}
 	struct Header GetHeader() const {
 	 struct Header ret;
@@ -482,7 +491,7 @@ class PsrDADA {
 	 cfreq    = in.cfreq;
 	 bandwidth = in.bandwidth;
 	 // station
-	 stationid = stationid;
+	 stationid = in.stationid;
 	 // strings
 	 strcpy(utc_start_str, in.utc_start_str);
 	 strcpy(name, in.name);
