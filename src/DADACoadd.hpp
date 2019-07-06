@@ -103,14 +103,15 @@ class DADACoadd  {
 		 }
 		 // sanity checks like local indices are same
 		 mpi::gather(addcomm, running_index, vec_rindex, addcomm_root);
-		 if(! std::adjacent_find( vec_rindex.cbegin(), vec_rindex.cend(), std::not_equal_to<uint64_t>() )) {
+		 uint64_t ridx = running_index;
+		 if(std::all_of( vec_rindex.cbegin(), vec_rindex.cend(), [ridx] (uint64_t i) { return i == ridx;})) {
+		 		 // reset vec_rindex for future use
+		 		 vec_rindex.clear();
+		 }
+		 else {
 				 std::cerr << "DADACoadd::syncheck #2 failed!" << std::endl;
 				 std::cerr << "DADACoadd::syncheck #2 MAJOR ERROR!" << std::endl;
 				 std::cerr << "Abort! Abort! Abort!" << std::endl;
-		 }
-		 else {
-		 		 // reset vec_rindex for future use
-		 		 vec_rindex.clear();
 		 }
 #if 0
 		 // like # data reads in dadain == # writes in dadaout
