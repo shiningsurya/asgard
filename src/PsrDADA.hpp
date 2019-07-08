@@ -318,7 +318,7 @@ class PsrDADA {
 	 // READ -- this blocks
 	 timeslice chunk_read = ipcio_read(hdu->data_block, (char*)packin, bytes_chunk);
 	 if(chunk_read == -1) {
-		multilog(log,LOG_INFO,"PsrDADA::ReadData key=%x ipcio_read failed\n");
+		multilog(log,LOG_INFO,"PsrDADA::ReadData key=%x ipcio_read failed\n", dada_key);
 		return -1;
 	 }
 	 timeslice nsamps_read = chunk_read / bytes_stride;
@@ -500,6 +500,41 @@ class PsrDADA {
 	}
 	bool Scrub() {
 	 return true;
+	}
+	uint64_t FreeBuf() const {
+     uint64_t nbufs = ipcbuf_get_nbufs( (ipcbuf_t*)hdu->data_block );
+     uint64_t fullbufs = ipcbuf_get_nfull( (ipcbuf_t*)hdu->data_block );
+     return nbufs - fullbufs;
+	}
+	uint64_t TellRead() const {
+     ipcio_t * ipc = hdu->data_block;
+     int64_t current = -1;
+
+	 if(ipc -> rdwrt == 'R' || ipc -> rdwrt == 'r') {
+      current = ipcbuf_tell_read( (ipcbuf_t*)ipc ); 
+	 }
+
+	 if(current < 0) {
+      multilog(log, LOG_ERR, "PsrDADA::TellRead key=%x ipcbuf_tell failed\n", dada_key);
+      return -1;
+	 }
+
+	 return current + ipc->bytes;
+	}
+	uint64_t TellWrite() const {
+     ipcio_t * ipc = hdu->data_block;
+     int64_t current = -1;
+
+	 if(ipc -> rdwrt == 'w' || ipc -> rdwrt == 'W') {
+      current = ipcbuf_tell_write( (ipcbuf_t*)ipc ); 
+	 }
+
+	 if(current < 0) {
+      multilog(log, LOG_ERR, "PsrDADA::TellWrite key=%x ipcbuf_tell failed\n", dada_key);
+      return -1;
+	 }
+
+	 return current + ipc->bytes;
 	}
 };
 // static variable initialization

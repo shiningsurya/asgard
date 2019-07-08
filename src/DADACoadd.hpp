@@ -17,6 +17,7 @@ class DADACoadd  {
 	mpi::communicator world;
 	mpi::communicator addcomm;
 	uint64_t running_index;
+	std::vector<uint64_t> vec_rindex;
 	// data voting
 	bool vote;
 	unsigned int numants_votes;
@@ -67,6 +68,8 @@ class DADACoadd  {
 		running_index = 0;
 		dadain.ReadLock(true);
 		if(world.rank() == world_root) dadaout.WriteLock(true);
+		// assume for the beginning everyone is participating
+		addcomm = std::move(world.split(true));
 		while (  keepgoing  ||  dadain.ReadHeader()  ) // for stretch of observation 
 		{
 		 // READING
@@ -98,26 +101,31 @@ class DADACoadd  {
 			vote = true;
 			keepgoing = true;
 		 }
-		 // VOTING
-#if 0
-		 // sanity checks like UTC is same
-		 // like # data reads in dadain == # writes in dadaout
-		 addcomm = std::move(world.split(vote));
-		 // root resolution and broadcasting
-		 if(world.rank() == world_root) {
-			addcomm_root = addcomm.rank();
+		 // sanity checks like local indices are same
+		 mpi::gather(addcomm, running_index, vec_rindex, addcomm_root);
+		 uint64_t ridx = running_index;
+		 if(std::all_of( vec_rindex.cbegin(), vec_rindex.cend(), [ridx] (uint64_t i) { return i == ridx;})) {
+		 		 // reset vec_rindex for future use
+		 		 vec_rindex.clear();
 		 }
-		 mpi::broadcast(world, addcomm_root, world_root);
+		 else {
+				 std::cerr << "DADACoadd::syncheck #2 failed!" << std::endl;
+				 std::cerr << "DADACoadd::syncheck #2 MAJOR ERROR!" << std::endl;
+				 std::cerr << "Abort! Abort! Abort!" << std::endl;
+		 }
+#if 0
+		 // like # data reads in dadain == # writes in dadaout
+		 // ^ this seems like super stringent
 #endif
 		 // actual MPI coadd call
-		 mpi::reduce(world, data_f, sample_chunk, o_data_f, std::plus<float>(), world_root);
+		 mpi::reduce(addcomm, data_f, sample_chunk, o_data_f, std::plus<float>(), addcomm_root);
 		 // WRITING
-		 if(world.rank() == world_root) {
+		 if(addcomm.rank() == addcomm_root) {
 			// set Header
 			if(!running_index) {
 			 // write out Header
 			 std::cerr << "DADACoadd::WRITING HEADER";
-			 std::cerr << " rank=" << world.rank() << std::endl;
+			 std::cerr << " rank=" << addcomm.rank() << std::endl;
 			 dHead.stationid = 0;
 			 dadaout.SetHeader(dHead);
 			 dadaout.WriteHeader();
@@ -125,9 +133,9 @@ class DADACoadd  {
 			 if(filout) fbout.Initialize(dHead);
 			}
 			std::cerr << "DADACoadd::WRITING DATA";
-			std::cerr << " rank=" << world.rank() << std::endl;
+			std::cerr << " rank=" << addcomm.rank() << std::endl;
 			// write data
-			dadaout.WriteData(o_data_f, o_data_b, world.size());
+			dadaout.WriteData(o_data_f, o_data_b, addcomm.size());
 			// Filterbankwrite
 			if(filout) {
 			 fbout.Data(o_data_b, read_chunk); 
@@ -135,10 +143,17 @@ class DADACoadd  {
 			std::cerr << "DADACoadd::Running Index=" << running_index++ ;
 			std::cerr << " rank=" << world.rank() << std::endl;
 		 }
+		 // new communicator
+		 addcomm = std::move(addcomm.split(vote|incomplete));
+		 // root resolution and broadcasting
+		 if(world.rank() == world_root) {
+			addcomm_root = addcomm.rank();
+		 }
+		 mpi::broadcast(world, addcomm_root, world_root);
 		 if(incomplete) break;
 		} // for stretch of observation
 		dadain.ReadLock(false);
-		if(world.rank() == world_root) {
+		if(addcomm.rank() == addcomm_root) {
 		 dadaout.WriteLock(false);
 		 fbout.Close();
 		}
