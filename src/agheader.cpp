@@ -25,6 +25,8 @@ int main(int ac, char * av[]){
 		opt.add_options()
 				("files,f", po::value<PathList>(&files)->composing(), "Filterbank file(s).")
 				("unpack,u", po::value<timeslice>(&unpack), "Data sample requested.")
+				("src,s", po::bool_switch()->default_value(false), "print src_raj/src_dej.")
+				("group,Q", po::bool_switch()->default_value(false), "prints group in first column.")
 				("help,h", "Prints help");
 		opd.add("files",-1);
 		// parsing
@@ -50,6 +52,10 @@ int main(int ac, char * av[]){
 						for(timeslice ii = 0; ii < unpack*fb.nchans; ii++) std::cout << da[ii] << "  ";
 						std::cout << std::endl;
 						delete[] da;
+				}
+				else if(vm.count("src")) {
+						if(vm.count("group")) std::cout << fb.group << "\t";
+						std::cout << fb.src_raj << "\t" << fb.src_dej << std::endl;
 				}
 				else {
 						std::cout << fb;
