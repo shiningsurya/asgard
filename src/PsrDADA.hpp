@@ -1,6 +1,7 @@
 #pragma once
 #define __STDC_FORMAT_MACROS 1
 #include <asgard.hpp>
+#include <exception>
 // psrdada stuff
 #include "dada_def.h"
 #include "dada_hdu.h"
@@ -111,8 +112,7 @@ class PsrDADA {
 	}
 	bool Connect() {
 	 dada_error = dada_hdu_connect(hdu) < 0;
-	 if(dada_error) return false;
-	 return true;
+	 return dada_error;
 	}
 	bool Disconnect() {
 	 if(hdu == nullptr) return true;
@@ -147,7 +147,7 @@ class PsrDADA {
 	hdu = dada_hdu_create(log);
 	dada_hdu_set_key(hdu, dada_key);
 	// Connection
-	Connect();
+	if(Connect()) exit(1);
 	// state initialize
 	read_lock = false;
 	write_lock = false;
