@@ -6,7 +6,7 @@ Class holding candidates in Numpy Tables for efficiency.
 Part of Asgard
 '''
 import os
-from CandidateData import CandidateData
+from CandidateData import CandidateData, CoincideCandidateData
 
 def GetGroup(cpath):
     '''
@@ -136,16 +136,17 @@ class CandidateSet(dict):
             ( I1 - I0 ) * TSAMP
         4. DM
     '''
-    def __init__(self, cpath, group=None, fpath=None, antenna=None, gl=0.0, gb=0.0):
+    def __init__(self, cpath, group=None, fpath=None, antenna=None, _tstart=None,gl=0.0, gb=0.0):
         '''
         Creates a CandidateSet object where 
         all the candidates belong to a single group.
 
         Arguments
         ---------
-        cpath : str, list
+        cpath : str, list, dict
             Path to candidates str
             list of CandidateData
+            dict 
         group: str
             Groups to consider
         gl: Galactic coordinates : Latitude
@@ -161,6 +162,14 @@ class CandidateSet(dict):
             self.gl = gl 
             self.gb = gb
             self.group = group
+        elif isinstance(cpath, dict):
+            self.gl = gl 
+            self.gb = gb
+            self.group = group
+            # after coinciding
+            for ant, yy in cpath.items():
+                if len(yy[0]) != 0:
+                    self.__setitem__(ant, CoincideCandidateData(yy, antenna=ant, _tstart=_tstart))
 
     def __group_action(self, cpath, group, fpath):
         # walk logic
@@ -215,5 +224,4 @@ def AllCandidates(cpath, fpath):
     for ag in allgroup:
         ret[ ag ] = CandidateSet(cpath, ag, fpath)
     return ret
-
 
