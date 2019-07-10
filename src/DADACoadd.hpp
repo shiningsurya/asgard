@@ -60,8 +60,7 @@ class DADACoadd  {
 	 {
 		// Barrier to have all the nodes start new observation at the same time
 		world.barrier();
-		std::cerr << "DADACoadd::COADDER Beginning new observation"; 
-		std::cerr << " rank=" << world.rank() << std::endl;
+		std::cerr << "DADACoadd::COADDER Beginning new observation numobs=" << numobs << std::endl; 
 		PsrDADA dadain(key_in, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadain.log");
 		keepgoing = false;
 		incomplete = false;
