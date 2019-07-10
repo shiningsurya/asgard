@@ -94,6 +94,7 @@ def kDCoincide(x, write_pickle=False, only_coincide=False, nn=5, cant=2, tslice=
     Get a kDtree on peak_time, sn, dm, width across all the antennas.
     in a step of 1sec(?) query all the kdtrees for points
     sntolerance, dmtolerance matching
+    --> For some reason it is missing things.
     '''
     ### KDTree building
     from sklearn.neighbors import KDTree 
@@ -119,11 +120,11 @@ def kDCoincide(x, write_pickle=False, only_coincide=False, nn=5, cant=2, tslice=
     mask = np.zeros(len(x.keys()))
     ## Main loop
     for tt in np.arange(imaxtime,step=tslice):
+        qq[IPT] = tt # first is time
         # prepare arrays
         tdict = {k:np.zeros((5,nn)) for k in x.keys()}
         # forall antennas
         for iant, ant in enumerate(x.keys()):
-            qq[IPT] = tt # first is time
             inn = kdtree[ant].query(qq, **kdkwargs)
             ptin = x[ant].peak_time[inn]
             sel = np.logical_and(ptin >= tt-tslice, ptin <= tt+tslice)
@@ -152,3 +153,109 @@ def kDCoincide(x, write_pickle=False, only_coincide=False, nn=5, cant=2, tslice=
         del tdict
     ## Make CandidateSet out of ret
     return CandidateSet(ret, _tstart = mintstart)
+
+def kDDCoincide(x, write_pickle=False, only_coincide=False, nn=5, cant=2, tslice=1):
+    '''
+    k-D Tree based coincidence algorithm.
+
+    Arguments
+    ---------
+    x : instance of CandidateSet or pickle filename
+
+    Returns
+    -------
+    instance of CandidateSet reduced
+
+    Algorithm Take 2:
+    Create ONLY one KDTree. Indices tell which antennas
+    '''
+    ### KDTree building
+    from sklearn.neighbors import KDTree 
+    maxtime = 0.0
+    mintstart = min(map(lambda r_: r_.tstart, x.values()))
+    endtimes = dict()
+    X = []
+    for ant,y in x.items():
+        diff = ( y.tstart - mintstart ).seconds
+        aX = np.stack((diff+y.peak_time, y.sn, y.dm, y.width)).T
+        X.append(aX)
+        endtimes[ant] = aX.shape[0]
+        #
+        maxtime = max(maxtime, np.max(y.peak_time))
+    # train
+    X = np.concatenate(X, axis=0)
+    kdtree = KDTree(X, leaf_size=40, metric='minkowski')
+    #
+    imaxtime = int(maxtime)
+    ## Setting up variables
+    IPT = 0
+    ISN = 1
+    IDM = 2
+    IWD = 3
+    kdkwargs = {'k':nn, 'breadth_first':True, 'sort_results':True, 'return_distance':False}
+    ret = {k:[[],[],[],[]] for k in x.keys()}
+    qq = np.zeros((1,4))
+    mask = np.zeros(len(x.keys()))
+    ## Main loop
+    for tt in np.arange(imaxtime,step=tslice):
+        # prepare arrays
+        tdict = {k:np.zeros((5,nn)) for k in x.keys()}
+        qq[IPT] = tt # first is time
+        inn = kdtree.query(qq, **kdkwargs)
+        ## query time
+        ptin = X[inn, IPT]
+        sel = np.logical_and(ptin >= tt-tslice, ptin <= tt+tslice)
+        selsum = sel.sum()
+        xinn = inn[sel]
+        ## figure out antenna
+        for ant in FigureAnt(xinn, endtimes):
+            iant = x.keys().index(ant)
+            mask[iant] = selsum
+            tdict[ant][IPT,:selsum] = X[xinn, IPT]
+            tdict[ant][ISN,:selsum] = X[xinn, ISN]
+            tdict[ant][IDM,:selsum] = X[xinn, IDM]
+            tdict[ant][IWD,:selsum] = X[xinn, IWD]
+            tdict[ant][4,:selsum] = selsum
+        # overlap type1
+        if np.count_nonzero(mask) >= cant:
+            for ant, dat in tdict.items():
+                for idx,dval in enumerate(dat[4]):
+                    if dval == 0:
+                        break
+                    else:
+                        ret[ant][ISN] += [dat[ISN,idx]]
+                        ret[ant][IDM] += [dat[IDM,idx]]
+                        ret[ant][IWD] += [dat[IWD,idx]]
+                        ret[ant][IPT] += [tt]
+        # overlap type2
+        # do sn, dm overlap here
+        # cleanup
+        del tdict
+    ## Make CandidateSet out of ret
+    return CandidateSet(ret, _tstart = mintstart)
+
+def FigureAnt(li, et):
+    '''
+    To help me figure out antenna stuff
+    from endtimes
+
+    Arguments
+    ---------
+    li : list of indices
+    et : dictionary
+
+    Returns
+    -------
+    list of antennas
+    '''
+    ret = []
+    for si in li:
+        # one index
+        for ant, endindex in et.items():
+            if si > endindex:
+                si -= endindex
+                continue
+            else:
+                ret.append(ant)
+                break
+    return ret

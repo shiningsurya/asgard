@@ -5,7 +5,6 @@ import cPickle as cpk
 import matplotlib.pyplot as plt
 import CandidateData as cd
 import CandidateSet as cs
-import CandidateSet
 
 # VIBGYOR colormap the old-school way
 colors = dict()
@@ -114,16 +113,14 @@ def VsTime(xx, saveas=None):
     ---------
     xx : instance of CandidateSet or pickle filename
     '''
-    print "type ", type(xx)
     if isinstance(xx, str):
         x = ReadPkl(xx)
         fi = saveas or "{0}.pdf".format(os.pathname.splitext(xx)[0])
-    elif isinstance(xx, cs.CandidateSet):
+    elif isinstance(xx, dict):
         x = xx
         fi = saveas 
     else:
-        x = xx
-        #raise TypeError("Type of xx not understood.")
+        raise TypeError("Type of xx not understood.")
     fig = plt.figure(dpi=300)
     ## Width vs PeakTime
     ax1 = fig.add_axes([0.1, 0.05, 0.8, 0.3])
@@ -149,10 +146,10 @@ def VsTime(xx, saveas=None):
     ax1.get_shared_x_axes().join(ax1,ax3)
     ## plotting
     for ant, y in x.items():
-        ax1.scatter(y.peak_time, y.width, label=ant, edgecolors='none', alpha=.6, c=colors[ant])
-        ax2.scatter(y.peak_time, y.sn, label=ant,edgecolors='none', alpha=.6, c=colors[ant])
-        ax3.scatter(y.peak_time, y.dm, label=ant, edgecolors='none', alpha=.6, c=colors[ant])
-    ax3.legend(ncol=6,title=y.tstart, fancybox=True, loc='lower left', bbox_to_anchor=(0.0,1.0), fontsize='small')
+        ax1.scatter(y.peak_time, y.width, label="{0}({1})".format(ant, y.width.size), edgecolors='none', alpha=.6, c=colors[ant])
+        ax2.scatter(y.peak_time, y.sn, label="{0}({1})".format(ant, y.sn.size),edgecolors='none', alpha=.6, c=colors[ant])
+        ax3.scatter(y.peak_time, y.dm, label="{0}({1})".format(ant, y.dm.size), edgecolors='none', alpha=.6, c=colors[ant])
+    ax3.legend(ncol=4,title=y.tstart, fancybox=True, loc='lower left', bbox_to_anchor=(0.0,1.0), fontsize='small')
     if isinstance(xx, str):
         plt.savefig(fi)
         plt.close()
