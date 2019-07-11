@@ -10,7 +10,6 @@ class FilterbankCandidate {
  private:
 	DedispManager ddm;
 	FloatVector dat;
-	timeslice curr;
 	FilterbankReader fbr;
 	Filterbank fb;
 	CandidateList cl;
@@ -58,6 +57,7 @@ class FilterbankCandidate {
 	 return true;
 	}
  public:
+	timeslice curr;
   double duration, tstart;
   int nbits;
 	unsigned int bmin, bmax;

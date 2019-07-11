@@ -1,0 +1,33 @@
+header:
+        - sn
+        - dm
+        - filterwidth
+        - time:
+                - peak_time
+                - duration
+                - tstart
+                - tsamp
+        - frequency:
+                - fch1
+                - foff
+                - nchans
+        - indices:
+                - i0
+                - i1
+                - peak_index
+                - maxdelay
+                - istart
+                - istop
+                - nsamps (istop - istart)
+                - dd_nsamps (nsamps - maxdelay)
+        - parameters:
+                - nbits
+                - isKur
+                - antenna
+                - group
+                - source_name
+
+data:
+        - d_fb   (nsamps, nchans)
+        - dd_tim (dd_nsamps)
+        - dd_fb  (dd_nsamps, nchans)
