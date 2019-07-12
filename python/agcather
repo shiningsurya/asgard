@@ -1,0 +1,91 @@
+#!/usr/bin/python
+# constants
+# imports
+import os
+import sys
+import pickle as pkl
+import CandidateData as cd
+import CandidateSet as cs
+#
+def ParseArgs():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='agather', description='Asgard tool for gathering candidates in one place.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('group', help = 'Group to work on. [def=all groups]', type=str, default=None)
+    # begin
+    # aggreate to a file
+    add('-o', help = 'Aggregate to a CandidateSet pickle in this dir.', dest = 'odir')
+    add('--prefix', help = 'Directory prefix.', default='/mnt/ssd/cand/', dest='prefix')
+    add('--cand-dir', help = 'Candidate Directory.', default=None, dest='cdir')
+    add('--pos', help = 'Position file.', default=None, dest='pos')
+    # done
+    return ap.parse_args()
+def GetAntenna(x):
+    '''
+        Returns
+        -------
+        str: antenna
+    '''
+    fname, ext = os.path.splitext(x)
+    # 20180521_162250_muos_ea02_kur.cand
+    # 20180521_162250_muos_ea02.cand
+    toks = fname.split('_')
+    if len(toks) >= 4 and ext == '.cand':
+        return toks[3]
+if __name__ == '__main__':
+    args = ParseArgs()
+    group = args.group
+    pos = args.pos
+    # pos logic
+    if pos:
+        GetGLGBfromPOS = dict()
+        with open(pos,"r") as fpos:
+            for fline in fpos.readlines():
+                g, r, d = fline.strip().split('\t')
+                gr = "_".join(os.path.basename(g).split("_")[:3])
+                GetGLGBfromPOS[gr+"_"] = (float(r),float(d))
+    print args
+    CANDROOT = args.cdir or os.path.join(args.prefix, 'cands') 
+    FILROOT  = os.path.join(args.prefix, 'fildata')
+    if group:
+        cfiles = [x for x in os.listdir(CANDROOT) if x.startswith(group)]
+    else:
+        cfiles = [x for x in os.listdir(CANDROOT) if x.endswith('.cand')]
+        lgroups = [cs.GetGroup(x) for x in cfiles]
+    if len(cfiles) > 1:
+        if group:
+            group_cands = []
+            for cf in cfiles:
+                group_cands.append(cd.CandidateData(os.path.join(CANDROOT,cf)))
+            try:
+                if pos:
+                    gl,gb = GetGLGBfromPOS[group]
+                else:
+                    gl,gb = group_cands[0].ra, group_cands[0].dec
+            except KeyError:
+                gl, gb = None, None
+            candset = cs.CandidateSet(group_cands, group=group, gl=gl, gb=gb)
+            print candset
+            filename = os.path.join(args.odir, candset.group + "_candset.pkl")
+            with open(filename, "wb") as f:
+                pkl.dump(candset, f)
+        else:
+            for g in lgroups:
+                group_cands = []
+                for cf in cfiles:
+                    group_cands.append(cd.CandidateData(os.path.join(CANDROOT,cf)))
+                if pos:
+                    gl,gb = GetGLGBfromPOS[group]
+                else:
+                    gl,gb = g_cand.ra, g_cand.dec
+                candset = cs.CandidateSet(group_cands, group=group, gl=gl, gb=gb)
+                filename = os.path.join(args.odir, candset.group + "_candset.pkl")
+                with open(filename, "wb") as f:
+                    pkl.dump(candset, f)
+    else:
+        raise ValueError("This is unacceptable!")
+
+
+
+

@@ -11,6 +11,12 @@ import copy
 
 DATEFMT = "%Y%m%d_%H%M%S"
 
+class Candidates(object):
+    '''
+    Abstract class
+    '''
+    pass
+
 def ExtractDTandAnt(fname):
     # 20180521_162250_muos_ea02_kur.cand
     # 20180521_162250_muos_ea02.cand
@@ -56,7 +62,7 @@ class NullCandidateData(object):
         self.procname = procname
         self.ant      = "eaXX"
 
-class CandidateData(object):
+class CandidateData(Candidates):
     '''
     Container class
 
@@ -180,3 +186,25 @@ def WriteCandidateData(cdata, filename=None, tsamp=97e-6):
             line += "{0:d}\n".format(i1[i])
             # write
             f.write(line)
+
+class CoincideCandidateData(Candidates):
+    '''
+    Like CandidateData, 
+    '''
+    def __init__(self, r, antenna=None, _tstart=None):
+        '''
+        Arguments
+        ---------
+        r: list of 4 lists
+            ordering:
+            IPT, ISN, IDM, IWD
+        '''
+        # all the lens should be same
+        assert len( set(map(len,r)) ) == 1
+        self.peak_time = np.array(r[0])
+        self.sn = np.array(r[1])
+        self.dm = np.array(r[2])
+        self.width = np.array(r[3])
+        self.n = self.sn.size
+        self.ant = antenna
+        self.tstart = _tstart
