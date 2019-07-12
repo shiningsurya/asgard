@@ -48,7 +48,7 @@ class DADACoadd  {
 	// Filterbank Writer
 	FilterbankSink fbout;
 	// debug
-	int numobs;
+	unsigned int numobs;
 	// coadder
 	void coadder() {
 	 numobs = 0;
@@ -72,7 +72,7 @@ class DADACoadd  {
 		while (  keepgoing  ||  dadain.ReadHeader()  ) // for stretch of observation 
 		{
 		 // READING
-		 std::cerr << "DADACoadd::READING rank=" << world.rank() << std::endl;
+		 std::cerr << "DADACoadd::READING rank=" << world.rank() << " ridx=" << running_index << std::endl;
 		 read_chunk = dadain.ReadData(data_f, data_b);
 		 // if Read header for the first time
 		 if(!running_index) dHead = std::move(dadain.GetHeader());
@@ -139,17 +139,18 @@ class DADACoadd  {
 			if(filout) {
 			 fbout.Data(o_data_b, read_chunk); 
 			}
-			std::cerr << "DADACoadd::Running Index=" << running_index++ ;
+			std::cerr << "DADACoadd::Running Index=" << running_index;
 			std::cerr << " rank=" << world.rank() << std::endl;
 		 }
 		 // new communicator
-		 addcomm = std::move(addcomm.split(vote|incomplete));
+		 addcomm = std::move(addcomm.split(vote&&incomplete));
 		 // root resolution and broadcasting
 		 if(world.rank() == world_root) {
 			addcomm_root = addcomm.rank();
 		 }
 		 mpi::broadcast(world, addcomm_root, world_root);
 		 if(incomplete) break;
+		 running_index++;
 		} // for stretch of observation
 		dadain.ReadLock(false);
 		if(addcomm.rank() == addcomm_root) {
