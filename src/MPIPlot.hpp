@@ -1,5 +1,6 @@
 #pragma once
 #include <asgard.hpp>
+#include <numeric> // iota
 // Filterbank reading
 #include "Filterbank.hpp"
 // Crawling
@@ -35,6 +36,7 @@ class MPIPlot : protected Plotter {
 	std::vector<std::vector<FloatVector>> o_plot_f;
 	std::vector<StringVector> o_antenna_array;
 	std::vector<std::string> flat_antenna_array;
+	std::vector<unsigned int> sort_antenna;
 	// plotting variables
 	timeslice wid, wid_plot, i0, numelems, numelems_plot;
 	unsigned int nchans, nbits, nchans_plot, nant, hant;
@@ -120,56 +122,74 @@ class MPIPlot : protected Plotter {
 	 mpi::gather(world, antenna_array, o_antenna_array, root);
 	 // flatten it in root
 	 if(world.rank() == root) {
+		assert(o_antenna_array.size() == world.size());
 		// flatting gathered
 		for(int i_ = 0; i_ < world.size(); i_++) {
-		 std::copy(o_antenna_array[i_].begin(), o_antenna_array[i_].end(), flat_antenna_array.end());
+		 std::copy(o_antenna_array[i_].begin(), o_antenna_array[i_].end(), back_inserter(flat_antenna_array));
 		}
 		nant = flat_antenna_array.size();
 		hant = nant / 2;
+		sort_antenna.resize(nant);
+		// sort antenna -- can't believe STL doesn't have an argsort 
+		// https://stackoverflow.com/questions/10580982/c-sort-keeping-track-of-indices
+		std::iota(sort_antenna.begin(), sort_antenna.end(), 0);
+		std::sort(sort_antenna.begin(), sort_antenna.end(), 
+		 [&](unsigned int a, unsigned int b){ return flat_antenna_array[a] < flat_antenna_array[b];});
 	 }
 	 /////////////////////////////
+	 istep = 0;
 	 while(istep != nsteps) {
 		// broadcast loop variable
 		mpi::broadcast(world, istep, root);
 		// extract filterbankdata
 		i0 = istep * timestep / tsamp;
+		// broadcast i0 variable
+		mpi::broadcast(world, i0, root);
 		for(int i_ = 0; i_ < f.size(); i_++) {
 		 f[i_].Unpack(inptrs[i_], i0, wid);
 		 operations::Crunch(inptrs[i_], nchans, wid, nchans_plot, wid_plot, outptrs[i_]);
 		 plot_f.emplace_back(outptrs[i_], outptrs[i_] + numelems_plot);
 		}
 		mpi::gather(world, plot_f, o_plot_f, root);
+		// clear plot_f for future use
+		plot_f.clear();
 		///////// PLOTTING
 		//// in root
 		if(world.rank() == root) {
+		 // flat 
 		 std::vector<FloatVector> flat_plot_f;
-		 assert(nant == flat_plot_f.size());
+		 for(int i_ = 0; i_ < world.size(); i_++) {
+			std::copy(o_plot_f[i_].begin(), o_plot_f[i_].end(), back_inserter(flat_plot_f));
+		 }
+		 // clear o_plot_f for future use
+		 o_plot_f.clear();
+		 // begin
 		 if(count != 0) cpgpage();
 		 w = (0.88f/nant) - 0.02f;
 		 xmin = 0.1;
 		 ymin = 0.05;
 		 xmax = 0.9;
 		 ymax = w + ymin;
-		 for(int iant = 0; iant < nant; iant++) {
+		 for(auto iant : sort_antenna) {
 			// axis variables
 			axis[0] = istep * timestep;
 			axis[1] = axis[0] + timestep;
 			cpgsci(1); // color index
 			cpgsvp(xmin, xmax, ymin, ymax);
 			cpgswin(axis[0],axis[1],axis[2],axis[3]);
-			if(iant == 0) {
+			if(iant == sort_antenna.front()) {
 			 cpgmtxt("B",2,.5,0.5,"Time (s)"); 
 			 cpgbox("BCN",0.0,0,"BC",40.0,0);
 			 cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
 			 cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 			}
-			else if( iant == hant) {
+			else if( iant == sort_antenna[hant]) {
 			 cpgbox("BC",0.0,0,"BC",40.0,0);
 			 cpgmtxt("L",4,0.,0.5,"Freq (MHz)");
 			 cpgmtxt("LV",3,0.2,0.0,std::to_string((int)axis[2]).c_str());
 			 cpgmtxt("LV",3,0.8,0.0,std::to_string((int)axis[3]).c_str());
 			}
-			else if(iant == nant - 1) {
+			else if(iant == sort_antenna.back()) {
 			 cpgbox("BC",0.0,0,"BC",40.0,0);
 			 cpgmtxt("T",1,.5,0.5,group.c_str()); // group at middle
 			 if(isKur) cpgmtxt("T",1,.8,0.5,"KUR"); // group at middle
@@ -188,7 +208,7 @@ class MPIPlot : protected Plotter {
 			cpgsfs(1);
 			cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
 			tr[0] = axis[0] - 0.5 * tr[2];
-			cpgimag(flat_plot_f[iant].data(), nchans_plot, wid_plot, 0, nchans_plot-1, 0, wid_plot-1, bmin, bmax, tr);
+			cpgimag(flat_plot_f[iant].data(), nchans_plot, wid_plot, 1, nchans_plot, 1, wid_plot, bmin, bmax, tr);
 			cpgmtxt("RV",2,.5,0.5,flat_antenna_array[iant].c_str());
 			ymin = ymax + 0.02;
 			ymax += w   + 0.02 ;
