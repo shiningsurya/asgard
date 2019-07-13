@@ -1,4 +1,3 @@
-
 #include "asgard.hpp"
 #include "Filterbank.hpp"
 // Boost
@@ -53,7 +52,7 @@ int main(int ac, char * av[]){
 						std::cout << std::endl;
 						delete[] da;
 				}
-				else if(vm.count("src")) {
+				else if(vm["src"].as<bool>()) {
 						if(vm.count("group")) std::cout << fb.group << "\t";
 						std::cout << fb.src_raj << "\t" << fb.src_dej << std::endl;
 				}
