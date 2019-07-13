@@ -44,36 +44,9 @@ class Plotter {
 				~Plotter() {
 						cpgend();
 				}
-				virtual void Plot() {
-				}
 };
+#ifdef FILTERBANK_H
 auto FCompare = [](Filterbank& x, Filterbank& y) { return x.antenna < y.antenna; };
-auto CLCompare = [](CandidateList& x, CandidateList& y) { return x[0].antenna < y[0].antenna; };
-auto CCompare = [](Candidate& x, Candidate& y) { return x.antenna < y.antenna; };
-auto SCompare = [](std::string& x, std::string& y) { return GetAntenna(x) < GetAntenna(y); };
-auto iCompare = [](Candidate& x, Candidate& y) { return x.i0 < y.i0; };
-StringVector SVFromDE(DEList& x) {
-		StringVector ret;
-		for(fs::directory_entry& de : x) ret.push_back( de.path().string() );
-		return ret;
-}
-StringVector SVFromPL(PathList& x) {
-		StringVector ret;
-		for(auto& de : x) ret.push_back( de.string() );
-		return ret;
-}
-CandidateAntenna CAFromPL(const PathList& x) {
-		CandidateAntenna ret;
-		double zero = 0.0;
-		for(const auto& de : x) ret.push_back( ReadCandidates( de.string(), zero) );
-		return ret;
-}
-CandidateAntenna CAFromDE(DEList& x) {
-		CandidateAntenna ret;
-		double zero = 0.0;
-		for(fs::directory_entry& de : x) ret.push_back( ReadCandidates( de.path().string(), zero) );
-		return ret;
-}
 FilterbankList FLFromPL(const PathList& x) {
 		FilterbankList ret;
 		FilterbankReader fbr;
@@ -103,5 +76,34 @@ FilterbankList FLFromDE(DEList& x) {
 		// going haywire.
 		// And the reason is self explanatory:
 		// I forgot "return ret"
+}
+#endif // FILTERBANK_H
+#ifdef CANDIDATE_H
+auto CLCompare = [](CandidateList& x, CandidateList& y) { return x[0].antenna < y[0].antenna; };
+auto CCompare = [](Candidate& x, Candidate& y) { return x.antenna < y.antenna; };
+auto SCompare = [](std::string& x, std::string& y) { return GetAntenna(x) < GetAntenna(y); };
+auto iCompare = [](Candidate& x, Candidate& y) { return x.i0 < y.i0; };
+CandidateAntenna CAFromPL(const PathList& x) {
+		CandidateAntenna ret;
+		double zero = 0.0;
+		for(const auto& de : x) ret.push_back( ReadCandidates( de.string(), zero) );
+		return ret;
+}
+CandidateAntenna CAFromDE(DEList& x) {
+		CandidateAntenna ret;
+		double zero = 0.0;
+		for(fs::directory_entry& de : x) ret.push_back( ReadCandidates( de.path().string(), zero) );
+		return ret;
+}
+#endif // CANDIDATE_H
+StringVector SVFromDE(DEList& x) {
+		StringVector ret;
+		for(fs::directory_entry& de : x) ret.push_back( de.path().string() );
+		return ret;
+}
+StringVector SVFromPL(PathList& x) {
+		StringVector ret;
+		for(auto& de : x) ret.push_back( de.string() );
+		return ret;
 }
 #endif

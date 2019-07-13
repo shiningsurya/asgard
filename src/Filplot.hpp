@@ -383,7 +383,7 @@ class DPlot : protected Plotter {
 	FloatVector bins = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f};
 	float xlin[2] = {0.0f, 0.0f}, ylin[2] = {0.0f, 0.0f};
  public:
-	DPlot(std::string fn, float ts, int chout, float ffc, float tfc) : nchans(chout), timestep(ts), ffac(ffc), tfac(tfc), 
+	DPlot(std::string fn, float ts, float ffc, float tfc) : timestep(ts), ffac(ffc), tfac(tfc), 
 	Plotter(fn) {
 	 cpgpap (0.0,0.618); //10.0, width and aspect ratio
 
@@ -399,13 +399,11 @@ class DPlot : protected Plotter {
 	 Plot(xx, method);
 	}
 	void Plot(Filterbank& f, int method) {
-	 nchans = 1024;
-	 wid = 256;
 	 // variables
 	 float axis[4];
 	 double duration = f.duration;
 	 int nsteps;
-	 int nchansin = f.nchans;
+	 int nchans = f.nchans;
 	 excision::xestimate estt, estf;
 	 if(timestep == 0.0f) {
 		timestep = duration;
@@ -414,33 +412,34 @@ class DPlot : protected Plotter {
 	 else {
 		nsteps = duration/timestep + 1;
 	 }
-	 widin = timestep / f.tsamp;
+	 wid = timestep / f.tsamp;
 	 timeslice i0 = 0; // one time initialization
 	 // RAII
 	 // Resource acquisition is initialization
+	 
+	 // this is ugly
+	 // Filterbank data
 	 float * dat = new float[wid*nchans];
-	 float * datin = new float[widin*nchansin];
+	 // Marginalized 
 	 float * bandshape = new float[nchans];
 	 float * timeshape = new float[wid];
 	 char *  bandflags = new char[nchans];
-	 for(int i = 0; i < nchans; i++) bandflags[i] = 'c';
 	 char * timeflags = new char[wid];
+	 for(int i = 0; i < nchans; i++) bandflags[i] = 'c';
 	 for(timeslice i = 0; i < wid; i++) timeflags[i] = 'c';
+	 // Axis
 	 float * timex = new float[wid];
 	 float * freqx = new float[nchans];
-	 float dt = timestep / wid;
-	 float ft = f.foff * nchansin / nchans;
-	 freqx[nchans-1] = f.fch1;
-	 for(int ii = nchans-2; ii >= 0; ii--) freqx[ii] = freqx[ii+1] + ft;
-	 tr[3] = freqx[nchans-1]; // fixed
-	 tr[2] = (float)f.tsamp * widin / wid;
-	 tr[4] = ft;
+	 operations::FreqTable(f.fch1, f.foff, f.nchans, freqx);
+	 // variables
+	 tr[3] = freqx[0]; // fixed
+	 tr[2] = f.tsamp;
+	 tr[4] = f.foff;
 	 // work loop
-	 for(int i = 0; i < nsteps; i++, i0+=widin, count++) {
+	 for(int i = 0; i < nsteps; i++, i0+=wid, count++) {
 		if(count != 0) cpgpage();
 		// work part
-		f.Unpack(datin, i0, widin);
-		operations::Crunch(datin, nchansin, widin, nchans, wid, dat);
+		f.Unpack(dat, i0, wid);
 		operations::FreqShape(dat, wid, nchans, bandshape);
 		operations::TimeShape(dat, wid, nchans, timeshape);
 		// xrfi part
@@ -452,32 +451,31 @@ class DPlot : protected Plotter {
 		 estf = excision::Histogram(bandshape, nchans, bandflags, bins, ffac);
 		 estt = excision::Histogram(timeshape, wid, timeflags, bins, tfac);
 		}
+		std::cout << "Timeflag rms=" << estt.rms << " rmsfac=" << estt.rmsfac << std::endl;
+		std::cout << "Freqflag rms=" << estf.rms << " rmsfac=" << estf.rmsfac << std::endl;
 		// plot part
 		// filterbank
 		axis[0] = i * timestep;
 		axis[1] = axis[0] + timestep;
-		axis[2] = freqx[0];
-		axis[3] = freqx[nchans-1];
+        axis[2] = freqx[nchans-1];
+        axis[3] = freqx[0];
 		cpgsci(1);
-		cpgsvp(0.1, 0.7, 0.1, 0.7);
+		cpgsvp(0.1, 0.8, 0.1, 0.8);
 		cpgswin(axis[0],axis[1],axis[2],axis[3]);
 		cpgbox("BCNT",0.0,0,"BCTN",20.0,4);
 		cpgsfs(1);
 		cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
 		tr[0] = axis[0];
-		cpgimag(dat, nchans, wid, 1, nchans, 1, wid, 0, 3, tr);
+		cpgimag(dat, nchans, wid, 1, nchans, 1, wid, f.bmin, f.bmax, tr);
 		cpgmtxt("B",2,0.5,0.5,"Time (s)");
-		cpgmtxt("L",3, 0.5, 0.5, "Freq (Hz)");
+		cpgmtxt("L",3, 0.5, 0.5, "Freq (MHz)");
 		// bandshape
 		cpgsci(1);
-		cpgsvp(0.7, 0.9, 0.1, 0.7);
-		axis[2] = freqx[0];
-		axis[3] = freqx[nchans-1];
+		cpgsvp(0.8, 0.9, 0.1, 0.8);
 		axis[0] = 0.0f;
 		axis[1] = 4.0f;
 		cpgswin(axis[0],axis[1],axis[2],axis[3]);
 		cpgbox("BCM",0.0,0,"BC",30.0,0);
-		cpgline(nchans, bandshape, freqx);
 		// lines in bandshape
 		xlin[0] = axis[0];
 		xlin[1] = axis[1];
@@ -489,13 +487,15 @@ class DPlot : protected Plotter {
 			cpgline(2,xlin,ylin);
 		 }
 		}
+		cpgsci(6);
+		cpgline(nchans, bandshape, freqx);
 		// timeshape
 		axis[0] = i * timestep;
 		axis[1] = axis[0] + timestep;
 		axis[2] = 0.0f;
 		axis[3] = 4.0f;
 		cpgsci(1);
-		cpgsvp(0.1, 0.7, 0.7, 0.9);
+		cpgsvp(0.1, 0.8, 0.8, 0.9);
 		cpgswin(axis[0],axis[1],axis[2],axis[3]);
 		cpgbox("BC",0.0,0,"BCM",0.0,0);
 		cpgmtxt("T",3, 0.5, 0.5, f.group.c_str());
@@ -505,8 +505,7 @@ class DPlot : protected Plotter {
 		slice_str = std::string("Slice:") + std::to_string(i+1) + std::string("/") + std::to_string(nsteps);
 		cpgmtxt("T",3,.0,0.0,slice_str.c_str());   // slice index
 		timex[0] = axis[0];
-		for(int ii = 1; ii < wid; ii++) timex[ii] = timex[ii-1] + dt;
-		cpgline(wid, timex, timeshape);
+		for(int ii = 1; ii < wid; ii++) timex[ii] = timex[ii-1] + f.tsamp;
 		// lines in timeshape
 		ylin[0] = axis[2];
 		ylin[1] = axis[3];
@@ -518,6 +517,8 @@ class DPlot : protected Plotter {
 			cpgline(2,xlin,ylin);
 		 }
 		}
+		cpgsci(6);
+		cpgline(wid, timex, timeshape);
 	 }
 	 delete[] dat;
 	 delete[] bandshape;
