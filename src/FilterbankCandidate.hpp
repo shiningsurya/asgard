@@ -31,7 +31,8 @@ class FilterbankCandidate {
 	 maxdelay = ddm.SetDM(dm, filterwidth);
 	 // logic
 	 timeslice mid = .5 * (i0 + i1);
-	 istart = mid - (1 * maxdelay);
+	 if(mid < (1 * maxdelay)) istart = 0;
+	 else istart = mid - (1 * maxdelay);
 	 istop  = mid + (2 * maxdelay);
 	 // load filterbank
 	 nsamps = istop - istart;

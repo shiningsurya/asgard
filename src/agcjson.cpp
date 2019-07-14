@@ -1,6 +1,8 @@
 #include "asgard.hpp"
 #include "Analyzer.hpp"
 // FilterbankCandidate 
+#include "Filterbank.hpp"
+#include "Candidate.hpp"
 #include "FilterbankCandidate.hpp"
 // JSON 
 #include "CandidateJSON.hpp"
@@ -38,7 +40,7 @@ int main(int ac, char * av[]){
 	("output-directory,o",po::value<fs::path>(&pdir), "Output directory,\nwhere Candidate JSONs will be stored")
 	("group,g", po::value<StringVector>(&groups)->composing(),"Sets the group to use.\nIf option not given, all the groups found"
 	 "\nwhile crawling will be used."
-	)
+	);
  opd.add("group",-1);
  //
  try{
@@ -63,7 +65,7 @@ int main(int ac, char * av[]){
  //
  if(! (fildirs.empty() || candirs.empty())  ) {
 	fs::path xp = pdir;
-	CandidateJSON cjson(pdir);
+	CandidateJSON cjson(pdir.string());
 	if(! fs::exists(xp)) fs::create_directory(xp);
 	// files given manually
 	assert(fildirs.size() == candirs.size());
@@ -86,10 +88,15 @@ int main(int ac, char * av[]){
 	 // g = groups[gin]
 	 xp = pdir / groups[gin];
 	 if(! fs::exists(xp)) fs::create_directory(xp);
-     CandidateJSON cjson(xp);
+     CandidateJSON cjson(xp.string());
 	 // Fbc
-	 FilterbankCandidate thisfbc(fb.kfils[groups[gin]], fb.kcands[groups[gin]]);
-	 cjson(thisfbc);
+	 auto a_ = fb.kfils[groups[gin]];
+	 auto b_ = fb.kcands[groups[gin]];
+	 assert(a_.size() == b_.size());
+	 for(int i = 0; i < a_.size();i++) {
+		FilterbankCandidate thisfbc(a_[i].string(), b_[i].string());
+		cjson.Write(thisfbc);
+	 }
 	}
  }
  return 0;
