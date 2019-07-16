@@ -1,3 +1,4 @@
+#pragma once
 #include "asgard.hpp"
 #include "Operations.hpp"
 #ifndef XRFI_H
@@ -9,7 +10,7 @@ namespace excision {
 				float rmsfac;
 				bool isMad, isHist;
 		};
-		struct xestimate  MAD(float * in, timeslice length, char * flag, float fac) {
+		struct xestimate  MAD(PtrFloat in, timeslice length, PtrByte flag, float fac) {
 				// Median Absolute Deviation
 				float median, rms;
 				int hlen= length / 2;
@@ -47,7 +48,7 @@ namespace excision {
 				ret.isHist = false;
 				return ret;
 		}
-		struct xestimate  Histogram(float * in, timeslice length, char * flag, FloatVector& bins, float fac) {
+		struct xestimate  Histogram(PtrFloat in, timeslice length, PtrByte flag, const FloatVector& bins, float fac) {
 				// Histogram
 				float mode, hmode, rms;
 				timeslice modepoint, fwhm_1, fwhm_2;
@@ -91,72 +92,73 @@ namespace excision {
 				ret.isHist = true;
 				return ret;
 		}
+		class xRFI {
+				private:
+						// class parameters
+						const int method;
+						const FloatVector bins = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f};
+				public:
+						// input sizes
+						const timeslice wid;
+						const int nchans;
+						// exposing flags, shapes
+						PtrByte bandflags, timeflags;
+						PtrFloat bandshape, timeshape;
+						// factors
+						const float time_factor, freq_factor;
+						// estimates
+						struct xestimate estt, estf;
+						// ctor
+						xRFI(int _method, float _timef, float _freqf, timeslice _wid, int _nchans)
+								: method(_method), wid(_wid), nchans(_nchans),
+								time_factor(_timef), freq_factor(_freqf) {
+										// flags
+										bandflags = new unsigned char[nchans];
+										timeflags = new unsigned char[wid];
+										// shapes
+										bandshape = new float[nchans]();
+										timeshape = new float[wid]();
+								}
+						~xRFI() {
+								// clear out heap-memory
+								if(bandflags != nullptr) delete[] bandflags;
+								if(timeflags != nullptr) delete[] timeflags;
+								if(timeshape != nullptr) delete[] timeshape;
+								if(bandshape != nullptr) delete[] bandshape;
+						}
+						void Excise(PtrFloat dat, bool _filter = false) {
+								// no need to reset any arrays bc every element is met
+								// optimized for streams
+								operations::TimeFreqShape(dat, wid, nchans, timeshape, bandshape);
+								// xrfi part
+								if(method == 1) {
+										// MAD
+										estf = excision::MAD(bandshape, nchans, bandflags, freq_factor);
+										estt = excision::MAD(timeshape, wid, timeflags, time_factor);
+								}
+								else if(method == 2) {
+										// Histogram
+										estf = excision::Histogram(bandshape, nchans, bandflags, bins, freq_factor);
+										estt = excision::Histogram(timeshape, wid, timeflags, bins, time_factor);
+								}
+								// removing
+								if(_filter)
+										Filter(dat);
+						} 
+						void Filter(PtrFloat dat) {
+								timeslice idx;
+#pragma omp parallel for collapse(2) private(idx)
+								for(timeslice iwid = 0; iwid < wid; iwid++) {
+										for(int ichan = 0; ichan < nchans; ichan++) {
+												// AND or OR here .........vv
+												if(bandflags[ichan] == 'o' && timeflags[iwid] == 'o') {
+														idx = ( iwid * nchans ) + ichan;
+														//TODO zero out? replace by mean?
+														dat[idx] = 10.0f;
+												}
+										}
+								}
+						}
+		};
 }
-
-
-/*
- *class xRFI {
- *        private:
- *                double timestep;
- *                timeslice i0, i1, wid;
- *                FloatVector bins = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f};
- *                bool plot;
- *                int method;
- *                float cutoff, MAD_rms2cutoff, HIS_rms2cutoff;
- *        public:
- *                xRFI(int m, bool p, float madc, float hisc) : 
- *                        method(m),
- *                        plot(p),
- *                        MAD_rms2cutoff(madc),
- *                        HIS_rms2cutoff(hisc) {
- *
- *                }
- *                Work(Filterbank& f, int method) {
- *                        // variables
- *                        double duration = f.duration;
- *                        int nsteps;
- *                        int nchans = f.nchans;
- *                        if(timestep == 0.0f) {
- *                                timestep = duration;
- *                                nsteps = 1;
- *                        }
- *                        else {
- *                                nsteps = duration/timestep + 1;
- *                        }
- *                        wid = timestep / f.tsamp;
- *                        i0 = 0; // one time initialization
- *                        // RAII
- *                        // Resource acquisition is initialization
- *                        PtrFloatUnique dat = std::make_unique<float>(wid*nchans);
- *                        PtrFloatUnique bandshape = std::make_unique<float>(nchans);
- *                        PtrFloatUnique timeshape = std::make_unique<float>(wid);
- *                        PtrCharUnique bandflags = std::make_unique<char>(nchans);
- *                        PtrCharUnique timeflags = std::make_unique<char>(wid);
- *                        // plot initialization 
- *                        if(plot) {
- *                                xRFIPlot xp(nsteps, f, wid, nchans);
- *                        }
- *                        // work loop
- *                        for(int i = 0; i < nsteps; i++, i0+=wid) {
- *                                // work part
- *                                f.Unpack(dat, i0, wid);
- *                                operation::FreqShape(dat, wid, nchans, bandshape);
- *                                operations::TimeShape(dat, wid, nchans, timeshape);
- *                                // xrfi part
- *                                if(method == 1) {
- *                                        excision::MAD(bandshape, nchans, bandflags);
- *                                        excision::MAD(timeshape, wid, timeflags);
- *                                }
- *                                else(method == 2) {
- *                                        excision::Histogram(bandshape, nchans, bandflags);
- *                                        excision::Histogram(timeshape, wid, timeflags);
- *                                }
- *                                // plot part
- *                                if(plot) {
- *                                        xp.Plot(dat, bandshape, timeshape, bandflags, timeflags);
- *                                }
- *                        }
- *                }
- *};
- */
 #endif

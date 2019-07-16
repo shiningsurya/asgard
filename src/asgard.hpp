@@ -49,36 +49,7 @@ typedef std::vector<Group> GroupVector;
 
 typedef std::vector<float> FloatVector;
 typedef std::vector<double> DoubleVector;
-/*
- *class  FloatVector {
- *        private:
- *                float * p;
- *                timeslice data;
- *        public:
- *                float& operator[] (timeslice x) {
- *                        if(x > data) {
- *                                std::cerr << "SIGSEGV captured in FloatVector\n";
- *                                return p[0];
- *                        }
- *                        else {
- *                                return p[x];
- *                        }
- *                }
- *                timeslice size() { return data; }
- *                bool reserve(timeslice x) { 
- *                        delete[] p;
- *                        p = new float[x];
- *                        memset(p, 0.0f, x * sizeof(float));
- *                        data = x;
- *                }
- *                float * data() { return &p[0]; }
- *                float front() { return p[0];}
- *                float back() { return p[data-1]; }
- *                float * begin() { return &p[0]; }
- *                float *  end() { return &p[data -1]; }
- *};
- */
-typedef std::unique_ptr<float*> PtrFloatUnique;
+typedef std::unique_ptr<float> PtrFloatUnique;
 typedef float* PtrFloat;
 typedef unsigned char * PtrByte;
 typedef std::unique_ptr<char*> PtrCharUnique;
