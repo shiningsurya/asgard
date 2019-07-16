@@ -32,8 +32,9 @@ colors['ea21'] = "#ffcb00"
 colors['ea22'] = "#ffb200"
 colors['ea23'] = "#ff9800"
 colors['ea24'] = "#ff7f00"
-colors['ea25'] = "#ff3f00"
-colors['ea26'] = "#ff0000"
+colors['ea25'] = "#ff3400"
+colors['ea26'] = "#ff4f00"
+colors['ea99'] = "#ff0000"
 
 # limits
 snmin, snmax = 5, 100
@@ -61,7 +62,7 @@ def AllScatter(xx, saveas=None):
     if isinstance(xx, str):
         x = ReadPkl(xx)
         fi = saveas or "{0}.pdf".format(os.pathname.splitext(xx)[0])
-    elif isinstance(xx, cs.CandidateSet):
+    elif isinstance(xx, dict):
         x = xx
         fi = saveas 
     fig = plt.figure(dpi=300)

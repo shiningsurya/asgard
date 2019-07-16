@@ -6,7 +6,8 @@ Class holding candidates in Numpy Tables for efficiency.
 Part of Asgard
 '''
 import os
-from CandidateData import CandidateData, CoincideCandidateData
+import copy
+from CandidateData import CandidateData, CoincideCandidateData, FilterCandidateData
 
 def GetGroup(cpath):
     '''
@@ -223,5 +224,17 @@ def AllCandidates(cpath, fpath):
     print len(allgroup)
     for ag in allgroup:
         ret[ ag ] = CandidateSet(cpath, ag, fpath)
+    return ret
+
+def FilterCandidateSet(cset, sncut=[0,10], dmcut=[0,100], inplace=False):
+    '''
+    Filter CandidateSet 
+    '''
+    if inplace:
+        ret = cset
+    else:
+        ret = copy.deepcopy(cset)
+    for ant, y in ret.items():
+        ret[ant] = FilterCandidateData(y, sncut=sncut, dmcut=dmcut)
     return ret
 

@@ -137,16 +137,16 @@ class CandidateGroup(object):
         self.tsec = 86400.0 *  (self.mjd - self.mjd[0] )
         assert np.all(self.tsec >= 0)
 
-def FilterCandidateData(cdata, sncut=10, dmcut=100):
+def FilterCandidateData(cdata, sncut=[0,10], dmcut=[0,100]):
     '''
     To create a new copy of CandidateData instance and
     apply filtering
     '''
     # copying
     ret = copy.deepcopy(cdata)
-    # filtering
-    sn_selects = cdata.sn < sncut
-    dm_selects = cdata.dm < dmcut
+    # filtering -- select deletes
+    sn_selects = np.logical_or(ret.sn < sncut[0], ret.sn > sncut[1])
+    dm_selects = np.logical_or(ret.dm < dmcut[0], ret.dm > dmcut[1])
     al_selects = np.where( np.logical_or(sn_selects, dm_selects) )
     # selection
     ret.sn = np.delete(ret.sn,al_selects)
