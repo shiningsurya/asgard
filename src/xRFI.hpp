@@ -101,9 +101,9 @@ namespace excision {
 						const Method method;
 						const FloatVector bins = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f};
 				public:
-				  // random stuff
-				  std::random_device rd;
-				  std::mt19937 mt;
+						// random stuff
+						std::random_device rd;
+						std::mt19937 mt;
 						// input sizes
 						const timeslice wid;
 						const int nchans;
@@ -118,7 +118,7 @@ namespace excision {
 						xRFI(Method _method, float _timef, float _freqf, timeslice _wid, int _nchans)
 								: method(_method), wid(_wid), nchans(_nchans),
 								time_factor(_timef), freq_factor(_freqf),
-								 mt(rd()) {
+								mt(rd()) {
 										// flags
 										bandflags = new unsigned char[nchans];
 										timeflags = new unsigned char[wid];
@@ -152,15 +152,15 @@ namespace excision {
 								if(_filter == Filter::Zero)
 										FilterZero(dat);
 								else if(_filter == Filter::Noise) 
-								  FilterWhite(dat);
+										FilterWhite(dat);
 						} 
 						void FilterZero(PtrFloat dat) {
 								timeslice idx;
-//#pragma omp parallel for collapse(2) private(idx)
+#pragma omp parallel for collapse(2) private(idx)
 								for(timeslice iwid = 0; iwid < wid; iwid++) {
 										for(int ichan = 0; ichan < nchans; ichan++) {
 												// AND or OR here .........vv
-												if(bandflags[ichan] == 'o' && timeflags[iwid] == 'o') {
+												if(bandflags[ichan] == 'o' || timeflags[iwid] == 'o') {
 														idx = ( iwid * nchans ) + ichan;
 														//TODO zero out? replace by mean?
 														dat[idx] = 0.0f;
@@ -169,22 +169,46 @@ namespace excision {
 								}
 						}
 						void FilterWhite(PtrFloat dat) {
-						  float mean = 0.5f * (estf.CentralTendency + estt.CentralTendency);
-						  float std  = 0.5f * (estf.rms + estt.rms);
-						  std::normal_distribution<float> norm(mean, std);
+								std::normal_distribution<float> normt(estt.CentralTendency, estt.rms);
+								std::normal_distribution<float> normf(estf.CentralTendency, estf.rms);
 								timeslice idx;
-//#pragma omp parallel for collapse(2) private(idx)
+#pragma omp parallel for collapse(2) private(idx)
 								for(timeslice iwid = 0; iwid < wid; iwid++) {
 										for(int ichan = 0; ichan < nchans; ichan++) {
 												// AND or OR here .........vv
-												if(bandflags[ichan] == 'o' && timeflags[iwid] == 'o') {
+												if(timeflags[iwid] == 'o') {
 														idx = ( iwid * nchans ) + ichan;
 														//TODO zero out? replace by mean?
-														dat[idx] = norm(mt);
+														dat[idx] = normt(mt);
+												}
+												if(bandflags[ichan] == 'o') {
+														idx = ( iwid * nchans ) + ichan;
+														//TODO zero out? replace by mean?
+														dat[idx] = normf(mt);
 												}
 										}
 								}
 						}
 		};
+		std::istream& operator>>(std::istream& in, Method& mm) {
+				std::string tok;
+				in >> tok;
+				if(tok == "1")
+						mm = Method::Histogram;
+				else
+						mm = Method::MAD;
+				return in;
+		} 
+		std::istream& operator>>(std::istream& in, Filter& ff) {
+				std::string tok;
+				in >> tok;
+				if(tok == "0")
+						ff = Filter::No;
+				else if(tok == "1")
+						ff = Filter::Zero;
+				else
+						ff = Filter::Noise;
+				return in;
+		} 
 }
 #endif

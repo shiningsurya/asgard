@@ -412,7 +412,7 @@ class DPlot : protected Plotter {
 						}
 						wid = timestep / f.tsamp;
 						timeslice i0 = 0; // one time initialization
-						excision::xRFI xrfi(method, tfac, tfac, wid, nchans);
+						excision::xRFI xrfi(excision::Method::MAD, tfac, tfac, wid, nchans);
 						// Filterbank data
 						PtrFloat dat = new float[wid*nchans];
 						// Axis
@@ -428,7 +428,7 @@ class DPlot : protected Plotter {
 								if(count != 0) cpgpage();
 								// work part
 								f.Unpack(dat, i0, wid);
-								xrfi.Excise(dat, true);
+								xrfi.Excise(dat, excision::Filter::Zero);
 								// plot part
 								// filterbank
 								axis[0] = i * timestep;

@@ -185,10 +185,10 @@ static inline int quant8bit(float x) {
  else return 255;
 }
 static inline int quant2bit(float x) {
- if(x < -0.9674) return 0;
- else if(x < 0) return 1;
- else if(x < 0.9674) return 2;
- else return 3;
+		if(x < -0.9674) return 0;
+		else if(x < 0) return 1;
+		else if(x < 0.9674) return 2;
+		else return 3;
 }
 unsigned char dig2bit(float a, float b, float c, float d) {
 		unsigned char A, B, C, D;	
