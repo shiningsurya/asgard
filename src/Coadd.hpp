@@ -36,7 +36,7 @@ class Coadd {
 				int method;
 				float * bandshape, * timeshape;
 				FloatVector bins;
-				char * bandflags, * timeflags;
+				unsigned char * bandflags, * timeflags;
 				bool xxinitialized;
 				void _work_2(Filterbank& x, Filterbank& y, PtrFloatUnique  ret ) {
 						// ret is initialized before
@@ -47,8 +47,8 @@ class Coadd {
 						// or make them unique ptr?
 						bandshape = new float[nchans];
 						timeshape = new float[wid];
-						bandflags = new char[nchans];
-						timeflags = new char[wid];
+						bandflags = new unsigned char[nchans];
+						timeflags = new unsigned char[wid];
 						bins = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f};
 						xxinitialized = true;
 				}
@@ -173,6 +173,7 @@ class Coadd {
 #ifdef MPI
 #include "Group.hpp"
 #include "Analyzer.hpp"
+#include "xRFI.hpp"
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
 #include <boost/mpi/collectives.hpp>
@@ -193,6 +194,7 @@ namespace mpi = boost::mpi;
  *  This is by design of MPI. "in_value".
  *  One workaround for future would be to use 
  *  zero'd array as inptr on vlite-nrl
+ *  = Ignore, I was dumb then. I can specify hosts and run mpirun from foreign hosts too.
  * */
 class CoaddMPI {
 		private:
@@ -277,6 +279,8 @@ class CoaddMPI {
 						tstep = param.loadsecs / f[0].tsamp;				
 						numelems = tstep * f[0].nchans;
 						nsteps = duration / param.loadsecs;
+						// create xrfi
+						excision::xRFI xrfi(excision::Method::MAD, 10.0f, 10.0f, tstep, f[0].nchans);
 						// initialize stuff
 						for(auto& xin : inptrs) xin = new float[numelems]();
 						if(world.rank() == root) outptr = new float[numelems]();
@@ -297,6 +301,9 @@ class CoaddMPI {
 										if(timenow >= f[ifb].tstart && timenow < f[ifb].tstop) {
 												i0 = ( timenow - f[ifb].tstart ) * 86400.0f / f[ifb].tsamp;
 												f[ifb].Unpack(inptrs[ifb], i0, tstep);
+												// Excision here -- begin
+											 xrfi.Excise(inptrs[ifb], excision::Filter::Zero);
+												// Excision here -- end
 										}
 										else{
 												// this only happens in the beginning hence not optimized
@@ -319,30 +326,33 @@ class CoaddMPI {
 										// count numant
 										for(int j = 0; j < world.size(); j++){
 												if(timenow <= All_tstops[j] && timenow >= All_tstarts[j]) numants++;
-										}
-										// write fb data logic
-										fbw.WriteFBdata(outptr, boundcheck, numelems, numants);
-										// incrementing as in serial
-										// NB see comments in serial code
-										boundcheck += (numelems * nbits / 8);
-										i++;
-								}
-						}
-						// gracefully exiting
-						for(auto& ipf : inptrs) if(ipf != nullptr)  delete[] ipf;
-						if(world.rank() == root) {
-								if(outptr != nullptr) delete[] outptr;
-								fbw.Close();
-						}
-				}
-		public:
-				//CoaddMPI(mpi::environment _env, mpi::communicator _comm) :
-				//env(_env), world(_comm) {
-				//}
-				void Work(CoaddMPI_Params& param) {
-						root = 0;
-						work_one_group(param);
-				}
+          }
+          // Excision here -- begin
+          xrfi.Excise(outptr, excision::Filter::Zero);
+          // Excision here -- end
+          // write fb data logic
+          fbw.WriteFBdata(outptr, boundcheck, numelems, numants);
+          // incrementing as in serial
+          // NB see comments in serial code
+          boundcheck += (numelems * nbits / 8);
+          i++;
+        }
+      }
+      // gracefully exiting
+      for(auto& ipf : inptrs) if(ipf != nullptr)  delete[] ipf;
+      if(world.rank() == root) {
+        if(outptr != nullptr) delete[] outptr;
+        fbw.Close();
+      }
+    }
+  public:
+    //CoaddMPI(mpi::environment _env, mpi::communicator _comm) :
+    //env(_env), world(_comm) {
+    //}
+    void Work(CoaddMPI_Params& param) {
+      root = 0;
+      work_one_group(param);
+    }
 };
 #endif // MPI
 #endif

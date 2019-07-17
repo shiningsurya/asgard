@@ -3,7 +3,10 @@
 #include "Operations.hpp"
 #ifndef XRFI_H
 #define XRFI_H
+#include <random>
 namespace excision {
+  enum class Method { MAD, Histogram };
+  enum class Filter { No, Zero, Noise };
 		struct xestimate {
 				float CentralTendency;
 				float rms;
@@ -95,9 +98,12 @@ namespace excision {
 		class xRFI {
 				private:
 						// class parameters
-						const int method;
+						const Method method;
 						const FloatVector bins = {0.0f, 0.5f, 1.0f, 1.5f, 2.0f, 2.5f, 3.0f, 3.5f, 4.0f};
 				public:
+				  // random stuff
+				  std::random_device rd;
+				  std::mt19937 mt;
 						// input sizes
 						const timeslice wid;
 						const int nchans;
@@ -109,9 +115,10 @@ namespace excision {
 						// estimates
 						struct xestimate estt, estf;
 						// ctor
-						xRFI(int _method, float _timef, float _freqf, timeslice _wid, int _nchans)
+						xRFI(Method _method, float _timef, float _freqf, timeslice _wid, int _nchans)
 								: method(_method), wid(_wid), nchans(_nchans),
-								time_factor(_timef), freq_factor(_freqf) {
+								time_factor(_timef), freq_factor(_freqf),
+								 mt(rd()) {
 										// flags
 										bandflags = new unsigned char[nchans];
 										timeflags = new unsigned char[wid];
@@ -126,35 +133,54 @@ namespace excision {
 								if(timeshape != nullptr) delete[] timeshape;
 								if(bandshape != nullptr) delete[] bandshape;
 						}
-						void Excise(PtrFloat dat, bool _filter = false) {
+						void Excise(PtrFloat dat, Filter _filter = Filter::No) {
 								// no need to reset any arrays bc every element is met
 								// optimized for streams
 								operations::TimeFreqShape(dat, wid, nchans, timeshape, bandshape);
 								// xrfi part
-								if(method == 1) {
+								if(method == Method::MAD) {
 										// MAD
 										estf = excision::MAD(bandshape, nchans, bandflags, freq_factor);
 										estt = excision::MAD(timeshape, wid, timeflags, time_factor);
 								}
-								else if(method == 2) {
+								else if(method == Method::Histogram) {
 										// Histogram
 										estf = excision::Histogram(bandshape, nchans, bandflags, bins, freq_factor);
 										estt = excision::Histogram(timeshape, wid, timeflags, bins, time_factor);
 								}
 								// removing
-								if(_filter)
-										Filter(dat);
+								if(_filter == Filter::Zero)
+										FilterZero(dat);
+								else if(_filter == Filter::Noise) 
+								  FilterWhite(dat);
 						} 
-						void Filter(PtrFloat dat) {
+						void FilterZero(PtrFloat dat) {
 								timeslice idx;
-#pragma omp parallel for collapse(2) private(idx)
+//#pragma omp parallel for collapse(2) private(idx)
 								for(timeslice iwid = 0; iwid < wid; iwid++) {
 										for(int ichan = 0; ichan < nchans; ichan++) {
 												// AND or OR here .........vv
 												if(bandflags[ichan] == 'o' && timeflags[iwid] == 'o') {
 														idx = ( iwid * nchans ) + ichan;
 														//TODO zero out? replace by mean?
-														dat[idx] = 10.0f;
+														dat[idx] = 0.0f;
+												}
+										}
+								}
+						}
+						void FilterWhite(PtrFloat dat) {
+						  float mean = 0.5f * (estf.CentralTendency + estt.CentralTendency);
+						  float std  = 0.5f * (estf.rms + estt.rms);
+						  std::normal_distribution<float> norm(mean, std);
+								timeslice idx;
+//#pragma omp parallel for collapse(2) private(idx)
+								for(timeslice iwid = 0; iwid < wid; iwid++) {
+										for(int ichan = 0; ichan < nchans; ichan++) {
+												// AND or OR here .........vv
+												if(bandflags[ichan] == 'o' && timeflags[iwid] == 'o') {
+														idx = ( iwid * nchans ) + ichan;
+														//TODO zero out? replace by mean?
+														dat[idx] = norm(mt);
 												}
 										}
 								}
