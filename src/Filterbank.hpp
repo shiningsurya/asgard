@@ -24,6 +24,7 @@
 #include<fstream>
 #endif
 #include <Redigitizer.hpp>
+#include <numeric>
 namespace bios = boost::iostreams;
 //#include <fstream>
 //typedef long unsigned int timeslice;
@@ -344,30 +345,35 @@ class FilterbankWriter {
 	float alpha, beta, gamma, delta;
 	int nbits;
 	void _copy_fbdata(PtrFloat ret, timeslice datasamps, int nant) {
+	 // the running mean idea
+	 float rmean = 0.0f, rstd = 0.0f;
+	 // two pass mean, std estimate
+	 std::for_each(ret, ret + datasamps, [&rmean](const float& xx) { rmean += xx; });
+	 rmean /= datasamps;
+	 std::for_each(ret, ret + datasamps, [&rstd, &rmean](const float& xx) { rstd += pow(xx - rmean, 2); });
+	 rstd = sqrt(rstd / (datasamps - 1)); // Bessel correction
+	 // writing
 	 if(nbits == 2) {
 		for(timeslice i = 0; i < datasamps;) {
-		 alpha = ret[i++] / nant;
-		 beta  = ret[i++] / nant;
-		 gamma = ret[i++] / nant;
-		 delta = ret[i++] / nant;
-		 dd[it++] = dig2bit(alpha, beta, gamma, delta, 0); 
+		 alpha = (ret[i++] - rmean) / rstd;
+		 beta  = (ret[i++] - rmean) / rstd;
+		 gamma = (ret[i++] - rmean) / rstd;
+		 delta = (ret[i++] - rmean) / rstd;
+		 dd[it++] = dig2bit(alpha, beta, gamma, delta); 
 		}
 	 }
 	 else if(nbits == 4) {
 		for(timeslice i = 0; i < datasamps;) {
-		 alpha = ret[i++] / nant;
-		 beta  = ret[i++] / nant;
-		 dd[it++] = dig4bit(alpha, beta, 0); 
+		 alpha = (ret[i++] - rmean) / rstd;
+		 beta  = (ret[i++] - rmean) / rstd;
+		 dd[it++] = dig4bit(alpha, beta);
 		}
 	 }
 	 else if(nbits == 8) {
+		 // TODO
 		for(timeslice i = 0; i < datasamps;) {
-		 alpha = ret[i++] / nant;
-		 dd[it++] = dig8bit(alpha, 0); 
-#ifdef _DEBUG
-		 if(debnum-- && debug_file.good())
-			debug_file << alpha << "  " << std::bitset<8>(dig8bit(alpha,0)) << std::endl;
-#endif  // _DEBUG
+		 alpha = (ret[i++] - rmean) / rstd;
+		 dd[it++] = dig8bit(alpha);
 		}
 	 }
 	}

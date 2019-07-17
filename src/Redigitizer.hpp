@@ -8,6 +8,7 @@
 #define LO4BITS 15 
 #define UP4BITS 240
 
+#if 0
 static inline int quant2bit_1(float a) {
 		if(a <= 0.09) return 0;
 		else if(a <= 0.38) return 1;
@@ -105,6 +106,7 @@ static inline int quant2bit_16(float a) {
 }
 
 static inline int quant2bit(int nant, float a) {
+	//	a *= sqrt(nant);
 		if(nant == 1)       return quant2bit_1(a);
 		else if(nant == 2)  return quant2bit_2(a);
 		else if(nant == 3)  return quant2bit_3(a);
@@ -123,11 +125,18 @@ static inline int quant2bit(int nant, float a) {
 		else if(nant == 16) return quant2bit_16(a);
 		else return static_cast<int>(a);
 }
-static inline int quant4bit(float a) {
-		return static_cast<int>(a);
-}
-static inline int quant8bit(float a) {
-		return static_cast<int>(a);
+unsigned char dig2bit___(float a, float b, float c, float d, int numant) {
+		unsigned char A, B, C, D;	
+		float sqrt_nant = sqrt(numant);
+		A = (unsigned char) (static_cast<unsigned int>(a*sqrt_nant) & 0x03) << 6;
+		//std::cout << " a =  " << a << " A =  " << std::bitset<8>(A) << std::endl;
+		B = (unsigned char) (static_cast<unsigned int>(b*sqrt_nant) & 0x03) << 4;
+		//std::cout << " b =  " << b << " B =  " << std::bitset<8>(B) << std::endl;
+		C = (unsigned char) (static_cast<unsigned int>(c*sqrt_nant) & 0x03) << 2;
+		//std::cout << " c =  " << c << " C =  " << std::bitset<8>(C) << std::endl;
+		D = (unsigned char) (static_cast<unsigned int>(d*sqrt_nant) & 0x03) << 0;
+		//std::cout << " d =  " << d << " D =  " << std::bitset<8>(D) << std::endl;
+		return A|B|C|D;
 }
 unsigned char dig2bit(float a, float b, float c, float d, int numant) {
 		unsigned char A, B, C, D;	
@@ -141,7 +150,59 @@ unsigned char dig2bit(float a, float b, float c, float d, int numant) {
 		//std::cout << " d =  " << d << " D =  " << std::bitset<8>(D) << std::endl;
 		return A|B|C|D;
 }
-unsigned char dig4bit(float a, float b, int numant) {
+#endif // deadcode
+// Numbers from Jenet&Anderson
+static inline int quant4bit(float x) {
+ if(x < -2.397) return 0;
+ else if(x < -1.839) return 1;
+ else if(x < -1.432) return 2;
+ else if(x < -1.093) return 3;
+ else if(x < -0.7928) return 4;
+ else if(x < -0.5152) return 5;
+ else if(x < -0.2514) return 6;
+ else if(x <  0.000) return 7;
+ else if(x < 0.2514) return 8;
+ else if(x < 0.5152) return 9;
+ else if(x < 0.7928) return 10;
+ else if(x < 1.093) return 11;
+ else if(x < 1.432) return 12;
+ else if(x < 1.839) return 13;
+ else if(x < 2.397) return 14;
+ else return 15;
+}
+static inline int quant8bit(float x) {
+ if(x < -4.395) return 0;
+ else if(x < -4.056) return 1;
+ else if(x < -3.829) return 2;
+ else if(x < -3.654) return 3;
+ else if(x < -3.510) return 4;
+ else if(x < -3.387) return 5;
+ else if(x < -3.279) return 6;
+ else if(x < -3.183) return 7;
+ else if(x < -3.095) return 8;
+ else if(x < -3.015) return 9;
+ // TODO -- they are so many of them!!
+ else return 255;
+}
+static inline int quant2bit(float x) {
+ if(x < -0.9674) return 0;
+ else if(x < 0) return 1;
+ else if(x < 0.9674) return 2;
+ else return 3;
+}
+unsigned char dig2bit(float a, float b, float c, float d) {
+		unsigned char A, B, C, D;	
+		A = (unsigned char) (quant2bit(a) & 0x03) << 6;
+		//std::cout << " a =  " << a << " A =  " << std::bitset<8>(A) << std::endl;
+		B = (unsigned char) (quant2bit(b) & 0x03) << 4;
+		//std::cout << " b =  " << b << " B =  " << std::bitset<8>(B) << std::endl;
+		C = (unsigned char) (quant2bit(c) & 0x03) << 2;
+		//std::cout << " c =  " << c << " C =  " << std::bitset<8>(C) << std::endl;
+		D = (unsigned char) (quant2bit(d) & 0x03) << 0;
+		//std::cout << " d =  " << d << " D =  " << std::bitset<8>(D) << std::endl;
+		return A|B|C|D;
+}
+unsigned char dig4bit(float a, float b) {
 		unsigned char A, B;	
 		A = (unsigned char) (quant4bit(a) & 0x07) << 4;
 		//std::cout << " a =  " << a << " A =  " << std::bitset<8>(A) << std::endl;
@@ -149,7 +210,7 @@ unsigned char dig4bit(float a, float b, int numant) {
 		//std::cout << " b =  " << b << " B =  " << std::bitset<8>(B) << std::endl;
 		return A|B;
 }
-unsigned char dig8bit(float a, int numant) {
+unsigned char dig8bit(float a) {
 		return (unsigned char) quant8bit(a);
 }
 #endif // _REDIGIT_H_
