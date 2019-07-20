@@ -185,6 +185,11 @@ struct CoaddMPI_Params {
 		std::string group_string;
 		float loadsecs;
 		bool kur;
+		// excision
+		float tfac;
+		float ffac;
+		excision::Method method;
+		excision::Filter filter;
 };
 namespace mpi = boost::mpi;
 /****
@@ -233,102 +238,110 @@ class CoaddMPI {
 						 * **/
 						// aggregate in root For debugging
 						mpi::gather(world, filstringlist , All_filpathlist, root);
-						mpi::gather(world, env.processor_name(), All_hostnames, root);
-						if(world.rank() == root) {
-								for(int iii = 0; iii !=  All_filpathlist.size(); iii++)
-										for(auto& Sv : All_filpathlist[iii]) {
-												std::cout << " I " << Sv << " @ " << All_hostnames[iii];
-												if(All_hostnames[iii] == env.processor_name()) std::cout << "*";
-												std::cout << std::endl;
-										}
-						}
-						FilterbankList f;
-						for(auto& xpl : filpathlist) {
-								// read filterbanks into f
-								Filterbank ffb;
-								fbr.Read(ffb, xpl.string());
-								f.push_back(ffb);
-								// keep times
-								l_tstops.push_back(ffb.tstop);
-								l_tstarts.push_back(ffb.tstart);
-								// initializing data pointers
-								inptrs.push_back(nullptr);
-						}
-						assert(f.size() != 0);
-						assert(f.size() == inptrs.size());
-						// figure out local mintstart, maxtstop
-						tstart = *std::min_element(l_tstarts.begin(), l_tstarts.end());
-						tstop  = *std::max_element(l_tstops.begin(), l_tstops.end());
-						// figure out global mintstart and maxtstart
-						// should I have all_reduce or reduce on root?
-						mpi::all_reduce(world, tstart, mintstart, mpi::minimum<double>());
-						mpi::all_reduce(world, tstop, maxtstop, mpi::maximum<double>());
-						mpi::gather(world, tstart, All_tstarts, root);
-						mpi::gather(world, tstop, All_tstops, root);
-						// maxtstop - mintstart is in fractional mjd
-						// duration of the resultant filterbank
-						duration = 86400.0f * ( maxtstop - mintstart );
-						// write fb header logic
-						// reading f[0] lol
-						if(world.rank() == root) {
-								nbits = f[0].nbits;
-								boundcheck = fbw.Initialize(param.outfile, f[0],  duration, mintstart, nbits);
-						}
-						mpi::broadcast(world, nbits, root);
-						// figure out tstep(width)
-						tstep = param.loadsecs / f[0].tsamp;				
-						numelems = tstep * f[0].nchans;
-						nsteps = duration / param.loadsecs;
-						// create xrfi
-						excision::xRFI xrfi(excision::Method::MAD, 10.0f, 10.0f, tstep, f[0].nchans);
-						// initialize stuff
-						for(auto& xin : inptrs) xin = new float[numelems]();
-						if(world.rank() == root) outptr = new float[numelems]();
-						// timenow is current time
-						timenow = 0.0;
-						i = 0;
-						// coadd logic
-						while (true) {
-								// initialization
-								numants = 0;
-								// i is like loop index
-								mpi::broadcast(world, i, root);
-								if(i == nsteps) break;
-								// work start
-								timenow = mintstart + ( i * param.loadsecs / 86400.0f );
-								// read fbdata into inptr
-								for(int ifb = 0; ifb != f.size(); ifb++){
-										if(timenow >= f[ifb].tstart && timenow < f[ifb].tstop) {
-												i0 = ( timenow - f[ifb].tstart ) * 86400.0f / f[ifb].tsamp;
-												f[ifb].Unpack(inptrs[ifb], i0, tstep);
-												// Excision here -- begin
-											 xrfi.Excise(inptrs[ifb], excision::Filter::Zero);
-												// Excision here -- end
-										}
-										else{
-												// this only happens in the beginning hence not optimized
-												std::fill(inptrs[ifb], inptrs[ifb] + numelems, 0);
-										}
-								}
-								// local coaddition
-								// result in inptrs[0]
-								for(int ipt = 1; ipt != inptrs.size(); ipt++) {
-										PtrFloat a_in = inptrs[0];
-										PtrFloat b_in = inptrs[ipt];
+      mpi::gather(world, env.processor_name(), All_hostnames, root);
+      if(world.rank() == root) {
+        // output
+        std::cout << "Asgard::agmcoadd\n";
+        std::cout << "  will write out to " << param.outfile << std::endl;
+        std::cout << "  RFI Excision=" << param.method << std::endl;
+        std::cout << "  RFI Filter=" << param.filter << std::endl;
+        std::cout << "  tfac=" << param.tfac << "  ffac=" << param.ffac << std::endl;
+        for(int iii = 0; iii !=  All_filpathlist.size(); iii++)
+          for(auto& Sv : All_filpathlist[iii]) {
+            std::cout << " I " << Sv << " @ " << All_hostnames[iii];
+            if(All_hostnames[iii] == env.processor_name()) std::cout << "*";
+            std::cout << std::endl;
+          }
+      }
+      FilterbankList f;
+      for(auto& xpl : filpathlist) {
+        // read filterbanks into f
+        Filterbank ffb;
+        fbr.Read(ffb, xpl.string());
+        f.push_back(ffb);
+        // keep times
+        l_tstops.push_back(ffb.tstop);
+        l_tstarts.push_back(ffb.tstart);
+        // initializing data pointers
+        inptrs.push_back(nullptr);
+      }
+      assert(f.size() != 0);
+      assert(f.size() == inptrs.size());
+      // figure out local mintstart, maxtstop
+      tstart = *std::min_element(l_tstarts.begin(), l_tstarts.end());
+      tstop  = *std::max_element(l_tstops.begin(), l_tstops.end());
+      // figure out global mintstart and maxtstart
+      // should I have all_reduce or reduce on root?
+      mpi::all_reduce(world, tstart, mintstart, mpi::minimum<double>());
+      mpi::all_reduce(world, tstop, maxtstop, mpi::maximum<double>());
+      mpi::gather(world, tstart, All_tstarts, root);
+      mpi::gather(world, tstop, All_tstops, root);
+      // maxtstop - mintstart is in fractional mjd
+      // duration of the resultant filterbank
+      duration = 86400.0f * ( maxtstop - mintstart );
+      // write fb header logic
+      // reading f[0] lol
+      if(world.rank() == root) {
+        nbits = f[0].nbits;
+        boundcheck = fbw.Initialize(param.outfile, f[0],  duration, mintstart, nbits);
+      }
+      mpi::broadcast(world, nbits, root);
+      // figure out tstep(width)
+      tstep = param.loadsecs / f[0].tsamp;				
+      numelems = tstep * f[0].nchans;
+      nsteps = duration / param.loadsecs;
+      // create xrfi
+      excision::xRFI xrfi(param.method, param.tfac, param.ffac, tstep, f[0].nchans);
+      // initialize stuff
+      for(auto& xin : inptrs) xin = new float[numelems]();
+      if(world.rank() == root) outptr = new float[numelems]();
+      // timenow is current time
+      timenow = 0.0;
+      i = 0;
+      // coadd logic
+      while (true) {
+        // initialization
+        numants = 0;
+        // i is like loop index
+        mpi::broadcast(world, i, root);
+        if(i == nsteps) break;
+        // work start
+        timenow = mintstart + ( i * param.loadsecs / 86400.0f );
+        // read fbdata into inptr
+        for(int ifb = 0; ifb != f.size(); ifb++){
+          if(timenow >= f[ifb].tstart && timenow < f[ifb].tstop) {
+            i0 = ( timenow - f[ifb].tstart ) * 86400.0f / f[ifb].tsamp;
+            f[ifb].Unpack(inptrs[ifb], i0, tstep);
+            // Excision here -- begin
+            xrfi.Excise(inptrs[ifb], param.filter);
+            // Excision here -- end
+          }
+          else{
+            // this only happens in the beginning hence not optimized
+            std::fill(inptrs[ifb], inptrs[ifb] + numelems, 0);
+          }
+        }
+        // local coaddition
+        // result in inptrs[0]
+        for(int ipt = 1; ipt != inptrs.size(); ipt++) {
+          PtrFloat a_in = inptrs[0];
+          PtrFloat b_in = inptrs[ipt];
+#ifdef AGOMP
 #pragma omp parallel for
-										for(timeslice iii = 0; iii < numelems; iii++)
-												a_in[iii] += b_in[iii];
-								}
-								// actual MPI coadd call
-								mpi::reduce(world, inptrs[0], numelems, outptr, std::plus<float>(), root);
-								// divide logic
-								if(world.rank() == root) {
-										// count numant
-										for(int j = 0; j < world.size(); j++){
-												if(timenow <= All_tstops[j] && timenow >= All_tstarts[j]) numants++;
+#endif
+          for(timeslice iii = 0; iii < numelems; iii++)
+            a_in[iii] += b_in[iii];
+        }
+        // actual MPI coadd call
+        mpi::reduce(world, inptrs[0], numelems, outptr, std::plus<float>(), root);
+        // divide logic
+        if(world.rank() == root) {
+          // count numant
+          for(int j = 0; j < world.size(); j++){
+            if(timenow <= All_tstops[j] && timenow >= All_tstarts[j]) numants++;
           }
           // Excision here -- begin
-          xrfi.Excise(outptr, excision::Filter::Zero);
+          xrfi.Excise(outptr, param.filter);
           // Excision here -- end
           // write fb data logic
           fbw.WriteFBdata(outptr, boundcheck, numelems, numants);

@@ -6,9 +6,9 @@
 
 
 int main() {
-std::string filpath("/home/shining/study/MS/vLITE/mkerr/fil/fil2/20180521_183057_muos_ea12_kur.fil");
-std::string candpath("/home/shining/study/MS/vLITE/mkerr/cands/20180521_183057_muos_ea12_kur.cand");
-		CandidateJSON cj("/tmp/test");
+std::string filpath("/mnt/ssd/fildata/20190711_215217_muos_ea11_kur.fil");
+std::string candpath("/mnt/ssd/cands/20190711_215217_muos_ea11_kur.cand");
+		CandidateJSON cj("/home/vlite-master/surya/dankspace/json_Test", true);
 		FilterbankCandidate fbc(filpath, candpath);
 		cj.Write(fbc);
 		return 0;

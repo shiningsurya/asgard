@@ -27,13 +27,17 @@ void operations::TimeFreqShape(PtrFloat in, timeslice nsamps, int nchans, PtrFlo
 		std::fill(timeshape, timeshape + nsamps, 0.0f);
 		std::fill(bandshape, bandshape + nchans, 0.0f);
 		// main array
+#ifdef AGOMP
 #pragma omp parallel for collapse(2) private(idx)
+#endif
 		for(timeslice isamp = 0; isamp < nsamps; isamp++) {
 				for(int ichan = 0; ichan < nchans; ichan++) {
 						idx = isamp * nchans + ichan;
 						idx_element = in[idx];
-						bandshape[ichan] += idx_element / nchans;
-						timeshape[isamp] += idx_element / nsamps;
+						// I wasted hours on this bug. 
+						// colsum should be divided by nrows
+						bandshape[ichan] += idx_element / nsamps;
+						timeshape[isamp] += idx_element / nchans;
 				}
 		}
 }
@@ -132,11 +136,13 @@ FloatVector operations::FreqTable(float fch1, float foff, int nchans) {
 		for(int i = 0; i < nchans; i++) ret.push_back( fch1 + i * foff );
 		return ret;
 }
+#ifdef FILTERBANK_H
 FloatVector operations::FreqTable(Filterbank& f) {
 		FloatVector ret;
 		for(int i = 0; i < f.nchans; i++) ret.push_back( (float)f.fch1 + (i * (float)f.foff) );
 		return ret;
 }	
+#endif // FILTERBANK_H
 std::vector<timeslice> operations::Delays(FloatVector freqs, double dm, double tsamp) {
 		std::vector<timeslice> ret;
 		float f1 = freqs[0];

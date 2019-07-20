@@ -7,6 +7,48 @@
 namespace excision {
   enum class Method { MAD, Histogram };
   enum class Filter { No, Zero, Noise };
+  std::istream& operator>>(std::istream& in, Method& mm) {
+    std::string tok;
+    in >> tok;
+    if(tok == "1")
+      mm = Method::Histogram;
+    else
+      mm = Method::MAD;
+    return in;
+  }
+  std::istream& operator>>(std::istream& in, Filter& ff) {
+    std::string tok;
+    in >> tok;
+    if(tok == "0")
+      ff = Filter::No;
+    else if(tok == "1")
+      ff = Filter::Zero;
+    else 
+      ff = Filter::Noise;
+    return in;
+  }
+  std::ostream& operator<<(std::ostream& in, const Method& mm) {
+    if(mm == Method::MAD)
+      in << " Median Absolute Deviation";
+    else if(mm == Method::Histogram)
+      in << " Histogram";
+    return in;
+  }
+  std::ostream& operator<<(std::ostream& in, const Filter& ff) {
+    if(ff == Filter::No)
+      in << " No Filtering";
+    else if(ff == Filter::Zero)
+      in << " Zero-ing";
+    else
+      in << " WhiteNoise";
+    return in;
+  }
+  struct excisionParams {
+    Method method;
+    Filter filter;
+    float tfac;
+    float ffac;
+  };
 		struct xestimate {
 				float CentralTendency;
 				float rms;
@@ -96,6 +138,7 @@ namespace excision {
 				return ret;
 		}
 		class xRFI {
+		  using eParams = struct excisionParams;
 				private:
 						// class parameters
 						const Method method;
@@ -126,6 +169,17 @@ namespace excision {
 										bandshape = new float[nchans]();
 										timeshape = new float[wid]();
 								}
+						xRFI(const eParams& _xp, timeslice _wid, int _nchans)
+								: method(_xp.method), wid(_wid), nchans(_nchans),
+								time_factor(_xp.tfac), freq_factor(_xp.ffac),
+								mt(rd()) {
+										// flags
+										bandflags = new unsigned char[nchans];
+										timeflags = new unsigned char[wid];
+										// shapes
+										bandshape = new float[nchans]();
+										timeshape = new float[wid]();
+								}
 						~xRFI() {
 								// clear out heap-memory
 								if(bandflags != nullptr) delete[] bandflags;
@@ -148,6 +202,7 @@ namespace excision {
 										estf = excision::Histogram(bandshape, nchans, bandflags, bins, freq_factor);
 										estt = excision::Histogram(timeshape, wid, timeflags, bins, time_factor);
 								}
+								std::cout << "xRFI::Excise filter=" << _filter << std::endl;
 								// removing
 								if(_filter == Filter::Zero)
 										FilterZero(dat);
@@ -156,7 +211,9 @@ namespace excision {
 						} 
 						void FilterZero(PtrFloat dat) {
 								timeslice idx;
+#ifdef AGOMP
 #pragma omp parallel for collapse(2) private(idx)
+#endif
 								for(timeslice iwid = 0; iwid < wid; iwid++) {
 										for(int ichan = 0; ichan < nchans; ichan++) {
 												// AND or OR here .........vv
@@ -172,43 +229,22 @@ namespace excision {
 								std::normal_distribution<float> normt(estt.CentralTendency, estt.rms);
 								std::normal_distribution<float> normf(estf.CentralTendency, estf.rms);
 								timeslice idx;
+#ifdef AGOMP
 #pragma omp parallel for collapse(2) private(idx)
+#endif
 								for(timeslice iwid = 0; iwid < wid; iwid++) {
-										for(int ichan = 0; ichan < nchans; ichan++) {
-												// AND or OR here .........vv
-												if(timeflags[iwid] == 'o') {
-														idx = ( iwid * nchans ) + ichan;
-														//TODO zero out? replace by mean?
-														dat[idx] = normt(mt);
-												}
-												if(bandflags[ichan] == 'o') {
-														idx = ( iwid * nchans ) + ichan;
-														//TODO zero out? replace by mean?
-														dat[idx] = normf(mt);
-												}
-										}
-								}
-						}
-		};
-		std::istream& operator>>(std::istream& in, Method& mm) {
-				std::string tok;
-				in >> tok;
-				if(tok == "1")
-						mm = Method::Histogram;
-				else
-						mm = Method::MAD;
-				return in;
-		} 
-		std::istream& operator>>(std::istream& in, Filter& ff) {
-				std::string tok;
-				in >> tok;
-				if(tok == "0")
-						ff = Filter::No;
-				else if(tok == "1")
-						ff = Filter::Zero;
-				else
-						ff = Filter::Noise;
-				return in;
-		} 
-}
+          for(int ichan = 0; ichan < nchans; ichan++) {
+            idx = ( iwid * nchans ) + ichan;
+            // AND or OR here .........vv
+            if(timeflags[iwid] == 'o') {
+              dat[idx] = normt(mt);
+            }
+            if(bandflags[ichan] == 'o') {
+              dat[idx] = normf(mt);
+            }
+          }
+        }
+      }
+  };
+} // namespace excision
 #endif

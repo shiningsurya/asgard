@@ -39,6 +39,9 @@ class Filterbank {
 				int headersize;
 				long int datasize, totalsamp;
 				unsigned int bmin, bmax;
+#ifdef AG_RUNNING
+				FloatVector last;
+#endif 
 				// printing
 				friend std::ostream& operator<< (std::ostream& os, const Filterbank& fb);
 				// Read data
@@ -88,6 +91,24 @@ class Filterbank {
 								}
 						}
 						// return is 2d array of size td * nchans
+#ifdef AG_RUNNING
+      PtrFloat ret = fbf;
+      timeslice datasamps = nsamp * nchans;
+      timeslice lastsamps = 0;
+						// the running mean idea
+						// two pass mean, std estimate
+						float _rmean = 0.0f;
+						float _rstd = 0.0f;
+						std::for_each(ret, ret + datasamps, [&_rmean](const float& xx) { _rmean += xx; });
+//						_rmean += std::accumulate(last.begin(), last.end(), 0);
+						_rmean /= (datasamps + last.size());
+						std::for_each(ret, ret + datasamps, [&_rstd, &_rmean](const float& xx) { _rstd += pow(xx - _rmean, 2); });
+//						std::for_each(last.begin(), last.end(), [&_rstd, &_rmean](const float& xx) { _rstd += pow(xx - _rmean, 2); });
+						_rstd = sqrt(_rstd / (datasamps - 1)); // Bessel correction
+						std::cout << " reading _rmean=" <<_rmean << " _rstd=" << _rstd << std::endl;
+//						last.clear(); last.resize(lastsamps);
+//						std::copy(ret + (datasamps - lastsamps), ret + datasamps, std::back_inserter(last));
+#endif
 				}
 		private:
 				bool mmap;
@@ -337,19 +358,37 @@ class FilterbankWriter {
 				timeslice it;
 				float alpha, beta, gamma, delta;
 				int nbits;
+#ifdef AG_RUNNING
+    FloatVector last;
+#endif
 				void _copy_fbdata(PtrFloat ret, timeslice datasamps, int nant) {
-						// the running mean idea
 						float rmean = 0.0f, rstd = 0.0f;
+      rmean = 1.12f * nant;
+      rstd  = 0.92f * sqrt(nant);
+#ifdef AG_RUNNING
+      std::transform(ret, ret + datasamps, ret, [&nant](float& xx) { return xx / nant; });
+						// the running mean idea
 						// two pass mean, std estimate
-						std::for_each(ret, ret + datasamps, [&rmean](const float& xx) { rmean += xx; });
-						rmean /= datasamps;
-						std::for_each(ret, ret + datasamps, [&rstd, &rmean](const float& xx) { rstd += pow(xx - rmean, 2); });
-						rstd = sqrt(rstd / (datasamps - 1)); // Bessel correction
-						std::cout << " rmean=" << rmean << " rstd=" << rstd << std::endl;
+						timeslice lastsamps = 0;
+						float _rmean = 0.0f;
+						float _rstd = 0.0f;
+						std::for_each(ret, ret + datasamps, [&_rmean](const float& xx) { _rmean += xx; });
+//					_rmean += std::accumulate(last.begin(), last.end(), 0);
+						_rmean /= (datasamps + last.size());
+						std::for_each(ret, ret + datasamps, [&_rstd, &_rmean](const float& xx) { _rstd += pow(xx - _rmean, 2); });
+//						std::for_each(last.begin(), last.end(), [&_rstd, &_rmean](const float& xx) { _rstd += pow(xx - _rmean, 2); });
+						_rstd = sqrt(_rstd / (datasamps - 1)); // Bessel correction
+						std::cout << " Writing _rmean=" <<_rmean << " _rstd=" << _rstd << std::endl;
+						std::cout << " Writing  rmean=" << rmean << " rstd=" << rstd << std::endl;
+//						last.clear(); last.resize(lastsamps);
+//						std::copy(ret + (datasamps - lastsamps), ret + datasamps, std::back_inserter(last));
+						rmean = _rmean;
+						rstd = _rstd;
+						// I am dumb
+						// I forgot to divide by nant
+#endif
 						// writing
 						if(nbits == 2) {
-								rmean = 1.5f * nant;
-								rstd  = sqrt(nant);
 								for(timeslice i = 0; i < datasamps;) {
 										alpha = (ret[i++] - rmean) / rstd;
 										beta  = (ret[i++] - rmean) / rstd;

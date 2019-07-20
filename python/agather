@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python2.7
 # constants
 ROOT = 0
 # imports
@@ -19,8 +19,8 @@ def ParseArgs():
     add('group', help = 'Group to work on. [def=all groups]', type=str, default=None)
     # begin
     # aggreate to a file
-    add('-o', help = 'Aggregate to a CandidateSet pickle in ROOT.', dest = 'odir')
-    add('--prefix', help = 'Directory prefix.', default='/mnt/ssd/cand/', dest='prefix')
+    add('-o', help = 'Aggregate to a CandidateSet pickle in ROOT.', dest = 'odir', default='./')
+    add('--prefix', help = 'Directory prefix.', default='/mnt/ssd/', dest='prefix')
     # done
     return ap.parse_args()
 def GetAntenna(x):
@@ -35,11 +35,14 @@ def GetAntenna(x):
     toks = fname.split('_')
     if len(toks) >= 4 and ext == '.cand':
         return toks[3]
+############################
 if __name__ == '__main__':
+    args = None
     if RANK == ROOT:
         args = ParseArgs()
-        group = args.group
         print args
+    args = comm.bcast(args, root=ROOT)
+    group = args.group
     CANDROOT = os.path.join(args.prefix, 'cands')
     FILROOT  = os.path.join(args.prefix, 'fildata')
     try:
@@ -54,7 +57,8 @@ if __name__ == '__main__':
         if group:
             # this is weird case
             g_cands = cd.CandidateData(os.path.join(CANDROOT, cfiles[0]))
-            gl, gb = cs.GetGLGB(FILROOT, group)
+            if RANK == ROOT:
+						    gl, gb = cs.GetGLGB(FILROOT, group)
         else:
             # allgroup case
             lcands = [cd.CandidateData(os.path.join(CANDROOT, x)) for x in cfiles]
@@ -65,13 +69,17 @@ if __name__ == '__main__':
     else:
         # perfect world case
         g_cands = cd.CandidateData(os.path.join(CANDROOT, cfiles[0]))
-        gl, gb = cs.GetGLGB(FILROOT, group)
+        if RANK == ROOT:
+            gl, gb = cs.GetGLGB(FILROOT, group)
     # gather in ROOT
     if group:
         group_cands = comm.gather(g_cands, root=ROOT)
         if RANK == ROOT:
             candset = cs.CandidateSet(group_cands, group=group, gl=gl, gb=gb)
             filename = os.path.join(args.odir, candset.group + "_candset.pkl")
+            print "this is filename ", filename 
+            print candset
+            print candset.gl, candset.gb
             with open(filename, "wb") as f:
                 pkl.dump(candset, f)
     else:

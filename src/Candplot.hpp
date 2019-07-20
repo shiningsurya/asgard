@@ -2,7 +2,7 @@
 #include "Filterbank.hpp"
 #include "Candidate.hpp"
 #include "Operations.hpp"
-#include "FilterbankCandidate.hpp"
+#include "FilterbankCandidate.hpp" 
 #include "Plotter.hpp"
 class CandPlot : protected Plotter {
  protected:
@@ -230,6 +230,7 @@ class CandPlot : protected Plotter {
 	 do {
 		// put selection logic here
 		if(fcl.sn < 10) continue;
+		if(fcl.dm > 27 || fcl.dm < 25) continue;
 		//if(fcl.dm < 100) continue;
 		// end selection logic
 		if(count != 0) {
