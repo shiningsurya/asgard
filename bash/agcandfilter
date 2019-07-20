@@ -1,0 +1,64 @@
+#!/bin/bash
+# BASH script to filter out candidates
+# when C++, python is too hifi for the problem
+
+usage() {
+		echo "Asgard::agcandfilter"
+		echo "BASH utility to filter candidates w.r.t S/N and DM."
+		echo 
+		echo "Usage: $0 [ -h ] [-s SN_LOWER [SN_UPPER]] [-d DM_LOWER [DM_HIGHER]] [-o PATH]"
+}
+
+mightdm=false
+mightsn=false
+SN_HIGHER=1000.0
+DM_HIGHER=4000.0
+# getopt 
+while getopts ":hs:d:o:" arg
+do
+		case "$arg" in
+				"h")
+						usage
+						exit 0
+						;;
+				"o")
+						ODIR=${OPTARG}
+						;;
+				"s")
+						SN_LOWER=${OPTARG}
+						mightsn=true
+						mightdm=false
+						;;
+				"d")
+						DM_LOWER=${OPTARG}
+						mightdm=true
+						mightsn=false
+						;;
+				*)
+						if [[ mightdm -eq true ]]; then
+								DM_HIGHER=${OPTARG}
+								mightdm=false
+						elif [[ mightsn -eq true ]]; then
+								SN_HIGHER=${OPTARG}
+								mightsn=false
+						else
+								echo "!! Option not understood"
+								exit 1
+						fi
+						;;
+		esac
+done
+
+echo "--Diagnostic"
+echo "sn ${SN_LOWER} ${SN_HIGHER}"
+echo "dm ${DM_LOWER} ${DM_HIGHER}"
+echo "odir ${ODIR}"
+
+if [[ "$#" -eq 0 ]]; then
+		echo "No arguments provided!"
+		exit 0
+fi
+
+# awk
+
+# 
