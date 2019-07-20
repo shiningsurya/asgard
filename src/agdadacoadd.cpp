@@ -28,6 +28,11 @@ int main(int ac, char * av[]) {
 		bool filout;
 		unsigned int nbits;
 		uint64_t bufsz, nchans, nsamps;
+  // excision
+  float tfac, ffac;
+  excision::Method method;
+  excision::Filter filter;
+  struct excision::excisionParams xp;
 		// po
 		po::variables_map vm;
 		po::options_description opt("Options");
@@ -40,13 +45,20 @@ int main(int ac, char * av[]) {
 ("nbits,b",   po::value<unsigned int>(&nbits)->default_value(2), "nbits[def=2]")
 ("nchans,c",  po::value<uint64_t>(&nchans)->default_value(4096), "nchans[def=4096]")
 ("nsamps,n",  po::value<uint64_t>(&nsamps)->default_value(10240), "nsamps[def=10240]")
-("bufsz,s",  po::value<uint64_t>(&bufsz)->default_value(10485760), "buffer size[def=10485760]");
+("bufsz,s",  po::value<uint64_t>(&bufsz)->default_value(10485760), "buffer size[def=10485760]")
+("excision-timef,t", po::value<float>(&tfac)->default_value(5.0f),  "Time factor")
+("excision-freqf,l", po::value<float>(&ffac)->default_value(3.0f),  "Frequency factor")
+("excision-method,m", po::value<excision::Method>(&method)->default_value(excision::Method::MAD), "Excision method. def=MAD")
+("excision-filter,i", po::value<excision::Filter>(&filter)->default_value(excision::Filter::Noise), "Excision filtering. def=WhiteNoise");
 		// parsing
 		try {
 				po::store(po::command_line_parser(ac,av).options(opt).run(), vm);
 				po::notify(vm);
 				if(ac == 1 || vm.count("help")) {
-						std::cout << opt << std::endl;
+      std::cout << "Asgard::agdadacoadd MPI powered realtime coaddition" << std::endl;
+      std::cout << std::endl;
+      std::cout << opt << std::endl;
+      std::cout << "Part of Asgard" << std::endl;
 						return 0;
 				}
 		}
@@ -63,12 +75,15 @@ int main(int ac, char * av[]) {
 		if(rbufsz != bufsz) {
 				nsamps = 8 * rbufsz / nchans / nbits;
 		}
+		// excision logic
+		xp = {method, filter, tfac, ffac};
 		// key 0d to 0x
 		key_in  = dx(_key_in);
 		key_out = dx(_key_out);
 		DADACoadd  dc(
 				key_in, key_out, filout, // keys and filout
-				nsamps, nchans, nbits,          // big three
+				nsamps, nchans, nbits,   // big three
+				xp,                      // excisionParams
 				0);                      // root
 		dc.Work();
 		return 0;
