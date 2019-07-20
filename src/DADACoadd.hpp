@@ -59,17 +59,17 @@ class DADACoadd  {
     // coadder
     void coadder() {
       numobs = 0;
-      // connect to out buffer in root
-      if(world.rank() == world_root) {
-        key_out = one_two ? key_out1 : key_out2;
-        dadaout = PsrDADA(key_out, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadaout.log");
-        one_two = not one_two;
-      }
       while(++numobs) // for every observation
       {
+        // connect to out buffer in root
+        if(world.rank() == world_root) {
+          key_out = one_two ? key_out1 : key_out2;
+          dadaout = PsrDADA(key_out, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadaout.log");
+          one_two = not one_two;
+        }
         // Barrier to have all the nodes start new observation at the same time
         world.barrier();
-        std::cerr << "DADACoadd::Coadder New Obs numobs=" << numobs << " key=" << key_out << std::endl; 
+        std::cerr << "DADACoadd::Coadder New Obs numobs=" << numobs << " key=" << std::hex << key_out << std::endl; 
         PsrDADA dadain(key_in, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadain.log");
         keepgoing = false;
         incomplete = false;
@@ -83,7 +83,7 @@ class DADACoadd  {
         {
           // READING
           std::cerr << "DADACoadd::READING rank=" << world.rank() << " ridx=" << running_index; 
-          std::cerr << " key=" << key_out << std::endl;
+          std::cerr << " key=" << std::hex << key_out << std::endl;
           read_chunk = dadain.ReadData(data_f, data_b);
           // if Read header for the first time
           if(!running_index) dHead = std::move(dadain.GetHeader());
@@ -139,8 +139,8 @@ class DADACoadd  {
             if(!running_index) {
               // write out Header
               std::cerr << "DADACoadd::WRITING HEADER";
-              std::cerr << " key=" << key_out;
-              std::cerr << " rank=" << addcomm.rank() << std::endl;
+              std::cerr << " key=" << std::hex << key_out;
+              std::cerr << " rank=" << std::dec << addcomm.rank() << std::endl;
               dHead.stationid = 0;
               dadaout.SetHeader(dHead);
               dadaout.WriteHeader();
@@ -148,8 +148,8 @@ class DADACoadd  {
               if(filout) fbout.Initialize(dHead);
             }
             std::cerr << "DADACoadd::WRITING DATA";
-            std::cerr << " key=" << key_out;
-            std::cerr << " rank=" << addcomm.rank() << std::endl;
+            std::cerr << " key=" << std::hex << key_out;
+            std::cerr << " rank=" << std::dec << addcomm.rank() << std::endl;
             // RFI excision -- level 2
             std::cout << "DADACoadd::xRFI Level 2 Filter=" << eparam.filter << std::endl;
             xrfi.Excise(o_data_f, eparam.filter);
@@ -160,8 +160,8 @@ class DADACoadd  {
               fbout.Data(o_data_b, read_chunk); 
             }
             std::cerr << "DADACoadd::Running Index=" << running_index;
-            std::cerr << " key=" << key_out;
-            std::cerr << " rank=" << world.rank() << std::endl;
+            std::cerr << " key=" << std::hex << key_out;
+            std::cerr << " rank=" << std::dec << world.rank() << std::endl;
           }
           // new communicator
           addcomm = std::move(addcomm.split(keepgoing&&!incomplete));
@@ -176,13 +176,14 @@ class DADACoadd  {
         dadain.ReadLock(false);
         if(addcomm.rank() == addcomm_root) {
           dadaout.WriteLock(false);
+          dadaout.~PsrDADA();
           if(filout)
             fbout.Close();
         }
       } // for every observation
       // dada objects should be destroyed here
       // dadain goes out of scope
-      // dadaout dtor is destroyed while mov_assign is called
+      // dadaout dtor is explicitly called
       std::cout << "DADACoadd::COADDER exiting numobs=" << numobs << std::endl;
     }
   public:
