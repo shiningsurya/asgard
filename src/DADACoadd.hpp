@@ -6,6 +6,8 @@
 // xRFI
 #include "xRFI.hpp"
 using exParam = excision::excisionParams;
+// heimdall
+constexpr std::string candodir = "/mnt/ssd/cands"
 // MPI
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
@@ -51,6 +53,9 @@ class DADACoadd  {
     bool one_two; // true if dadaout1 or dadaout2
     // Filterbank Writer
     FilterbankSink fbout;
+    // Heimdall
+    Shell heimdall_sh;
+    unsigned int gpu_id;
     // debug
     unsigned int numobs;
     // xRFI
@@ -159,6 +164,13 @@ class DADACoadd  {
             if(filout) {
               fbout.Data(o_data_b, read_chunk); 
             }
+            // heimdall
+            if(running_index == 2) {
+              // only running heimdall after two writes
+              // args --> GPU_ID OUTDIR STATION_ID DADA_KEY
+              gpu_id = one_two ? 0 : 1;
+              heimdall_sh.ReadRun(true, gpu_id, candodir, dHead.station_id, key_out)
+            }
             std::cerr << "DADACoadd::Running Index=" << running_index;
             std::cerr << " key=" << key_out;
             std::cerr << " rank=" << world.rank() << std::endl;
@@ -221,6 +233,9 @@ class DADACoadd  {
             // initialize output buffers
             o_data_b = new unsigned char[bytes_chunk];
             o_data_f = new float[sample_chunk];
+            // initialize shell
+            heimdall_sh.SetFmt("/home/vlite-master/mtk/bin/heimdall -nsamps_gulp 30720 -gpu_id %d -dm 2 1000 -boxcar_max 64 -output_dir %s -group_output -zap_chans 0 190 -zap_chans 3900 4096 -beam %d -k %x -coincidencer vlite-nrl:27555 -V &> /mnt/ssd/cands/heimdall_log.asc");
+            // args --> GPU_ID OUTDIR STATION_ID DADA_KEY
           }
         }
     ~DADACoadd() {
