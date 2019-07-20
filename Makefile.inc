@@ -1,38 +1,35 @@
 # vim: ft=make
 # This is makefile include
-GCC := /home/vlite-master/surya/gcc-build
-CPP := $(GCC)/bin/g++ -std=c++11
+CPP := g++ -std=c++11 -Wno-unused-result
+SRC := /home/shining/study/MS/asgard
 DEBUG := -g
-OPTIMIZE:=# -O3
+OPTIMIZE:= -O3 -fopenmp
 LD_FLAGS := -lm 
-CPPFLAGS := $(DEBUG) $(OPTIMIZE) 
+CPPFLAGS := $(DEBUG) $(OPTIMIZE) -I$(SRC)/src -I$(SRC)/include
 #### boost
-BOOST := /home/vlite-master/surya/boost
-BOOST_INC := $(BOOST)/include
-BOOST_LIB := $(BOOST)/lib
+BOOST := 
+BOOST_INC :=
+BOOST_LIB :=
 BOOST_LD := -lboost_system -lboost_iostreams -lboost_filesystem -lboost_program_options
 #### dedisp
-DEDISP := /home/vlite-master/mtk/dedisp
-DEDISP_INC := $(DEDISP)/src
-DEDISP_LIB   := $(DEDISP)/lib
+DEDISP := /home/shining/study/MS/vLITE/dedisp
+DEDISP_INC := -I$(DEDISP)/inc
+DEDISP_LIB   := -L$(DEDISP)/lib
 DEDISP_LD := -ldedisp
+DEDISPFLAGS = $(DEDISP_INC) $(DEDISP_LIB)
 #### pgplot
-PGPLOT := /home/vlite-master/surya/pgplot
-PGPLOT_INC := $(PGPLOT)
-PGPLOT_LIB := $(PGPLOT)
-PGFORTRAN_LIB := $(GCC)/lib64
-PGPLOT_LD := -lpgplot -lcpgplot -lgfortran -lX11 -lpng
-#### png
-PNG := /home/vlite-master/surya
-PNG_INC := $(PNG)/include
-PNG_LIB := $(PNG)/lib
+PGPLOT :=
+PGPLOT_INC :=
+PGPLOT_LIB :=
+PGPLOT_LD := -lcpgplot -lpgplot -lpng
 #### MPI
-MPICPP := /home/vlite-master/surya/bin/mpic++ -std=c++11
-MPIFLAGS := -DMPI -DOMPI_SKIP_MPICXX -lboost_mpi -lboost_serialization
-#### DADA
-DADAHOME := /home/vlite-master/mtk
+MPICPP := mpic++ -std=c++11 -Wno-unused-result -g
+MPIFLAGS := -fopenmp -DOMPI_SKIP_MPICXX -DMPI -lboost_mpi -lboost_serialization
+#### PSRDADA
+DADAHOME := /home/shining/study/MS/vLITE
+DADA_LD := -lpsrdada
 #### JSON
-JSONINC := -I/home/vlite-master/surya/include
+JSONINC := /home/shining/study/MS
 ##### No user input beyond this line
 ##### No user input beyond this line
 ##### No user input beyond this line
