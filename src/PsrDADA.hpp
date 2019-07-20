@@ -515,10 +515,11 @@ class PsrDADA {
  bool Scrub() {
    return true;
  }
- uint64_t FreeBuf() const {
-   uint64_t nbufs = ipcbuf_get_nbufs( (ipcbuf_t*)hdu->data_block );
-   uint64_t fullbufs = ipcbuf_get_nfull( (ipcbuf_t*)hdu->data_block );
-   return nbufs - fullbufs;
+ uint64_t UsedDataBuf() const {
+   return ipcbuf_get_nfull( (ipcbuf_t*)hdu->data_block );
+ }
+ uint64_t UsedHeadBuf() const {
+   return ipcbuf_get_nfull( (ipcbuf_t*)hdu->header_block );
  }
  uint64_t TellRead() const {
    ipcio_t * ipc = hdu->data_block;

@@ -68,6 +68,9 @@ class DADACoadd  {
       {
         // connect to out buffer in root
         if(world.rank() == world_root) {
+          // XXX I am two minded about having a wait
+          // for heimdall_sh. 
+          // My understanding goes like there's 2 * bufflen time lag
           key_out = one_two ? key_out1 : key_out2;
           dadaout = PsrDADA(key_out, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadaout.log");
           one_two = not one_two;

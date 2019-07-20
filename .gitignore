@@ -56,7 +56,8 @@ test/testco
 test/testwl
 Makefile.inc
 tags
-test/test
+test/test*
+test/Test*.cpp
 test/testcompi
 testdada
 testrun

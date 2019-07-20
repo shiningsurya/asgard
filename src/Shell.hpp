@@ -34,6 +34,13 @@ class Shell {
 				std::cerr << "Shell::AsyncRun cmd=" << command << " run=" << ++TimesCalled << std::endl;
 		else
 				std::cerr << "Shell::SyncRun cmd=" << command << " run=" << ++TimesCalled << std::endl;
+		// if there is process running already 
+		// wait for it to end
+		if(AsyncRunning) {
+				std::cerr << "Shell::ReadRun previous command still running!" << std::endl;
+				std::cerr << "Waiting....." << std::endl;
+				Wait();
+		}
 	 // This is run
 	 command_fp = popen(command, "r");
 	 if(command_fp == nullptr) return false;
@@ -49,6 +56,7 @@ class Shell {
 	 if(AsyncRunning) {
 	 	ret = pclose(command_fp);
 	 	command_fp = nullptr;
+	 	AsyncRunning = false;
 	 }
 	 return ret;
 	}
