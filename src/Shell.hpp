@@ -1,43 +1,47 @@
 #pragma once
 #include <asgard.hpp>
-#include <sstream>
+#include <cstdarg>
 
+constexpr size_t MAX_CMD = 256;
 class Shell {
  private:
  	bool AsyncRunning;
  	unsigned int TimesCalled;
- 	char  command[256];
+ 	char  command[MAX_CMD], command_format[MAX_CMD];
  	FILE * command_fp;
  public:
-	Shell(const std::stringstream& ss) {
-	 // initialize counter
-	 TimesCalled = 0;
+		Shell() {
+		TimesCalled = 0;
 	 AsyncRunning = false;
-	 strcpy(command, ss.str().c_str());
 	 command_fp = nullptr;
-	 std::cerr << "Shell::ctor cmd=" << command << std::endl;
-	}
+		}
+		void SetFmt(const char * cmd) {
+				strcpy(command_format, cmd);
+		}
 	Shell(const char * cmd) {
 	 // initialize counter
 	 TimesCalled = 0;
 	 AsyncRunning = false;
-	 strcpy(command, cmd);
+	 strcpy(command_format, cmd);
 	 command_fp = nullptr;
-	 std::cerr << "Shell::ctor cmd=" << command << std::endl;
+	 std::cerr << "Shell::ctor cmdfmt=" << command_format << std::endl;
 	}
-	bool SyncRun() {
-	 // This is blocking run
+	bool ReadRun(bool _async, ...) {
+		va_list args; va_start(args, _async);
+		std::vsnprintf(command, MAX_CMD, command_format, args);
+		va_end(args);
+		if(_async) 
+				std::cerr << "Shell::AsyncRun cmd=" << command << " run=" << ++TimesCalled << std::endl;
+		else
+				std::cerr << "Shell::SyncRun cmd=" << command << " run=" << ++TimesCalled << std::endl;
+	 // This is run
 	 command_fp = popen(command, "r");
-	 std::cerr << "Shell::SyncRun run=" << TimesCalled++ << std::endl;
-	 return pclose(command_fp);
-	}
-	bool AsyncRun() {
-	 // This is non blocking run
-	 command_fp = popen(command, "r");
-	 if(command_fp == NULL) return false;
-	 std::cerr << "Shell::AsyncRun run=" << TimesCalled++ << std::endl;
-	 AsyncRunning = true;
-	 return true;
+	 if(command_fp == nullptr) return false;
+	 AsyncRunning = _async;
+	 if(_async)
+	 		return true;
+		else
+				return pclose(command_fp);
 	}
 	bool Wait() {
 	 bool ret=true;
