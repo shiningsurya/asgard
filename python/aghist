@@ -44,17 +44,21 @@ if __name__ == "__main__":
                 bits, counts = unique(read.ravel(), return_counts=True)
                 counts = 1.0 * counts / counts.sum()
                 # scaling
+                mm = counts.max()
                 fac = counts.max() - counts.min()
                 counts = counts - counts.min()
-                counts = counts / fac
+                if fac:
+                    counts = counts / fac
+                else:
+                    counts[:] = 1.0 * mm / (len(bits))
                 for b, c in zip(bits, counts):
                     bcount[brange == b] = c
                 # plot
-                plt.barh(brange+1, bcount, left=i, color='b')
+                plt.barh(brange, bcount, left=i, color='b')
                 # txt
                 for j in brange:
                     if fil.nbits < 8:
-                        plt.text(i + bcount[j] + 0.05, brange[j] + 2, "{0:2.1f}%".format(100*bcount[j]), fontsize='x-small', fontweight='ultralight')
+                        plt.text(i + bcount[j] + 0.05, brange[j], "{0:2.1f}%".format(100*bcount[j]), fontsize='x-small', fontweight='light')
                 gc.collect()
             # plot labels
             plt.ylabel('Sample')
@@ -67,7 +71,7 @@ if __name__ == "__main__":
             if fil.nbits > 2:
                 plt.yticks(brange[::5]+1.5, map(lambda xx: "{0:02d}".format(xx),brange[::5]))
             else:
-                plt.yticks(brange+1.5, map(lambda xx: "{0:02d}".format(xx),brange))
+                plt.yticks(brange+0.5, map(lambda xx: "{0:02d}".format(xx),brange))
             plt.xticks(rn)
             pdf.savefig()
             plt.close()

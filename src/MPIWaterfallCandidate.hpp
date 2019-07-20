@@ -198,8 +198,11 @@ class MPIWaterfallCandidate : protected Plotter, MPIBase {
 				float peak_time = o_calist_pt[iiant][ii];
 				float dm = o_calist_dm[iiant][ii];
 				float sn = o_calist_sn[iiant][ii];
+				// selection logic here -- begin
 				if(peak_time < axis[0] || peak_time >= axis[1]) continue;
-				if(sn < 10) continue;
+				//if(sn < 10) continue;
+				if(dm < 25 || dm > 27) continue;
+				// selection logic here -- end
 				// this c can be plotted
 				float cid = ( peak_time - axis[0] ) / timestep;
 				if(cid < 0 || cid > 1.0f) continue;

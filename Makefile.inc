@@ -30,3 +30,15 @@ DADAHOME := /home/shining/study/MS/vLITE
 DADA_LD := -lpsrdada
 #### JSON
 JSONINC := /home/shining/study/MS
+##### No user input beyond this line
+##### No user input beyond this line
+##### No user input beyond this line
+CPPFLAGS +=  -Wno-deprecated-declarations
+CPPFLAGS += -I. -Itest/ -Isrc/
+CPPFLAGS += -Wl,-rpath=$(GCC)/lib64
+BOOSTFLAGS := -I$(BOOST_INC) -L$(BOOST_LIB) -Wl,-rpath=$(BOOST_LIB) 
+DEDISPFLAGS := -I$(DEDISP_INC) -L$(DEDISP_LIB) -Wl,-rpath=$(DEDISP_LIB)
+PGPLOTFLAGS := -I$(PGPLOT_INC) -L$(PGPLOT_LIB) -Wl,-rpath=$(PGPLOT_LIB)
+PGPLOTFLAGS += -L$(PGFORTRAN_LIB) -Wl,-rpath=$(PGFORTRAN_LIB)
+PGPLOTFLAGS += -L$(PNG_LIB) -Wl,-rpath=$(PNG_LIB)
+DADAFLAGS := -I$(DADAHOME)/include -L$(DADAHOME)/lib -lpsrdada

@@ -17,7 +17,7 @@ int main(int ac, char * av[]) {
  bool kur, wplot;
  float loadsecs;
  StringVector groups;
- std::string dodir("/home/vlite-master/surya/dankspace/"), odir, dpre("/mnt/ssd/fildata/"), prefix;
+ std::string dodir("/home/vlite-master/surya/dankspace/"), odir, dpre("/mnt/ssd/"), prefix;
  std::string ekpng("kur_waterfall.png/png"), epng("waterfall.png/png");
  std::string outfile;
  // po

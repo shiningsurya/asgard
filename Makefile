@@ -45,11 +45,33 @@ testcc: src/*.hpp src/*.cpp
 	$(CPP) test/TestColorC.C $(CPPFLAGS) -o test/$@ $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(DEDISP_LIB) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
 testsh: src/*.hpp src/*.cpp
 	$(CPP) test/TestShell.cpp $(CPPFLAGS) -o test/$@ $(BOOST_LD) $(PGPLOT_LD) $(DEDISP_INC) $(DEDISP_LIB) $(BOOST_LD) $(LD_FLAGS) $(DEDISP_LD) 
+testcjson: ./test/TestCJSON.cpp
+	$(CPP) ./test/TestCJSON.cpp $(CPPFLAGS) $(JSONINC) $(DEDISPFLAGS) $(BOOSTFLAGS) -o test/$@  $(DEDISP_LD) $(BOOST_LD)
+testdain: ./test/TestDAIN.cpp
+	$(CPP) ./test/TestDAIN.cpp $(CPPFLAGS) $(DADAFLAGS) $(BOOST_LD)  -o test/$@ 
+	cp test/$@ /home/vlite-master/surya/bin/
+testdaout: ./test/TestDAOUT.cpp
+	$(CPP) ./test/TestDAOUT.cpp $(CPPFLAGS) $(DADAFLAGS) $(BOOST_LD)  -o test/$@ 
+testdaco: ./test/TestDADACoadd.cpp
+	$(MPICPP) ./test/TestDADACoadd.cpp $(CPPFLAGS) $(BOOSTFLAGS) $(MPIFLAGS) $(DADAFLAGS) $(BOOST_LD) -o test/$@ 
+testmplot: 
+	$(MPICPP) test/TestMPlot.cpp $(CPPFLAGS) $(BOOSTFLAGS) $(MPIFLAGS) $(PGPLOTFLAGS) $(BOOST_LD) -o bin/$@ $(PGPLOT_LD)
 ###########################################
+agdadacoadd: ./src/agdadacoadd.cpp
+	$(MPICPP) src/agdadacoadd.cpp $(CPPFLAGS) $(BOOSTFLAGS) $(MPIFLAGS) $(DADAFLAGS) $(BOOST_LD) -o bin/$@ 
+	cp bin/$@ /home/vlite-master/surya/bin/
+agmplot: ./src/agmplot.cpp
+	$(MPICPP) src/agmplot.cpp $(CPPFLAGS) $(BOOSTFLAGS) $(MPIFLAGS) $(PGPLOTFLAGS) $(BOOST_LD) -o bin/$@ $(PGPLOT_LD)
+agmcoadd: ./src/agmcoadd.cpp
+	$(MPICPP) src/agmcoadd.cpp $(CPPFLAGS) $(BOOSTFLAGS) $(MPIFLAGS) $(BOOST_LD) -o bin/$@ $(PGPLOT_LD)
 agstat: src/*.hpp
 	$(CPP) src/agstat.cpp $(CPPFLAGS) $(BOOSTFLAGS) -o bin/$@ $(BOOST_LD) $(LD_FLAGS)
+agheader: src/*.hpp
+	$(CPP) src/agheader.cpp $(CPPFLAGS) $(BOOSTFLAGS) -o bin/$@ $(BOOST_LD) $(LD_FLAGS)
 agcandplot: src/*.hpp
 	$(CPP) src/agcandplot.cpp $(CPPFLAGS) $(PGPLOTFLAGS) $(DEDISPFLAGS) $(BOOSTFLAGS) -o bin/$@ $(BOOST_LD) $(DEDISP_LD) $(PGPLOT_LD) $(LD_FLAGS)
+agcjson: src/*.hpp
+	$(CPP) src/agcjson.cpp $(CPPFLAGS) $(JSONINC) $(DEDISPFLAGS) $(BOOSTFLAGS) -o bin/$@ $(BOOST_LD) $(DEDISP_LD) $(LD_FLAGS)
 agplot: src/*.hpp
 	$(CPP) src/agplot.cpp $(CPPFLAGS) $(PGPLOTFLAGS) $(BOOSTFLAGS) -o bin/$@ $(BOOST_LD) $(PGPLOT_LD) $(LD_FLAGS)
 agcoadd: src/*.hpp
