@@ -25,7 +25,7 @@ int main(int ac, char * av[]) {
 		key_t key_in, key_out;
 		std::string _key_in, _key_out;
 		std::string _dkin("56"), _dkout("60");
-		bool filout;
+		bool filout, heimdall_op;
 		unsigned int nbits;
 		uint64_t bufsz, nchans, nsamps;
   // excision

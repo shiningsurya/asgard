@@ -1,0 +1,36 @@
+#!/usr/bin/python
+### constants begin
+### constants end
+'''
+agcand:
+[ ] To create PDF of candidate plots using agcandplot.
+[ ] To apply filters on candidates before generating candidateplots.
+[ ] To extract candidate files for ML usage.
+'''
+
+import os
+import sys
+def ParseArgs():
+ import argparse
+ '''For argument parsing'''
+ ap = argparse.ArgumentParser(prog='agcand', description='Asgard tool for candidate plotting, filtering, reduced data products.', epilog='Part of Asgard')
+ add = ap.add_argument
+ # begin
+ # candidate file
+ add('-C', help = 'Candidate file.', dest = 'cand')
+ # filterbank file
+ add('-F', help = 'Filterbank file.', dest='fil')
+ # plot 
+ add('-p', help = 'Name of the pdf. [default=group]', dest = 'plot', default=None)
+ # S/N filtering
+ add('--sn', help = 'S/N filter.', dest='sncut', default=10)
+ # DM filtering
+ add('--dm', help = 'DM filter.', dest='dmcut', default=100)
+ # misc options
+ add('--temp', help='Temp directory', dest='temp', default='/tmp')
+ return ap.parse_args()
+
+if __name__ == '__main__':
+ args = ParseArgs()
+
+

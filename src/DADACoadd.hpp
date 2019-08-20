@@ -6,8 +6,6 @@
 // xRFI
 #include "xRFI.hpp"
 using exParam = excision::excisionParams;
-// heimdall
-constexpr std::string candodir = "/mnt/ssd/cands"
 // MPI
 #include <boost/mpi/environment.hpp>
 #include <boost/mpi/communicator.hpp>
@@ -23,18 +21,18 @@ class DADACoadd  {
     mpi::communicator addcomm;
     uint64_t running_index;
     std::vector<uint64_t> vec_rindex;
-    // data voting
-    bool vote;
-    unsigned int numants_votes;
     // DADA
     key_t key_in, key_out1, key_out2, key_out;
+    unsigned int dkey_out1, dkey_out2, dkey_out;
     bool filout;
-    bool inswitch;
-    bool keepgoing;
-    bool incomplete;
+    int incomplete;
+    int eod;
+    int red_eod, red_incomplete;
+    bool force_iteration;
     // three important numbers
     timeslice nsamps;
     int nchans, nbits;
+    int fb_nbits;
     // stride numbers
     timeslice sample_stride;
     // bytes chunk
@@ -47,15 +45,11 @@ class DADACoadd  {
     PtrFloat o_data_f;
     PtrByte data_b;
     PtrByte o_data_b;
-    struct Header dHead;
+    struct Header dHead, oldheader;
     // Output DADA objects
     PsrDADA dadaout;
-    bool one_two; // true if dadaout1 or dadaout2
     // Filterbank Writer
     FilterbankSink fbout;
-    // Heimdall
-    Shell heimdall_sh;
-    unsigned int gpu_id;
     // debug
     unsigned int numobs;
     // xRFI
@@ -64,61 +58,60 @@ class DADACoadd  {
     // coadder
     void coadder() {
       numobs = 0;
+      key_out = key_out1;
       while(++numobs) // for every observation
       {
         // connect to out buffer in root
         if(world.rank() == world_root) {
-          // XXX I am two minded about having a wait
-          // for heimdall_sh. 
-          // My understanding goes like there's 2 * bufflen time lag
-          key_out = one_two ? key_out1 : key_out2;
           dadaout = PsrDADA(key_out, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadaout.log");
-          one_two = not one_two;
         }
         // Barrier to have all the nodes start new observation at the same time
         world.barrier();
         std::cerr << "DADACoadd::Coadder New Obs numobs=" << numobs << " key=" << std::hex << key_out << std::endl; 
         PsrDADA dadain(key_in, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadain.log");
-        keepgoing = false;
-        incomplete = false;
+        // default to true for logic to go into read-header
+        eod = 1;
+        incomplete = 1;
         running_index = 0;
+        force_iteration = false;
         dadain.ReadLock(true);
         if(world.rank() == world_root) dadaout.WriteLock(true);
         // assume for the beginning everyone is participating
-        vote = true;
         addcomm = std::move(world.split(true));
-        while (  keepgoing  ||  dadain.ReadHeader()  ) // for stretch of observation 
+        oldheader = dadain.GetHeader();
+        while (  (!eod && !incomplete) ||  dadain.ReadHeader()  ) // for stretch of observation 
         {
           // READING
           std::cerr << "DADACoadd::READING rank=" << world.rank() << " ridx=" << running_index; 
           std::cerr << " key=" << std::hex << key_out << std::endl;
           read_chunk = dadain.ReadData(data_f, data_b);
           // if Read header for the first time
-          if(!running_index) dHead = std::move(dadain.GetHeader());
-          if(!running_index) dadain.PrintHeader();
+          if(!running_index) {
+            dHead = std::move(dadain.GetHeader());
+            dadain.PrintHeader();
+          }
           if( read_chunk == -1 ) {
             // fill zeros because read failed
             // EOD read fail
             std::fill(data_f, data_f + sample_chunk, 0.0f);
-            vote = false;
-            // reset counter
-            keepgoing = false;
-            // begin new observation
-            break;
+            // log
+            std::cerr << "DADACoadd::EOD node=" << env.processor_name() << " ridx=" << running_index; 
+            eod = 1;
+            incomplete = 0;
           }
           else if( read_chunk < bytes_chunk) {
             // fill zeros at the end
             std::fill(data_f + sample_chunk - (read_chunk * 8 / nbits), data_f + sample_chunk, 0.0f);
-            vote = true;
             // reset counter
-            keepgoing = false;
-            incomplete = true;
+            incomplete = 1;
+            eod = 0;
+            // log
+            std::cerr << "DADACoadd::Incomplete node=" << env.processor_name() << " ridx=" << running_index; 
           }
           else if( read_chunk == bytes_chunk) {
             // perfect world case
-            vote = true;
-            keepgoing = true;
-            incomplete = false;
+            eod = 0;
+            incomplete = 0;
           }
           // sanity checks like local indices are same
           mpi::gather(addcomm, running_index, vec_rindex, addcomm_root);
@@ -132,13 +125,53 @@ class DADACoadd  {
             std::cerr << "DADACoadd::syncheck #2 MAJOR ERROR!" << std::endl;
             std::cerr << "Abort! Abort! Abort!" << std::endl;
           }
+          // sanity checks -- incomplete and eod
+          mpi::reduce(addcomm, incomplete, red_incomplete,std::plus<int>(), addcomm_root);
+          mpi::reduce(addcomm, eod, red_eod, std::plus<int>(), addcomm_root);
+          if(addcomm.rank() == addcomm_root) {
+            // create accumulates
+            if(red_eod != 0 || red_eod != addcomm.size()) {
+              // eod is not uniform
+              std::cerr << "DADACoadd::EOD out of sync eod=" << std::dec << red_eod  << std::endl;
+              // EOD out of sync is already taken care of
+              // a new communicator is created 
+            }
+            if(red_incomplete != 0 || red_incomplete != addcomm.size()) {
+              // incomplete is not uniform
+              std::cerr << "DADACoadd::INCOMPLETE out of sync incomplete=" << std::dec << red_incomplete << std::endl;
+              // This is very dicey. This is mysterious. 
+              // Current approach is conservative
+              //force_iteration = true;
+            }
+            else {
+              force_iteration = false;
+            }
+          }
+          mpi::broadcast(addcomm, force_iteration, addcomm_root);
+#if 0
+          // gather  keepgoing
+          // keepgoing = false if EOD || INCOMPLETE
+          // incomplete = true if INCOMPLETE
+          // eod = true if EOD
+          // -------------------------------------------------------
+          // like # data reads in dadain == # writes in dadaout
+          // ^ this seems like super stringent
+          // sanity checks like local indices are same
+          mpi::gather(addcomm, running_index, vec_rindex, addcomm_root);
+          uint64_t ridx = running_index;
+          if(std::all_of( vec_rindex.cbegin(), vec_rindex.cend(), [&ridx] (uint64_t i) { return i == ridx;})) {
+            // reset vec_rindex for future use
+            vec_rindex.clear();
+          }
+          else {
+            std::cerr << "DADACoadd::syncheck #2 failed!" << std::endl;
+            std::cerr << "DADACoadd::syncheck #2 MAJOR ERROR!" << std::endl;
+            std::cerr << "Abort! Abort! Abort!" << std::endl;
+          }
+#endif
           // RFI excision -- level 1
           std::cout << "DADACoadd::xRFI Level 1 Filter=" << eparam.filter << std::endl;
           xrfi.Excise(data_f, eparam.filter);
-#if 0
-          // like # data reads in dadain == # writes in dadaout
-          // ^ this seems like super stringent
-#endif
           // actual MPI coadd call
           mpi::reduce(addcomm, data_f, sample_chunk, o_data_f, std::plus<float>(), addcomm_root);
           // WRITING
@@ -149,11 +182,11 @@ class DADACoadd  {
               std::cerr << "DADACoadd::WRITING HEADER";
               std::cerr << " key=" << std::hex << key_out;
               std::cerr << " rank=" << std::dec << addcomm.rank() << std::endl;
-              dHead.stationid = 0;
+              dHead.stationid = 99;
               dadaout.SetHeader(dHead);
               dadaout.WriteHeader();
               // Filterbank Initialize
-              if(filout) fbout.Initialize(dHead);
+              if(filout) fbout.Initialize(dHead, fb_nbits);
             }
             std::cerr << "DADACoadd::WRITING DATA";
             std::cerr << " key=" << std::hex << key_out;
@@ -165,28 +198,25 @@ class DADACoadd  {
             dadaout.WriteData(o_data_f, o_data_b, addcomm.size());
             // Filterbankwrite
             if(filout) {
-              fbout.Data(o_data_b, read_chunk); 
-            }
-            // heimdall
-            if(running_index == 2) {
-              // only running heimdall after two writes
-              // args --> GPU_ID OUTDIR STATION_ID DADA_KEY
-              gpu_id = one_two ? 0 : 1;
-              heimdall_sh.ReadRun(true, gpu_id, candodir, dHead.station_id, key_out)
+              dadaout.Redigitize(o_data_f, o_data_b, fb_nbits, addcomm.size());
+              fbout.Data(o_data_b, read_chunk * fb_nbits / nbits); 
             }
             std::cerr << "DADACoadd::Running Index=" << running_index;
             std::cerr << " key=" << std::hex << key_out;
             std::cerr << " rank=" << std::dec << world.rank() << std::endl;
           }
           // new communicator
-          addcomm = std::move(addcomm.split(keepgoing&&!incomplete));
+          addcomm = std::move(addcomm.split(!eod||!incomplete));
           // root resolution and broadcasting
           if(world.rank() == world_root) {
             addcomm_root = addcomm.rank();
           }
           mpi::broadcast(world, addcomm_root, world_root);
+          if( (eod || incomplete) && !force_iteration) {
+            // begin new observation
+            break;
+          }
           running_index++;
-          if(incomplete) break;
         } // for stretch of observation
         dadain.ReadLock(false);
         if(addcomm.rank() == addcomm_root) {
@@ -214,11 +244,11 @@ class DADACoadd  {
         key_in(key_in_), 
         key_out1(key_out_),
         key_out2(key_out_ + 2),
-        one_two(true),
         filout(filout_),
         nsamps(nsamps_),
         nchans(nchans_),
         nbits(nbits_),
+        fb_nbits(2),
         eparam(_xp),
         xrfi(eparam, nsamps, nchans),
         running_index(0),
@@ -237,9 +267,6 @@ class DADACoadd  {
             // initialize output buffers
             o_data_b = new unsigned char[bytes_chunk];
             o_data_f = new float[sample_chunk];
-            // initialize shell
-            heimdall_sh.SetFmt("/home/vlite-master/mtk/bin/heimdall -nsamps_gulp 30720 -gpu_id %d -dm 2 1000 -boxcar_max 64 -output_dir %s -group_output -zap_chans 0 190 -zap_chans 3900 4096 -beam %d -k %x -coincidencer vlite-nrl:27555 -V &> /mnt/ssd/cands/heimdall_log.asc");
-            // args --> GPU_ID OUTDIR STATION_ID DADA_KEY
           }
         }
     ~DADACoadd() {

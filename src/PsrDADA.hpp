@@ -340,14 +340,14 @@ class PsrDADA {
    if(data == nullptr) data = new float[nsamps_read * nchans];
    if(chunk_read != bytes_chunk)
      std::cerr << "PsrDADA::ReadData read " 
-       << chunk_read 
+       << std::dec << chunk_read 
        << " bytes while expected "
        << bytes_chunk
        << " bytes."
        << std::endl;
    if(nsamps_read != nsamps)
      std::cerr << "PsrDADA::ReadData read " 
-       << nsamps_read 
+       << std::dec << nsamps_read 
        << " samples while expected "
        << nsamps
        << " samples."
@@ -513,13 +513,33 @@ class PsrDADA {
    return true;
  }
  bool Scrub() {
+   timeslice chunk_read;
+   PtrByte  b = new unsigned char[bytes_chunk];
+   multilog(log,LOG_INFO,"PsrDADA::Scrub key=%x called\n",dada_key);
+   // second attack on headerbuff
+   while(UsedHeadBuf()) {
+     header = ipcbuf_get_next_read(hdu->header_block, &header_size);
+     ipcbuf_mark_cleared( (ipcbuf_t*) hdu->header_block );
+   }
+   // first attack on databuff
+   while(UsedDataBuf()) {
+     do{
+       chunk_read = ipcio_read(hdu->data_block, (char*)b, bytes_chunk);
+     } while( !ipcbuf_eod( (ipcbuf_t*)hdu->data_block ) );
+   }
+   multilog(log,LOG_INFO,"PsrDADA::Scrub key=%x buffers cleared\n",dada_key);
+   delete[] b;
    return true;
  }
  uint64_t UsedDataBuf() const {
-   return ipcbuf_get_nfull( (ipcbuf_t*)hdu->data_block );
+   auto x = ipcbuf_get_nfull( (ipcbuf_t*)hdu->data_block );
+   multilog(log,LOG_INFO,"PsrDADA::UsedData key=%x buffers=%" PRIu64  "\n",dada_key, x);
+   return x;
  }
  uint64_t UsedHeadBuf() const {
-   return ipcbuf_get_nfull( (ipcbuf_t*)hdu->header_block );
+   auto x = ipcbuf_get_nfull( (ipcbuf_t*)hdu->header_block );
+   multilog(log,LOG_INFO,"PsrDADA::UsedHead key=%x buffers=%" PRIu64  "\n",dada_key, x);
+   return x;
  }
  uint64_t TellRead() const {
    ipcio_t * ipc = hdu->data_block;
@@ -550,6 +570,13 @@ class PsrDADA {
    }
 
    return current + ipc->bytes;
+ }
+ bool Redigitize(PtrFloat data, PtrByte packout, int out_nbits, int nants) {
+  auto old_nbits = nbits;
+  nbits = out_nbits;
+  pack(data, nants, sample_chunk, packout);
+  nbits = old_nbits;
+  return true;
  }
 };
 // static variable initialization

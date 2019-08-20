@@ -25,6 +25,7 @@ int main(int ac, char * av[]){
 				("files,f", po::value<PathList>(&files)->composing(), "Filterbank file(s).")
 				("unpack,u", po::value<timeslice>(&unpack), "Data sample requested.")
 				("src,s", po::bool_switch()->default_value(false), "print src_raj/src_dej.")
+				("name,n", po::bool_switch()->default_value(false), "print source_name.")
 				("group,Q", po::bool_switch()->default_value(false), "prints group in first column.")
 				("help,h", "Prints help");
 		opd.add("files",-1);
@@ -55,6 +56,10 @@ int main(int ac, char * av[]){
 				else if(vm["src"].as<bool>()) {
 						if(vm.count("group")) std::cout << fb.group << "\t";
 						std::cout << fb.src_raj << "\t" << fb.src_dej << std::endl;
+				}
+				else if(vm["name"].as<bool>()) {
+						if(vm.count("group")) std::cout << fb.group << "\t";
+						std::cout << fb.source_name << "\t" << fb.duration << std::endl;
 				}
 				else {
 						std::cout << fb;
