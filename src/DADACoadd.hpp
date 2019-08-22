@@ -11,27 +11,32 @@ using exParam = excision::excisionParams;
 #include <boost/mpi/communicator.hpp>
 #include <boost/mpi/collectives.hpp>
 #include <boost/mpi/operations.hpp>
+// for max precision printing
+#include <iomanip>
+#include <limits>
+#include <set>
+
 namespace mpi = boost::mpi;
 class DADACoadd  {
   private:
     // MPI
-    int world_root, addcomm_root;
+    int world_root;
     mpi::environment env;
     mpi::communicator world;
-    mpi::communicator addcomm;
     uint64_t running_index;
-    std::vector<uint64_t> vec_rindex;
+    unsigned int numants, yes, no;
+    bool participate;
     // DADA
     key_t key_in, key_out1, key_out2, key_out;
     unsigned int dkey_out1, dkey_out2, dkey_out;
     bool filout;
-    int incomplete;
-    int eod;
-    int red_eod, red_incomplete;
-    bool force_iteration;
+    int incomplete, eod;
     // three important numbers
     timeslice nsamps;
     int nchans, nbits;
+    double ctime, rtime;
+    int double_maxprecision;
+    std::vector<double> vec_ctime;
     int fb_nbits;
     // stride numbers
     timeslice sample_stride;
@@ -42,7 +47,7 @@ class DADACoadd  {
     timeslice read_chunk;
     // Buffers
     PtrFloat data_f;
-    PtrFloat o_data_f;
+    PtrFloat o_data_f, zero_data_f;
     PtrByte data_b;
     PtrByte o_data_b;
     struct Header dHead, oldheader;
@@ -65,20 +70,18 @@ class DADACoadd  {
         if(world.rank() == world_root) {
           dadaout = PsrDADA(key_out, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadaout.log");
         }
-        // Barrier to have all the nodes start new observation at the same time
-        world.barrier();
         std::cerr << "DADACoadd::Coadder New Obs numobs=" << numobs << " key=" << std::hex << key_out << std::endl; 
         PsrDADA dadain(key_in, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadain.log");
         // default to true for logic to go into read-header
         eod = 1;
         incomplete = 1;
         running_index = 0;
-        force_iteration = false;
         dadain.ReadLock(true);
         if(world.rank() == world_root) dadaout.WriteLock(true);
         // assume for the beginning everyone is participating
-        addcomm = std::move(world.split(true));
-        oldheader = dadain.GetHeader();
+        // addcomm = std::move(world.split(true));
+        // all nodes must be in sync
+        oldheader = dHead;
         while (  (!eod && !incomplete) ||  dadain.ReadHeader()  ) // for stretch of observation 
         {
           // READING
@@ -114,74 +117,52 @@ class DADACoadd  {
             incomplete = 0;
           }
           // sanity checks like local indices are same
-          mpi::gather(addcomm, running_index, vec_rindex, addcomm_root);
-          uint64_t ridx = running_index;
-          if(std::all_of( vec_rindex.cbegin(), vec_rindex.cend(), [&ridx] (uint64_t i) { return i == ridx;})) {
-            // reset vec_rindex for future use
-            vec_rindex.clear();
-          }
-          else {
-            std::cerr << "DADACoadd::syncheck #2 failed!" << std::endl;
-            std::cerr << "DADACoadd::syncheck #2 MAJOR ERROR!" << std::endl;
-            std::cerr << "Abort! Abort! Abort!" << std::endl;
-          }
-          // sanity checks -- incomplete and eod
-          mpi::reduce(addcomm, incomplete, red_incomplete,std::plus<int>(), addcomm_root);
-          mpi::reduce(addcomm, eod, red_eod, std::plus<int>(), addcomm_root);
-          if(addcomm.rank() == addcomm_root) {
-            // create accumulates
-            if(red_eod != 0 || red_eod != addcomm.size()) {
-              // eod is not uniform
-              std::cerr << "DADACoadd::EOD out of sync eod=" << std::dec << red_eod  << std::endl;
-              // EOD out of sync is already taken care of
-              // a new communicator is created 
-            }
-            if(red_incomplete != 0 || red_incomplete != addcomm.size()) {
-              // incomplete is not uniform
-              std::cerr << "DADACoadd::INCOMPLETE out of sync incomplete=" << std::dec << red_incomplete << std::endl;
-              // This is very dicey. This is mysterious. 
-              // Current approach is conservative
-              //force_iteration = true;
+          ctime = dHead.tstart + (running_index * nsamps * dHead.tsamp * 1E-6f / 86400.f);
+          std::cout << "DADACoadd::Coadder ctime=" << std::dec << std::setprecision(double_maxprecision)<< ctime;
+          std::cout << " rank=" << std::setprecision(6) << world.rank() << std::endl;
+          // BARRIER
+          mpi::gather(world, ctime, vec_ctime, world_root);
+          if (world.rank() == world_root) {
+            std::set<double> rtime (vec_ctime.begin(), vec_ctime.end());
+            if( rtime.size() == 1 ) {
+              // reset vec_rindex for future use
+              vec_ctime.clear();
+              participate = true;
             }
             else {
-              force_iteration = false;
+              // loose hell
+              std::cerr << "DADACoadd::syncheck #1 failed!" << std::endl;
+              std::cerr << "Abort!" << std::endl;
+              int i_ = 0;
+              for (auto k_ : rtime) {
+                std::cerr << "\trtime["<< std::dec << i_++ << "]="; 
+                std::cerr << std::setprecision(double_maxprecision) << k_ << std::endl;
+                std::cerr << std::setprecision(6);
+              }
+              participate = false;
             }
           }
-          mpi::broadcast(addcomm, force_iteration, addcomm_root);
-#if 0
-          // gather  keepgoing
-          // keepgoing = false if EOD || INCOMPLETE
-          // incomplete = true if INCOMPLETE
-          // eod = true if EOD
-          // -------------------------------------------------------
-          // like # data reads in dadain == # writes in dadaout
-          // ^ this seems like super stringent
-          // sanity checks like local indices are same
-          mpi::gather(addcomm, running_index, vec_rindex, addcomm_root);
-          uint64_t ridx = running_index;
-          if(std::all_of( vec_rindex.cbegin(), vec_rindex.cend(), [&ridx] (uint64_t i) { return i == ridx;})) {
-            // reset vec_rindex for future use
-            vec_rindex.clear();
-          }
-          else {
-            std::cerr << "DADACoadd::syncheck #2 failed!" << std::endl;
-            std::cerr << "DADACoadd::syncheck #2 MAJOR ERROR!" << std::endl;
-            std::cerr << "Abort! Abort! Abort!" << std::endl;
-          }
-#endif
           // RFI excision -- level 1
-          std::cout << "DADACoadd::xRFI Level 1 Filter=" << eparam.filter << std::endl;
           xrfi.Excise(data_f, eparam.filter);
-          // actual MPI coadd call
-          mpi::reduce(addcomm, data_f, sample_chunk, o_data_f, std::plus<float>(), addcomm_root);
+          // actual MPI coadd call -- BARRIER
+          rtime = ctime;
+          mpi::broadcast (world, rtime, world_root);
+          participate = ctime == rtime;
+          if (!participate) {
+            std::cerr << "DADACoadd::Coadder not participating" << std::endl;
+            std::cerr << "My   ctime=" << std::setprecision(double_maxprecision) << ctime << std::endl;
+            std::cerr << "Root ctime=" << std::setprecision(double_maxprecision) << rtime << std::endl;
+          }
+          mpi::reduce(world, participate ? yes : no, numants, std::plus<unsigned int>(), world_root);
+          mpi::reduce(world, participate ? data_f : zero_data_f, sample_chunk, o_data_f, std::plus<float>(), world_root);
           // WRITING
-          if(addcomm.rank() == addcomm_root) {
+          if(world.rank() == world_root) {
             // set Header
             if(!running_index) {
               // write out Header
               std::cerr << "DADACoadd::WRITING HEADER";
               std::cerr << " key=" << std::hex << key_out;
-              std::cerr << " rank=" << std::dec << addcomm.rank() << std::endl;
+              std::cerr << " rank=" << std::dec << world.rank() << std::endl;
               dHead.stationid = 99;
               dadaout.SetHeader(dHead);
               dadaout.WriteHeader();
@@ -190,36 +171,28 @@ class DADACoadd  {
             }
             std::cerr << "DADACoadd::WRITING DATA";
             std::cerr << " key=" << std::hex << key_out;
-            std::cerr << " rank=" << std::dec << addcomm.rank() << std::endl;
+            std::cerr << " rank=" << std::dec << world.rank() << std::endl;
             // RFI excision -- level 2
-            std::cout << "DADACoadd::xRFI Level 2 Filter=" << eparam.filter << std::endl;
             xrfi.Excise(o_data_f, eparam.filter);
             // write data
-            dadaout.WriteData(o_data_f, o_data_b, addcomm.size());
+            dadaout.WriteData(o_data_f, o_data_b, numants);
             // Filterbankwrite
             if(filout) {
-              dadaout.Redigitize(o_data_f, o_data_b, fb_nbits, addcomm.size());
+              dadaout.Redigitize(o_data_f, o_data_b, fb_nbits, numants);
               fbout.Data(o_data_b, read_chunk * fb_nbits / nbits); 
             }
             std::cerr << "DADACoadd::Running Index=" << running_index;
             std::cerr << " key=" << std::hex << key_out;
             std::cerr << " rank=" << std::dec << world.rank() << std::endl;
           }
-          // new communicator
-          addcomm = std::move(addcomm.split(!eod||!incomplete));
-          // root resolution and broadcasting
-          if(world.rank() == world_root) {
-            addcomm_root = addcomm.rank();
-          }
-          mpi::broadcast(world, addcomm_root, world_root);
-          if( (eod || incomplete) && !force_iteration) {
+          if( eod || incomplete ) {
             // begin new observation
             break;
           }
           running_index++;
         } // for stretch of observation
         dadain.ReadLock(false);
-        if(addcomm.rank() == addcomm_root) {
+        if(world.rank() == world_root) {
           dadaout.WriteLock(false);
           dadaout.~PsrDADA();
           if(filout)
@@ -252,6 +225,8 @@ class DADACoadd  {
         eparam(_xp),
         xrfi(eparam, nsamps, nchans),
         running_index(0),
+        ctime(0.0),
+        yes(1), no(0),
         world_root(root_) {
           // common ground work
           sample_stride = nchans * nbits / 8;
@@ -260,6 +235,7 @@ class DADACoadd  {
           // initialize buffers
           data_b = new unsigned char[bytes_chunk];
           data_f = new float[sample_chunk];
+          zero_data_f = new float[sample_chunk]();
           o_data_b = nullptr;
           o_data_f = nullptr;
           // ground work in root
@@ -268,10 +244,16 @@ class DADACoadd  {
             o_data_b = new unsigned char[bytes_chunk];
             o_data_f = new float[sample_chunk];
           }
+          // one time logging
+          std::cout << "DADACoadd::xRFI Level 1 Filter=" << eparam.filter << std::endl;
+          std::cout << "DADACoadd::xRFI Level 2 Filter=" << eparam.filter << std::endl;
+          // max-precision
+          double_maxprecision = std::numeric_limits<double>::digits10 + 1;
         }
     ~DADACoadd() {
       delete[] data_b;
       delete[] data_f;
+      delete[] zero_data_f;
       if(o_data_b != nullptr) delete[] o_data_b;
       if(o_data_f != nullptr) delete[] o_data_f;
     }
