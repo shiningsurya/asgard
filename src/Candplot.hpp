@@ -5,6 +5,19 @@
 #include "FilterbankCandidate.hpp" 
 #include "Plotter.hpp"
 class CandPlot : protected Plotter {
+ private:
+  void ranger (PtrFloat x, timeslice size, float& low, float& high, float toll=0.1, float tolh = 0.1) {
+    using std::min_element;
+    using std::max_element;
+    float min=0.0f, max=0.0f;
+    min = *min_element ( x, x + size);
+    max = *max_element ( x, x + size);
+    auto dd_range = max - min;
+    //
+    low = min - (toll * dd_range);
+    high = max + (tolh * dd_range);
+  }
+  float xxmin, xxmax;
  protected:
 	int imin, imax;
 	float xlin[2], ylin[2];
@@ -17,6 +30,7 @@ class CandPlot : protected Plotter {
 	 fac = 1e-2f;
 	 txtheight = -1.5 * charh;
 	}
+	#if 0
 	void Plot(PathList& fl, PathList& cl) {
 	 CandidateAntenna cant = CAFromPL(cl);
 	 StringVector ced, fed;
@@ -228,11 +242,6 @@ class CandPlot : protected Plotter {
 	 float min, max, xxmin, xxmax, dd_range;
 	 operations::FreqTable((float)fcl.fch1, (float)fcl.foff*fcl.nchans/chanout, chanout, freqs_ptr);
 	 do {
-		// put selection logic here
-		if(fcl.sn < 10) continue;
-		if(fcl.dm > 27 || fcl.dm < 25) continue;
-		//if(fcl.dm < 100) continue;
-		// end selection logic
 		if(count != 0) {
 		 cpgpage();
 		}
@@ -363,6 +372,157 @@ class CandPlot : protected Plotter {
 		//break;
 		count++;
 	 } while(fcl.Next());
+	 delete[] freqs_ptr;
+	 delete[] freqs_bshape;
+	}
+	#endif
+	void Plot2 (FilterbankCandidate& fcl) {
+  constexpr int chanout = 512;
+  PtrFloat fsddfb = new float[fcl.dd_nsamps * chanout];
+  // Frequency 
+  PtrFloat freqs_ptr = new float[chanout]();
+	 operations::FreqTable((float)fcl.fch1, (float)fcl.foff*fcl.nchans/chanout, chanout, freqs_ptr);
+  PtrFloat freqs_bshape = new float[chanout]();
+  // DM
+  auto dm_low = fcl.dmlist.front();
+  auto dm_high = fcl.dmlist.back();
+  timeslice dm_count = fcl.dm_count;
+  float dm_step = (dm_high - dm_low) / dm_count;
+  PtrFloat dm_bshape = new float[dm_count]();
+  // time
+  float tmin=0.0f, tmax=0.0f;
+  // work -- start
+  do {
+    if (count != 0) cpgpage();
+    FloatVector taxis = operations::TimeAxis ((float)fcl.tsamp, fcl.istart, fcl.istop);
+    auto twindow = fcl.dd_nsamps;
+    tmin = fcl.peak_time - fcl.dm_delay;
+    tmax = fcl.peak_time + fcl.dm_delay;
+    dm_low = fcl.dm - 100;
+    if ( dm_low < 0 ) dm_low = 0.0f;
+    dm_high = fcl.dm + 100;
+    ////////////////////////////////////
+    // SNDM
+    tr[0] = taxis[0];
+    tr[1] = 0.0f;
+    tr[2] = (float)fcl.tsamp;
+    tr[0] -= 0.5 * tr[2];
+    tr[3] = dm_low;
+    tr[4] = dm_step;
+    tr[5] = 0.0f;
+    cpgsfs(1);
+    cpgsvp (0.1, 0.55, 0.1, 0.42);
+    cpgswin (tmin, tmax, dm_low, dm_high);
+    cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
+    ranger (fcl.sndm, twindow * dm_count, xxmin, xxmax, 0.0f, 0.0f);
+    cpgimag(fcl.sndm, dm_count, twindow, 1, dm_count, 1, twindow, xxmin, xxmax, tr);
+    cpgbox("BCN",0.0,0,"BCNV",0.0,0);
+    cpgmtxt("B",2.5,.5,0.5,"Time (s)"); 
+    cpgmtxt("L",4,0.5,0.5,"DM (pc/cc)");
+    // SNDM - dmline
+    cpgsci(6); cpgsls(2);
+    xlin[0] = tmin; xlin[1] = tmax;
+    ylin[0] = ylin[1] = fcl.dm;
+    cpgline (2, xlin, ylin);
+    cpgsci(1); cpgsls(1);
+    // SNDM - ptline
+    cpgsci(4); cpgsls(2);
+    xlin[0] = fcl.peak_time; xlin[1] = fcl.peak_time;
+    ylin[0] = dm_low; ylin[1] = dm_high;
+    cpgline (2, xlin, ylin);
+    cpgsci(1); cpgsls(1);
+    // SNDM - yshape
+    cpgsfs(1); 
+    cpgsvp (0.55, 0.75, 0.1, 0.42);
+    operations::MaxBShape (fcl.sndm, twindow, dm_count, dm_bshape);
+    ranger (dm_bshape, dm_count, xxmin, xxmax);
+    cpgswin (xxmin, xxmax, dm_low, dm_high);
+    cpgline (dm_count, dm_bshape, &(fcl.dmlist[0]));
+    cpgbox("BCN",0.0,0,"BCV",0.0,0);
+    cpgmtxt("B",2.5,.5,0.5,"Max S/N"); 
+    // SNDM - dmline
+    cpgsci(6); cpgsls(2);
+    xlin[0] = xxmin; xlin[1] = xxmax;
+    ylin[0] = ylin[1] = fcl.dm;
+    cpgline (2, xlin, ylin);
+    cpgsci(1); cpgsls(1);
+    ////////////////////////////////////
+    // DDFB
+    tr[0] = taxis[0];
+    tr[1] = 0.0f;
+    tr[2] = (float)fcl.tsamp;
+    tr[0] -= 0.5 * tr[2];
+    tr[3] = freqs_ptr[0];
+    tr[4] = fcl.foff * fcl.nchans / chanout;
+    tr[5] = 0.0f;
+    cpgsfs(1);
+    cpgsvp (0.1, 0.55, 0.42, 0.74);
+    cpgswin (tmin, tmax, freqs_ptr[0], freqs_ptr[chanout-1]);
+    operations::Fscrunch (fcl.dd_fb, fcl.nchans, twindow, chanout, fsddfb);
+    cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
+    cpgimag(fsddfb, chanout, twindow, 1, chanout, 1, twindow, fcl.bmin, fcl.bmax, tr);
+    cpgbox("BC",0.0,0,"BCV",0.0,0);
+    cpgmtxt("L",4,0.5,0.5,"Freq (MHz)");
+    // DDFB - ptline
+    cpgsci(4); cpgsls(2);
+    xlin[0] = fcl.peak_time; xlin[1] = fcl.peak_time;
+    ylin[0] = freqs_ptr[0]; ylin[1] = freqs_ptr[chanout-1];
+    cpgline (2, xlin, ylin);
+    cpgsci(1); cpgsls(1);
+    // DDFB -- yshape
+    cpgsfs(1);
+    cpgsvp (0.55, 0.75, 0.42, 0.74);
+    operations::FreqShape (fsddfb, twindow, chanout, freqs_bshape);
+    ranger (freqs_bshape, chanout, xxmin, xxmax);
+    cpgswin (xxmin, xxmax, freqs_ptr[0], freqs_ptr[chanout-1]);
+    cpgbox("BCM",0.0,0,"BCMV",0.0,0);
+    cpgline (chanout, freqs_bshape, freqs_ptr);
+    ////////////////////////////////////
+    // DDTIM - ptline
+    cpgsci(4); cpgsls(2);
+    xlin[0] = fcl.peak_time; xlin[1] = fcl.peak_time;
+    ylin[0] = xxmin; ylin[1] = xxmax;
+    cpgline (2, xlin, ylin);
+    cpgsci(1); cpgsls(1);
+    // DDTIM
+    cpgsfs(1);
+    cpgsvp (0.1, 0.55, 0.74, 0.90);
+    ranger (fcl.dd_tim, twindow, xxmin, xxmax, 0.01, 0.2);
+    cpgswin (tmin, tmax, xxmin, xxmax );
+    cpgline ( twindow, &(taxis[0]), fcl.dd_tim );
+    cpgbox("BC",0.0,0,"BCNV",0.0,0);
+    cpgmtxt("L",4,0.5,0.5,"Intensity (a.u.)");
+    ////////////////////////////////////
+    // Text
+    cpgsci(1); // color index
+    cpgsvp(0.8, 0.90, 0.1, 0.75); // Meta data
+    txtrow = 0;
+    snprintf(txt, 256, "S/N: %3.2f", fcl.sn);
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    snprintf(txt, 256, "DM: %3.2f pc/cc", fcl.dm);
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    snprintf(txt, 256, "Width: %3.2f ms", fcl.tsamp*fcl.filterwidth*1e3f);
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    snprintf(txt, 256, "Peak Time: %4.3f s", fcl.peak_time);
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    snprintf(txt, 256, "Antenna: %s", fcl.antenna.c_str());
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    snprintf(txt, 256, "Source: %s", fcl.source_name.c_str());
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    snprintf(txt, 256, "Total time: %3.2f s", fcl.duration);
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    snprintf(txt, 256, "Tstart(MJD): %3.2f", fcl.tstart);
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    snprintf(txt, 256, "NBits: %d", fcl.nbits);
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    snprintf(txt, 256, "NChans: %d", fcl.nchans);
+    cpgmtxt("T",txtheight * txtrow++, 0.12, 0.0, txt);
+    ////////////////////////////////////
+    break;
+    count++;
+  } while (fcl.Next());
+	 delete[] fsddfb;
+	 delete[] dm_bshape;
 	 delete[] freqs_ptr;
 	 delete[] freqs_bshape;
 	}

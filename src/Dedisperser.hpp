@@ -5,55 +5,83 @@
 // Handles de-dispersion as a class
 // replaces operations::dedisperse
 // which calls DEDISP all the time
+#include "Operations.hpp"
+#include <limits>
 
 class DedispManager {
-		private:
+		protected:
 				dedisp_plan  dplan;
 				dedisp_error error;
 				float dm; 
 				double tsamp;
-				bool setdm;
 				int nchans;
-				timeslice maxd;
-				double f1, df;
+				timeslice max_delay, dm_count;
+				double f0, df;
+				FloatVector freqs;
 		public:
-				DedispManager() {
-						setdm = false;
+				DedispManager() : dplan(nullptr) {}
+				DedispManager (int nch, double ts, double fch1, double foff) :
+				nchans(nch), tsamp(ts), f0(fch1), df(foff) {
+						error = dedisp_create_plan(&dplan, nchans, tsamp , f0, df);
+						if( error != DEDISP_NO_ERROR ) std::cerr << "DedispManager::ctor Could not create dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
+						freqs = operations::FreqTable (f0, df, nchans);
 				}
 				void CreatePlan(int nch, double ts, double fch1, double foff) {
-						setdm = false;
 						error = dedisp_create_plan(&dplan, nch, ts, fch1, foff);
 						if( error != DEDISP_NO_ERROR ) std::cerr << "\nDedispManager: Could not create dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
 						tsamp = ts;
-						f1 = fch1;
+						f0 = fch1;
 						df = foff;
 						nchans = nch;
 				}
 				~DedispManager() {
 						dedisp_destroy_plan(dplan);
 				}
-				timeslice SetDM(float d, int filw) {
-						dm = d;
-						error = dedisp_generate_dm_list(dplan, d, d, filw*tsamp*1e6f, 1.0f);
-						if( error != DEDISP_NO_ERROR ) std::cerr << "\nDedispManager: Could not create dmlist: " <<  dedisp_get_error_string(error) << std::endl;
-						setdm = true;
-						maxd  = (timeslice) dedisp_get_max_delay(dplan);
-						return maxd;
+				void MallocOut (PtrFloat& out, timeslice nsamps) {
+				  nsamps -= max_delay;
+				  assert (nsamps > 0);
+				  std::size_t memsize =  nsamps * dm_count;
+				  out = new float [ memsize ];
 				}
-				void CoherentDD(float *&in, timeslice nsamps, float *&ret) {
-						if(!setdm) {
-								std::cerr << "DedispManager: DM not set and DD called\n";
-								std::cerr << "Fatal Error\n";
-						}
+				timeslice DMList (FloatVector& dmlist) {
+				  auto dmlist_ptr = dedisp_get_dm_list (dplan);
+				  dm_count = dedisp_get_dm_count (dplan);
+				  dmlist.clear(); dmlist.reserve (dm_count);
+				  std::copy ( dmlist_ptr, dmlist_ptr + dm_count, 
+				    std::back_inserter ( dmlist )
+				    );
+				  return dm_count;
+				}
+				timeslice ClosestDM (float dm) {
+				  auto dmlist = dedisp_get_dm_list (dplan);
+				  timeslice count = dedisp_get_dm_count (dplan);
+				  timeslice ret = 0;
+				  float close = std::numeric_limits<float>::max(), temp;
+				  //
+				  for (timeslice i = 0; i < count; i++) {
+				    temp = fabs ( dm - dmlist[i] );
+				    if (close > temp) {
+				      ret = i;
+				      close  = temp;
+				    }
+				  }
+				  return ret;
+				}
+				timeslice SetDM (float d0, float d1, unsigned int filw) {
+				  //std::cout << "d0=" << d0 << std::endl;
+				  //std::cout << "d1=" << d1 << std::endl;
+				  float dd0 = d0; float dd1 = d1;
+						error = dedisp_generate_dm_list(dplan, dd0, dd1, filw*tsamp*1e6f, 1.25f);
+						if( error != DEDISP_NO_ERROR ) std::cerr << "\nDedispManager::SetDM Could not create dmlist: " <<  dedisp_get_error_string(error) << std::endl;
+						max_delay  = (timeslice) dedisp_get_max_delay(dplan);
+						return max_delay;
+				}
+				void CoherentDD(PtrFloat& in, timeslice nsamps, PtrFloat& ret) {
 						error = dedisp_execute(dplan, (dedisp_size)nsamps, (const dedisp_byte*)in, sizeof(float)*8, (dedisp_byte*)ret, 8*sizeof(float), DEDISP_USE_DEFAULT);
 						/// Dedisp 
-						if( error != DEDISP_NO_ERROR ) std::cerr << "\nDedispManager: Could not execute dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
+						if( error != DEDISP_NO_ERROR ) std::cerr << "DedispManager::CoherentDD Could not execute dedispersion plan: " <<  dedisp_get_error_string(error) << std::endl;
 				}
-				void InCoherentDD(float * &input, std::vector<timeslice>& idlays, timeslice nsamps, float * &output){
-						if(!setdm) {
-								std::cerr << "DedispManager: DM not set and DD called\n";
-								std::cerr << "Fatal Error\n";
-						}
+				void InCoherentDD(PtrFloat input, const std::vector<timeslice>& idlays, timeslice nsamps, PtrFloat output){
 						int ridx;
 						for(timeslice i = 0; i < nsamps; i++) {
 								for(int j = 0; j < nchans; j++) {
@@ -73,6 +101,10 @@ class DedispManager {
 										 */
 								}
 						}
+				}
+				void InCoherentDD(PtrFloat input, const float dm, timeslice nsamps, PtrFloat output){
+				  auto idelays = operations::Delays (freqs, dm, tsamp);
+				  InCoherentDD (input, idelays, nsamps, output);
 				}
 };
 #endif
