@@ -73,7 +73,7 @@ int main(int ac, char * av[]) {
 		// INPUT NBITS is held sacred. 
 		uint64_t rbufsz = nsamps * nchans * nbits / 8;
 		if(rbufsz != bufsz) {
-				nsamps = 8 * rbufsz / nchans / nbits;
+				nsamps = 8 * bufsz / nchans / nbits;
 		}
 		// excision logic
 		xp = {method, filter, tfac, ffac};

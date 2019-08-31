@@ -531,9 +531,13 @@ class PsrDADA {
    delete[] b;
    return true;
  }
+ uint64_t TotalDataBuf() const {
+   auto x = ipcbuf_get_nbufs ( (ipcbuf_t*)hdu->data_block );
+   return x;
+ }
  uint64_t UsedDataBuf() const {
    auto x = ipcbuf_get_nfull( (ipcbuf_t*)hdu->data_block );
-   multilog(log,LOG_INFO,"PsrDADA::UsedData key=%x buffers=%" PRIu64  "\n",dada_key, x);
+   // multilog(log,LOG_INFO,"PsrDADA::UsedData key=%x buffers=%" PRIu64  "\n",dada_key, x);
    return x;
  }
  uint64_t UsedHeadBuf() const {

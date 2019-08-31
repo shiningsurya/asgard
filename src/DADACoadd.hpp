@@ -15,6 +15,9 @@ using exParam = excision::excisionParams;
 #include <iomanip>
 #include <limits>
 #include <set>
+#ifdef RT_PROFILE
+#include <boost/mpi/timer.hpp>
+#endif // RT_PROFILE
 
 namespace mpi = boost::mpi;
 class DADACoadd  {
@@ -31,6 +34,7 @@ class DADACoadd  {
     unsigned int dkey_out1, dkey_out2, dkey_out;
     bool filout;
     int incomplete, eod;
+    uint64_t num_writebuffs, num_readbuffs;
     // three important numbers
     timeslice nsamps;
     int nchans, nbits;
@@ -60,6 +64,10 @@ class DADACoadd  {
     // xRFI
     struct excision::excisionParams eparam;
     excision::xRFI xrfi;
+    // timing
+    #ifdef RT_PROFILE
+    mpi::timer rtimer, ltimer;
+    #endif // RT_PROFILE
     // coadder
     void coadder() {
       numobs = 0;
@@ -69,6 +77,7 @@ class DADACoadd  {
         // connect to out buffer in root
         if(world.rank() == world_root) {
           dadaout = PsrDADA(key_out, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadaout.log");
+          num_writebuffs = dadaout.TotalDataBuf();
         }
         std::cerr << "DADACoadd::Coadder New Obs numobs=" << numobs << " key=" << std::hex << key_out << std::endl; 
         PsrDADA dadain(key_in, nsamps, nchans, nbits, "/home/vlite-master/surya/logs/dadain.log");
@@ -76,6 +85,7 @@ class DADACoadd  {
         eod = 1;
         incomplete = 1;
         running_index = 0;
+        num_readbuffs = dadain.TotalDataBuf();
         dadain.ReadLock(true);
         if(world.rank() == world_root) dadaout.WriteLock(true);
         // assume for the beginning everyone is participating
@@ -84,10 +94,16 @@ class DADACoadd  {
         oldheader = dHead;
         while (  (!eod && !incomplete) ||  dadain.ReadHeader()  ) // for stretch of observation 
         {
+          #ifdef RT_PROFILE
+          ltimer.restart();
+          #endif // RT_PROFILE
           // READING
-          std::cerr << "DADACoadd::READING rank=" << world.rank() << " ridx=" << running_index; 
-          std::cerr << " key=" << std::hex << key_out << std::endl;
+          std::cerr << "DADACoadd::READING rank=" << world.rank() << " ridx=" << running_index << " key=" << std::hex << key_out << std::endl;
+          #ifdef RT_PROFILE
+          rtimer.restart();
           read_chunk = dadain.ReadData(data_f, data_b);
+          std::cout << "DADACoadd::Profiling::ReadData " << rtimer.elapsed() << std::endl;
+          #endif // RT_PROFILE
           // if Read header for the first time
           if(!running_index) {
             dHead = std::move(dadain.GetHeader());
@@ -116,12 +132,18 @@ class DADACoadd  {
             eod = 0;
             incomplete = 0;
           }
+          std::cout << "DADACoadd::Coadder read=" << read_chunk << " buffsz=" << bytes_chunk << std::endl;
+          std::cout << "DADACoadd::Coadder readbuf nfull=" << dadain.UsedDataBuf() << " nbuf=" << num_readbuffs << std::endl;
           // sanity checks like local indices are same
           ctime = dHead.tstart + (running_index * nsamps * dHead.tsamp * 1E-6f / 86400.f);
           std::cout << "DADACoadd::Coadder ctime=" << std::dec << std::setprecision(double_maxprecision)<< ctime;
           std::cout << " rank=" << std::setprecision(6) << world.rank() << std::endl;
           // BARRIER
+          #ifdef RT_PROFILE
+          rtimer.restart();
           mpi::gather(world, ctime, vec_ctime, world_root);
+          std::cout << "DADACoadd::Profiling::Gather_ctime " << rtimer.elapsed() << std::endl;
+          #endif // RT_PROFILE
           if (world.rank() == world_root) {
             std::set<double> rtime (vec_ctime.begin(), vec_ctime.end());
             if( rtime.size() == 1 ) {
@@ -143,18 +165,34 @@ class DADACoadd  {
             }
           }
           // RFI excision -- level 1
+          #ifdef RT_PROFILE
+          rtimer.restart();
           xrfi.Excise(data_f, eparam.filter);
+          std::cout << "DADACoadd::Profiling::xRFI_1 " << rtimer.elapsed() << std::endl;
+          #endif // RT_PROFILE
           // actual MPI coadd call -- BARRIER
           rtime = ctime;
+          #ifdef RT_PROFILE
+          rtimer.restart();
           mpi::broadcast (world, rtime, world_root);
+          std::cout << "DADACoadd::Profiling::Bcast_rtime " << rtimer.elapsed() << std::endl;
+          #endif // RT_PROFILE
           participate = ctime == rtime;
           if (!participate) {
             std::cerr << "DADACoadd::Coadder not participating" << std::endl;
             std::cerr << "My   ctime=" << std::setprecision(double_maxprecision) << ctime << std::endl;
             std::cerr << "Root ctime=" << std::setprecision(double_maxprecision) << rtime << std::endl;
           }
+          #ifdef RT_PROFILE
+          rtimer.restart();
           mpi::reduce(world, participate ? yes : no, numants, std::plus<unsigned int>(), world_root);
+          std::cout << "DADACoadd::Profiling::Reduce_numant " << rtimer.elapsed() << std::endl;
+          #endif // RT_PROFILE
+          #ifdef RT_PROFILE
+          rtimer.restart();
           mpi::reduce(world, participate ? data_f : zero_data_f, sample_chunk, o_data_f, std::plus<float>(), world_root);
+          std::cout << "DADACoadd::Profiling::Reduce_coadd " << rtimer.elapsed() << std::endl;
+          #endif // RT_PROFILE
           // WRITING
           if(world.rank() == world_root) {
             // set Header
@@ -169,17 +207,32 @@ class DADACoadd  {
               // Filterbank Initialize
               if(filout) fbout.Initialize(dHead, fb_nbits);
             }
-            std::cerr << "DADACoadd::WRITING DATA";
-            std::cerr << " key=" << std::hex << key_out;
-            std::cerr << " rank=" << std::dec << world.rank() << std::endl;
+            std::cerr << "DADACoadd::WRITING DATA" << " key=" << std::hex << key_out << " rank=" << std::dec << world.rank() << std::endl;
             // RFI excision -- level 2
+            #ifdef RT_PROFILE
+            rtimer.restart();
             xrfi.Excise(o_data_f, eparam.filter);
+            std::cout << "DADACoadd::Profiling::xRFI_2 " << rtimer.elapsed() << std::endl;
+            #endif // RT_PROFILE
             // write data
+            #ifdef RT_PROFILE
+            rtimer.restart();
             dadaout.WriteData(o_data_f, o_data_b, numants);
+            std::cout << "DADACoadd::Profiling::WriteData " << rtimer.elapsed() << std::endl;
+            #endif // RT_PROFILE
+            std::cout << "DADACoadd::Coadder writebuf nfull=" << dadaout.UsedDataBuf() << " nbuf=" << num_writebuffs << std::endl;
             // Filterbankwrite
             if(filout) {
+              #ifdef RT_PROFILE
+              rtimer.restart();
               dadaout.Redigitize(o_data_f, o_data_b, fb_nbits, numants);
+              std::cout << "DADACoadd::Profiling::Fil_redigit " << rtimer.elapsed() << std::endl;
+              #endif // RT_PROFILE
+              #ifdef RT_PROFILE
+              rtimer.restart();
               fbout.Data(o_data_b, read_chunk * fb_nbits / nbits); 
+              std::cout << "DADACoadd::Profiling::Fil_WriteData " << rtimer.elapsed() << std::endl;
+              #endif // RT_PROFILE
             }
             std::cerr << "DADACoadd::Running Index=" << running_index;
             std::cerr << " key=" << std::hex << key_out;
@@ -190,6 +243,9 @@ class DADACoadd  {
             break;
           }
           running_index++;
+          #ifdef RT_PROFILE
+          std::cout << "DADACoadd::Profiling::DataLoop " << ltimer.elapsed() << std::endl;
+          #endif
         } // for stretch of observation
         dadain.ReadLock(false);
         if(world.rank() == world_root) {
