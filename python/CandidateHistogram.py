@@ -51,6 +51,7 @@ elif args.style == 3:
     labels = ['S/N', 'DM', 'Width']
     xp = xx
 ## actually plot
+plt.ion()
 figure = corner.corner(xp, labels=labels, show_titles=True, scale_hist=True, bins=args.bins)
 if args.plot:
     plt.savefig(args.plot)

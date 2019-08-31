@@ -2,9 +2,11 @@
 import os
 import sys
 import cPickle as cpk
+import numpy as np
 import matplotlib.pyplot as plt
 import CandidateData as cd
 import CandidateSet as cs
+import CandidateJSON as cj
 
 # VIBGYOR colormap the old-school way
 colors = dict()
@@ -34,7 +36,11 @@ colors['ea23'] = "#ff9800"
 colors['ea24'] = "#ff7f00"
 colors['ea25'] = "#ff3400"
 colors['ea26'] = "#ff4f00"
+colors['ea96'] = "#33ff00"
+colors['ea97'] = "#ffff00"
+colors['ea98'] = "#1e00cd"
 colors['ea99'] = "#ff0000"
+colors['ea00'] = "#ff0000"
 
 # limits
 snmin, snmax = 5, 100
@@ -154,3 +160,64 @@ def VsTime(xx, saveas=None):
     if isinstance(xx, str):
         plt.savefig(fi)
         plt.close()
+
+def FBCPlot(xx, saveas=None):
+    '''
+    Plots a filterbank candidate which 
+    has been read from a JSON/BSON
+
+    Arguments
+    ---------
+    xx: dict, str
+    '''
+    if isinstance(xx, str):
+        x = cj.Read(xx)
+    elif isinstance(xx, dict):
+        x = xx
+    else:
+        raise ValueError("Argument not understood!")
+    # freq axis
+    xf = x['frequency']
+    xp = x["parameters"]
+    f_n_ar = np.arange(xf['nchans'])
+    freq_axis = xf['fch1'] + (f_n_ar * xf['foff'])
+    start_time = x['indices']['istart'] * x['time']['tsamp']
+    stop_time = x['indices']['istop'] * x['time']['tsamp']
+    fb = cj.Unpack(x['dd_fb'], x['indices']['dd_nsamps'], xf['nchans'], xp['nbits'])
+    time_axis = np.linspace(start_time, stop_time, x['indices']['dd_nsamps'])
+    # textstr
+    textstr = \
+        "S/N: {0:3.2f}\nDM: {1:3.2f} pc/cc\nWidth: {2:3.2f} ms\nPeak Time: {3:3.2f} s\nAntenna: {4}\nSource: {5}\n"\
+        "Total time: {6:3.2f} s\nTstart(MJD): {7:7.2f}\nNbits: {8:1d}\nNchans: {9:4d}".format(
+        x["sn"], x["dm"],x["filterwidth"]*x["time"]["tsamp"]*1e3, x["time"]["peak_time"], 
+        xp["antenna"], xp["source_name"], x["time"]["duration"], x["time"]["tstart"],
+        xp["nbits"], xf["nchans"])
+    fig = plt.figure(dpi=300)
+    # fb
+    ax1 = fig.add_axes([0.05, 0.05, 0.55, 0.45])
+    ax1.set_ylabel('Freq (MHz)')
+    ax1.set_xlabel('Time (s)')
+    # integrated time profile
+    ax2 = fig.add_axes([0.05, 0.5, 0.55, 0.3])
+    ax2.set_ylabel('Intensity (a.u.)')
+    ax2.set_xticks([])
+    ax2.set_yticks([])
+    ax2.yaxis.tick_right()
+    # freq profile
+    ax3 = fig.add_axes([0.6, 0.05, 0.17, 0.45])
+    ax3.set_xlabel('Intensity (a.u.)')
+    ax3.set_yticks([])
+    ax3.set_xticks([])
+    ## plotting
+    ax1.imshow(fb, aspect='auto', extent=[start_time,stop_time, freq_axis[-1], freq_axis[0]], vmin=0, vmax=((2**xp['nbits'] - 1)))
+    #ax1.set_yticks(f_n_ar, freq_axis)
+    ax2.plot(time_axis, np.array(x['dd_tim']))
+    ax3.plot(fb.mean(1), freq_axis)
+    ## text box
+    x3l = ax3.get_xlim()
+    ax3.text(x3l[0] + (0.05*(x3l[1] - x3l[0])),364,textstr, {'fontsize':'x-small'})
+    ax2.set_title(xp['group'])
+    if saveas:
+        plt.savefig(saveas)
+    else:
+        plt.show()

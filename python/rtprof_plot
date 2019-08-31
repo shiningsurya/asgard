@@ -1,0 +1,58 @@
+#!/usr/bin/python
+import numpy as np
+import matplotlib.pyplot as plt
+### constants begin
+LOGROOT = "/home/shining/wtf/logs"
+### constants end
+def ParseArgs():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='rtprof_plot', description='Asgard tool for plotting time series values parsed from coadder logs', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('files', help = 'Coadder log file. (debug?.1.?)', nargs='*', type=str)
+    # plot 
+    add('-p', help = 'Plot filename', dest = 'plot', default=None)
+    # coincider
+    add('--sig', help = 'Signature.', default='DataLoop', dest='sig')
+    # done
+    return ap.parse_args()
+
+def fileAction(ffile, ssig):
+    '''Work on single file'''
+    l = [] # container to hold the time series data
+
+    with open(ffile,"r") as f:
+        for line in f.readlines():
+            if line.startswith(ssig):
+                tt = line.strip().split()[-1]
+                try:
+                    l.append( float(tt) )
+                except:
+                    pass
+
+    return np.array(l, dtype=np.float32)
+
+BSIG  = "DADACoadd::Profiling::"
+
+if __name__ == "__main__":
+    args = ParseArgs()
+    SIG   = BSIG + args.sig
+    plotfile = args.plot or "rtprof_"+args.sig.lower()+".pdf"
+    ##
+    fig = plt.figure(dpi=300)
+    ##
+    for cfile in args.files:
+        RANK = cfile.split(".")[-1]
+        ts = fileAction (cfile, SIG)
+        # plot
+        lab = "{0}({1:3.2f} s)".format(RANK, ts.mean())
+        plt.hist(ts, bins='auto', density=True, label=lab, alpha=.6)
+        # plt.scatter(np.arange(ts.size), ts, s=3, label=lab)
+    plt.xlabel('Time (s)')
+    plt.yscale('log')
+    plt.grid(True)
+    plt.legend(loc='best')
+    plt.title(args.sig)
+    plt.tight_layout()
+    plt.savefig(plotfile)
+

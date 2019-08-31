@@ -9,6 +9,8 @@ class Candidate(object):
             f.close()
         self.line = line.strip()
         toks = self.line.split()
+        if len(toks) <= 2:
+            raise ValueError("Received pos")
         self.sn = float(toks[0])
         if np.isinf(self.sn):
             self.sn = 1e5
@@ -68,8 +70,9 @@ def ReadCandidates(filename, metadata=False):
         for line in f:
             try:
                 ret.append( Candidate(line, ant=ant, gr=gro) )
-            except IndexError:
-                print "Error in Reading Candidates from file:", filename.strip().split("/")[-1]
+            except:
+                #print "Error in Reading Candidates from file:", filename.strip().split("/")[0]
+                pass
     return ret
 
 class FilCandidate(Candidate):

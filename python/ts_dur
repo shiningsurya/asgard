@@ -1,0 +1,22 @@
+#!/usr/bin/python
+from datetime import datetime
+
+def ParseArgs():
+    import argparse
+    ap = argparse.ArgumentParser(prog='ts_dur', description='Asgard minitool to find duration between two timestamps', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('ts', help = 'multilog timestamps', nargs=2)
+    return ap.parse_args()
+
+DATEFMT = "%Y-%m-%d-%H:%M:%S"
+
+if __name__ == "__main__":
+    args = ParseArgs()
+    assert len(args.ts) == 2 
+    one = datetime.strptime(args.ts[0], DATEFMT)
+    two = datetime.strptime(args.ts[1], DATEFMT)
+    print two - one
+
+
+
+

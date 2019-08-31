@@ -1,0 +1,81 @@
+#!/usr/bin/python
+import numpy as np
+import matplotlib.pyplot as plt
+### constants begin
+LOGROOT = "/home/shining/wtf/logs"
+MAXBUFS = 1024
+#
+RBUFSIG  = "DADACoadd::Coadder readbuf"
+RTDLSIG  = "DADACoadd::Profiling::DataLoop"
+RTRCSIG  = "DADACoadd::Profiling::Reduce_coadd"
+RTx1SIG  = "DADACoadd::Profiling::xRFI_1"
+AGAINST_SIG    = RTRCSIG
+AGAINST_YLABEL = "Reduce coadd time (s)"
+AGAINST_SIG    = RTx1SIG
+AGAINST_YLABEL = "xRFI_1 time (s)"
+AGAINST_SIG    = RTDLSIG
+AGAINST_YLABEL = "DataLoop time (s)"
+### constants end
+def ParseArgs():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='rtdiag', description='Asgard tool for plotting realtime diagnostics from coadder logs.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('file', help = 'Coadder log file. (debug?.1.?)', type=str)
+    # plot 
+    add('-p', help = 'Plot filename', dest = 'plot', default=None)
+    # title
+    add('-t', help = 'Title', dest = 'title', default=None)
+    # done
+    return ap.parse_args()
+
+def fileAction(ffile):
+    ret = dict()
+    ret['readbuf'] = []
+    ret['against'] = []
+    #
+    with open(ffile, "r") as f:
+        for line in f.readlines():
+            if line.startswith(RBUFSIG):
+                for tt in line.strip().split():
+                    if tt.startswith("nfull"):
+                        try:
+                            ooo =  int(tt.split("=")[-1])
+                            if ooo >= MAXBUFS:
+                                ooo = -1
+                            ret['readbuf'].append( ooo )
+                        except:
+                            pass
+                        finally:
+                            break
+            elif line.startswith(AGAINST_SIG):
+                tt = line.strip().split()[-1]
+                try:
+                    ret['against'].append( float(tt) )
+                except:
+                    pass
+    #
+    return ret
+
+if __name__ == "__main__":
+    args = ParseArgs()
+    plotfile = args.plot or "rtdiag_"+args.file.replace('.', '_')+".pdf"
+    RANK = args.file.split(".")[-1]
+    r = fileAction(args.file)
+    ## plotting
+    fig = plt.figure(dpi=300)
+    axr = plt.gca()
+    axr.plot( r['readbuf'], 'r.' )
+    axr.set_xlabel('Time (a.u.)')
+    axr.set_ylabel('DADA buffer state')
+    axr.tick_params('y', colors='r')
+
+    axl = axr.twinx()
+    axl.plot( r['against'], 'b.' )
+    axl.set_ylabel(AGAINST_YLABEL)
+    axl.tick_params('y', colors='b')
+    ##
+    plt.title("Gulpsize (s)="+args.title)
+    plt.tight_layout()
+    plt.savefig(plotfile)
+
