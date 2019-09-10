@@ -7,6 +7,7 @@ MAXBUFS = 1024
 #
 RBUFSIG  = "DADACoadd::Coadder readbuf"
 RTDLSIG  = "DADACoadd::Profiling::DataLoop"
+RTRDSIG  = "DADACoadd::Profiling::ReadData"
 RTRCSIG  = "DADACoadd::Profiling::Reduce_coadd"
 RTx1SIG  = "DADACoadd::Profiling::xRFI_1"
 AGAINST_SIG    = RTRCSIG
@@ -15,6 +16,8 @@ AGAINST_SIG    = RTx1SIG
 AGAINST_YLABEL = "xRFI_1 time (s)"
 AGAINST_SIG    = RTDLSIG
 AGAINST_YLABEL = "DataLoop time (s)"
+AGAINST_SIG    = RTRDSIG
+AGAINST_YLABEL = "ReadData time (s)"
 ### constants end
 def ParseArgs():
     import argparse

@@ -1,0 +1,44 @@
+#!/usr/bin/python
+import os
+import gc
+import numpy as np
+import pysigproc as psp
+import matplotlib
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+
+def ParseArgs():
+    import argparse
+    ap = argparse.ArgumentParser(prog='agfbpyplot', description='Asgard tool for pythonic filterbank plot', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('fil', help='Filterbank file')
+    add('--timestep', help='Timestep to plot', default=10, type=float, dest='tstep')
+    add('-p', help='Output plot file', default=None, dest='pfile')
+    return ap.parse_args()
+if __name__ == "__main__":
+    args = ParseArgs()
+    fil = psp.SigprocFile(args.fil)
+    bmin, bmax = 0, ( 2 ** fil.nbits ) - 1
+    f0, f1 = 320.0, 360.0
+    dur_secs = (fil.tend - fil.tstart) * 86400.0
+    n_steps   = int( dur_secs / args.tstep )
+    wid = int(args.tstep / fil.tsamp)
+    with PdfPages(args.pfile) as pdf:
+        # file
+        # work
+        for i in xrange(n_steps):
+            # gc
+            plt.figure(dpi=300)
+            i0 = int(i * args.tstep / fil.tsamp)
+            plt.imshow( fil.unpack(i0, wid)[:,0,:].T, vmin=bmin, vmax=bmax, cmap=plt.cm.jet,
+                    extent=[i*args.tstep, (i+1)*args.tstep, f0, f1], aspect='auto'
+                    )
+            gc.collect()
+            # plot labels
+            plt.ylabel('Freq (MHz)')
+            plt.xlabel('Time (s)')
+            plt.tight_layout()
+            plt.title(os.path.basename(args.fil))
+            pdf.savefig()
+            plt.close()
+            plt.clf()

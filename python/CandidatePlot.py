@@ -57,6 +57,39 @@ def ReadPkl(f):
         xx = cpk.load(ff)
     return xx
 
+def SNDMScatter(xx, saveas=None):
+    '''
+    Perform a scatter plot between s/n and dm.
+
+    Arguments
+    ---------
+    xx : instance of CandidateSet or pickle filename
+    '''
+    if isinstance(xx, str):
+        x = ReadPkl(xx)
+        fi = saveas or "{0}.pdf".format(os.pathname.splitext(xx)[0])
+    elif isinstance(xx, dict):
+        x = xx
+        fi = saveas 
+    fig = plt.figure(dpi=300)
+    #
+    ## S/N vs DM
+    ax1 = fig.add_axes([0.1,0.1, 0.9, 0.9])
+    ax1.set_ylabel('S/N')
+    ax1.set_ylim([snmin, snmax])
+    ax1.set_yscale('log')
+    ax1.set_xlabel('DM (pc/cc)')
+    ax1.set_xscale('log')
+    ax1.set_xlim([dmmin, dmmax])
+    ## plotting
+    for ant, y in x.items():
+        ax1.scatter(y.dm, y.sn, label=ant, edgecolors='none', alpha=.6, c=colors[ant])
+    ## legend
+    ax1.legend(ncol=2,title=y.tstart, fancybox=True, loc='lower left', bbox_to_anchor=(.95,.9), fontsize='small')
+    if isinstance(xx, str):
+        plt.savefig(fi)
+        plt.close()
+
 def AllScatter(xx, saveas=None):
     '''
     Perform a scatter plot.
@@ -156,7 +189,10 @@ def VsTime(xx, saveas=None):
         ax1.scatter(y.peak_time, y.width, label="{0}({1})".format(ant, y.width.size), edgecolors='none', alpha=.6, c=colors[ant])
         ax2.scatter(y.peak_time, y.sn, label="{0}({1})".format(ant, y.sn.size),edgecolors='none', alpha=.6, c=colors[ant])
         ax3.scatter(y.peak_time, y.dm, label="{0}({1})".format(ant, y.dm.size), edgecolors='none', alpha=.6, c=colors[ant])
-    ax3.legend(ncol=4,title=y.tstart, fancybox=True, loc='lower left', bbox_to_anchor=(0.0,1.0), fontsize='small')
+    if len(x.keys()) == 1:
+        ax3.set_title(y.tstart)
+    else:
+        ax3.legend(ncol=4,title=y.tstart, fancybox=True, loc='lower left', bbox_to_anchor=(0.0,1.0), fontsize='small')
     if isinstance(xx, str):
         plt.savefig(fi)
         plt.close()

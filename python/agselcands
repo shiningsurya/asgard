@@ -1,0 +1,68 @@
+#!/usr/bin/python
+import os
+import numpy as np
+# asgard python in
+import sys
+sys.path.append('/home/shining/study/MS/asgard/python')
+import CandidateData as cd
+#
+def AddSelToFilename(infile):
+    ''' ea99 -> ea99sel '''
+    name, ext = os.path.splitext(infile)
+    out = "{0}sel{1}".format(name,ext)
+    return out
+
+def parseArgs():
+    import argparse
+    # for parsing args
+    # parent
+    pap = argparse.ArgumentParser(prog='agselcands', description='Command line tool to select, vet candidates.', epilog='Part of Asgard', add_help=True)
+    add = pap.add_argument
+    add('cands', help='Candidates files', nargs='*')
+    add('-o', help='Put candfiles in odir', dest='odir', default=None)
+    add('-O', help='Overwrite file. Adds ea??sel.', dest='overwrite', action='store_true', default=False)
+    add('-p', help='Print selected cands.', dest='printcand', action='store_true', default=False)
+    add('-v', help='Verbose', dest='verbose', action='store_true', default=False)
+    add('--sn', help='S/N limit', dest='sn', nargs='*', default=[ 10 ])
+    add('--dm', help='DM limit', dest='dm', nargs='*',  default=[ 100 ])
+    add('--n', help='Number threshold', dest='n', type=int, default=1)
+    #
+    return pap.parse_args()
+
+if __name__ == '__main__':
+    args = parseArgs()
+    if len(args.sn) == 1:
+        SNLOW, SNHIGH = float( args.sn[0] ), 100000
+    else:
+        SNLOW, SNHIGH = map(float, args.sn[:2])
+    if len(args.dm) == 1:
+        DMLOW, DMHIGH = float( args.dm[0] ), 2000
+    else:
+        DMLOW, DMHIGH = map(float, args.dm[:2])
+    if args.verbose:
+        print "SN in [{0}, {1}]".format(SNLOW, SNHIGH)
+        print "DM in [{0}, {1}]".format(DMLOW, DMHIGH)
+    #
+    for cfile in args.cands:
+        cx  = cd.CandidateData(cfile)
+        fcx = cd.FilterCandidateData(cx, sncut=[SNLOW,SNHIGH], dmcut=[DMLOW,DMHIGH])
+        if fcx.n >= args.n:
+            print "{0}\tFound {1} candidates.".format(cfile, fcx.n)
+            if args.printcand:
+                pformat = "{0: <16}  {1: <12}  {2: <12}"
+                print pformat.format("PeakTime(s)", "S/N", "DM (pc/cc)")
+                for pt, sn, dm in zip(fcx.peak_time, fcx.sn, fcx.dm):
+                    print pformat.format(pt, sn, dm)
+            #
+            if args.overwrite:
+                ofile = AddSelToFilename(cfile)
+                cd.WriteCandidateData(fcx, ofile)
+            #
+            if args.odir:
+                if not os.path.exists(args.odir):
+                    os.mkdir(args.odir)
+                ofile = os.path.join(args.odir,cfile)
+                cd.WriteCandidateData(fcx, ofile)
+
+
+

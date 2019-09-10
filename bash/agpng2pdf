@@ -1,0 +1,20 @@
+#!/bin/bash
+# set -x
+set -B
+
+if [ $# -eq 0 ]
+then
+		echo "Asgard::png2pdf"
+		echo "Packages grouped pngs to pdf"
+		echo "Usage: agpng2pdf <group>"
+		exit 0
+fi
+
+GROUP=$1
+NUM=$(ls | egrep "^${GROUP}" | wc -l)
+echo "Found $NUM of $GROUP"
+ARG=${GROUP}_{2..${NUM}}
+OUT=${GROUP/%png/pdf}
+
+eval convert ${GROUP} ${ARG} ${OUT}
+

@@ -156,7 +156,7 @@ def FilterCandidateData(cdata, sncut=[0,10], dmcut=[0,100]):
     ret.n = ret.sn.size
     return ret
 
-def WriteCandidateData(cdata, filename=None, tsamp=97e-6):
+def WriteCandidateData(cdata, filename=None, tsamp=781.25E-6):
     '''
     Writes out candidates in Heimdall format
     If filename is None, filename is constructed from cdata.
