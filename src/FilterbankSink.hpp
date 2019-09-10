@@ -59,13 +59,13 @@ class FilterbankSink{
 		fb_fp = fopen(filename.c_str(), "wb+");
 		Header(inhead);
 	 }
-	void Initialize(const struct Header& inhead) {
+	void Initialize(const struct Header& inhead, int _nbits = 2) {
 	 filename = std::string(inhead.sigproc_file);
 	 std::cerr << "FilterbankSink::Initialize filename=" << filename << std::endl;
 	 fb_fp = fopen(filename.c_str(), "wb+");
-	 Header(inhead);
+	 Header(inhead, _nbits);
 	}
-	void Header(const struct Header& inhead) {
+	void Header(const struct Header& inhead, int _nbits = 0) {
 	 if(fb_fp == NULL) {
 		fb_fp = fopen(filename.c_str(), "wb+");
 	 }
@@ -88,7 +88,7 @@ class FilterbankSink{
 	 send("foff", inhead.foff);
 	 // data
 	 send("nchans", inhead.nchans);
-	 send("nbits", inhead.nbits);
+	 send("nbits", _nbits ? _nbits : inhead.nbits);
 	 send("nifs", 1);
 	 // time
 	 send("tstart",inhead.tstart);

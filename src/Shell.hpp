@@ -2,7 +2,7 @@
 #include <asgard.hpp>
 #include <cstdarg>
 
-constexpr size_t MAX_CMD = 256;
+constexpr size_t MAX_CMD = 512;
 class Shell {
  private:
  	bool AsyncRunning;

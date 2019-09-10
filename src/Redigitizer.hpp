@@ -190,6 +190,29 @@ static inline int quant2bit(float x) {
 		else if(x < 0.9674) return 2;
 		else return 3;
 }
+unsigned char dig2bit_sf(float a, float b, float c, float d) {
+		unsigned char A, B, C, D;	
+		A = (unsigned char) (static_cast<unsigned char>(a) & 0x03) << 6;
+		//std::cout << " a =  " << a << " A =  " << std::bitset<8>(A) << std::endl;
+		B = (unsigned char) (static_cast<unsigned char>(b) & 0x03) << 4;
+		//std::cout << " b =  " << b << " B =  " << std::bitset<8>(B) << std::endl;
+		C = (unsigned char) (static_cast<unsigned char>(c) & 0x03) << 2;
+		//std::cout << " c =  " << c << " C =  " << std::bitset<8>(C) << std::endl;
+		D = (unsigned char) (static_cast<unsigned char>(d) & 0x03) << 0;
+		//std::cout << " d =  " << d << " D =  " << std::bitset<8>(D) << std::endl;
+		return A|B|C|D;
+}
+unsigned char dig4bit_sf(float a, float b) {
+		unsigned char A, B;	
+		A = (unsigned char) (static_cast<unsigned char>(a) & 0x07) << 4;
+		//std::cout << " a =  " << a << " A =  " << std::bitset<8>(A) << std::endl;
+		B = (unsigned char) (static_cast<unsigned char>(b) & 0x07) << 0;
+		//std::cout << " b =  " << b << " B =  " << std::bitset<8>(B) << std::endl;
+		return A|B;
+}
+unsigned char dig8bit_sf(float a) {
+		return (unsigned char) static_cast<unsigned char>(a);
+}
 unsigned char dig2bit(float a, float b, float c, float d) {
 		unsigned char A, B, C, D;	
 		A = (unsigned char) (quant2bit(a) & 0x03) << 6;

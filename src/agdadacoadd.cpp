@@ -25,7 +25,7 @@ int main(int ac, char * av[]) {
 		key_t key_in, key_out;
 		std::string _key_in, _key_out;
 		std::string _dkin("56"), _dkout("60");
-		bool filout;
+		bool filout, heimdall_op;
 		unsigned int nbits;
 		uint64_t bufsz, nchans, nsamps;
   // excision
@@ -73,7 +73,7 @@ int main(int ac, char * av[]) {
 		// INPUT NBITS is held sacred. 
 		uint64_t rbufsz = nsamps * nchans * nbits / 8;
 		if(rbufsz != bufsz) {
-				nsamps = 8 * rbufsz / nchans / nbits;
+				nsamps = 8 * bufsz / nchans / nbits;
 		}
 		// excision logic
 		xp = {method, filter, tfac, ffac};

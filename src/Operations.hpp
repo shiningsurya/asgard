@@ -8,6 +8,7 @@ namespace operations {
 		void Whiten(PtrFloat in, timeslice tnsamp);
 		void TimeFreqShape(PtrFloat in, timeslice nsamps, int nchans, PtrFloat timeshape, PtrFloat bandshape);
 		void FreqShape(float * in, timeslice nsamps, int nchans, float * out);
+		void MaxBShape(float * in, timeslice nsamps, int nchans, float * out);
 		void TimeShape(float * in, timeslice nsamps, int nchans, float * out);
 		void Fscrunch(float * in, int nchans_in, timeslice nsamps, int nchans_out, float * ret);
 		void Crunch(float * in, const int nchans_in, const timeslice nsamps_in, const int nchans_out, const timeslice nsamps_out, float * ret); 
@@ -98,6 +99,12 @@ void operations::FreqShape(float * in, timeslice nsamps, int nchans, float * out
 						out[ichan] += in[isamp*nchans + ichan];
 				}
 				out[ichan] /= nsamps;
+		}
+}
+void operations::MaxBShape(float * in, timeslice nsamps, int nchans, float * out) {
+		for(int ichan = 0; ichan < nchans; ichan++) {
+		  auto tin = in + (ichan * nsamps);
+				out[ichan] = *std::max_element ( tin, tin + nsamps );
 		}
 }
 void operations::TimeShape(float * in, timeslice nsamps, int nchans, float * out) {
