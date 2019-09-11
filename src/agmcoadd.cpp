@@ -13,7 +13,7 @@
 namespace po = boost::program_options;
 
 int main(int ac, char * av[]) {
-  bool kur;
+  bool kur; int nbits;
   float loadsecs;
   std::string groups;
   std::string dodir("/home/vlite-master/surya/dankspace/"), odir, dpre("/mnt/ssd/fildata/"), prefix;
@@ -31,6 +31,7 @@ int main(int ac, char * av[]) {
     ("group,g", po::value<std::string>(&groups)->composing(), "Groups")
     ("loadsecs", po::value<float>(&loadsecs)->default_value(2.0f), "Timestep (s)")
     ("xrfi,r", po::value<bool>(&kur)->default_value(true), "True for Kurtosis (def)\nOtherwise non kurtosis.")
+    ("nbits,b", po::value<int>(&nbits)->default_value(2), "Numbits digitization in coadded filterbank")
     ("odir,o", po::value<std::string>(&odir)->default_value(dodir), "Output directory")
     ("prefix", po::value<std::string>(&prefix)->default_value(dpre), "Prefix for fildata.")
     ("ant", po::value<std::string>(&ant)->default_value(dant), "Antenna code")
@@ -62,6 +63,7 @@ int main(int ac, char * av[]) {
   param.loadsecs = loadsecs;
   param.kur = kur;
   param.group_string = groups;
+  param.nbits = nbits;
   if(param.kur) param.outfile = odir + eslash + param.group_string + ant + std::string("_kur.fil");
   else param.outfile = odir + eslash + param.group_string + ant + std::string(".fil");
   param.tfac = tfac;

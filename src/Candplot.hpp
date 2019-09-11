@@ -228,11 +228,6 @@ class CandPlot : protected Plotter {
 	 float min, max, xxmin, xxmax, dd_range;
 	 operations::FreqTable((float)fcl.fch1, (float)fcl.foff*fcl.nchans/chanout, chanout, freqs_ptr);
 	 do {
-		// put selection logic here
-		if(fcl.sn < 10) continue;
-		if(fcl.dm > 27 || fcl.dm < 25) continue;
-		//if(fcl.dm < 100) continue;
-		// end selection logic
 		if(count != 0) {
 		 cpgpage();
 		}

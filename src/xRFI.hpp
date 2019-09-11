@@ -202,7 +202,6 @@ namespace excision {
 										estf = excision::Histogram(bandshape, nchans, bandflags, bins, freq_factor);
 										estt = excision::Histogram(timeshape, wid, timeflags, bins, time_factor);
 								}
-								std::cout << "xRFI::Excise filter=" << _filter << std::endl;
 								// removing
 								if(_filter == Filter::Zero)
 										FilterZero(dat);
