@@ -405,14 +405,13 @@ class FilterbankWriter {
 								}
 						}
 						else if(nbits == 8) {
-								// TODO
 								for(timeslice i = 0; i < datasamps;) {
 										alpha = (ret[i++] - rmean) / rstd;
 										dd[it++] = dig8bit(alpha);
 								}
 						}
 				}
-				void _copy_header(Filterbank& from, double tst) {
+				void _copy_header(Filterbank& from, double tst, int nb) {
 						it = 0;
 						dd = (unsigned char*)fbdata.data();
 						// ^ initializes 
@@ -426,8 +425,8 @@ class FilterbankWriter {
 						send_double("fch1",from.fch1);
 						send_double("foff",from.foff);
 						send_int("nchans",from.nchans);
-						send_int("nbits",from.nbits);
-						nbits = from.nbits;
+						send_int("nbits",nb);
+						nbits = nb;
 						send_double("tstart",tst);
 						send_double("tsamp",from.tsamp);
 						send_int("nifs",from.nifs);
@@ -488,13 +487,13 @@ class FilterbankWriter {
 						debnum = 2048L;
 #endif // _DEBUG
 				}
-				timeslice Initialize(std::string fname, Filterbank& takeHeader, double dur, double tstrt, int nbits) {
+				timeslice Initialize(std::string fname, Filterbank& takeHeader, double dur, double tstrt, int nbits_) {
 						// dur is the length
 						// tstrt is the starting time
 						// take headers from f and account for dur and tstrt
 						//
 						//outputfile = fopen(fname.c_str(),"wb");
-						std::size_t flength = takeHeader.headersize + ( dur/takeHeader.tsamp *takeHeader.nchans * nbits)/8;
+						std::size_t flength = takeHeader.headersize + ( dur/takeHeader.tsamp *takeHeader.nchans * nbits_)/8;
 						// by 4 because one byte yields 4 samples
 						bios::mapped_file_params param;
 						param.path = fname;
@@ -505,7 +504,7 @@ class FilterbankWriter {
 								std::cout << " PRAY!!!!!! " << std::endl;
 						}
 						// copy header
-						_copy_header(takeHeader, tstrt);
+						_copy_header(takeHeader, tstrt, nbits_);
 						return it;
 				}
 				void WriteFBdata(PtrFloat da, timeslice ib, timeslice datasamps) {

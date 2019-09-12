@@ -185,6 +185,7 @@ struct CoaddMPI_Params {
 		std::string group_string;
 		float loadsecs;
 		bool kur;
+		int nbits;
 		// excision
 		float tfac;
 		float ffac;
@@ -282,10 +283,10 @@ class CoaddMPI {
       // write fb header logic
       // reading f[0] lol
       if(world.rank() == root) {
-        nbits = f[0].nbits;
+        nbits = param.nbits;
         boundcheck = fbw.Initialize(param.outfile, f[0],  duration, mintstart, nbits);
       }
-      mpi::broadcast(world, nbits, root);
+      //mpi::broadcast(world, nbits, root);
       // figure out tstep(width)
       tstep = param.loadsecs / f[0].tsamp;				
       numelems = tstep * f[0].nchans;
