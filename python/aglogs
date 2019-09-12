@@ -1,0 +1,109 @@
+#!/usr/bin/python
+import os
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+### constants begin
+LOGROOT = "/home/shining/wtf/logs"
+LogSig = "DADACoadd::Coadder"
+LogSigChoice = ["readbuf"]
+RTSig = "DADACoadd::Profiling"
+RTChoice = ["DataLoop", "ReadData", "Reduce_coadd", "xRFI_1", "Gather_ctime", "Bcast_rtime", "Reduce_numant", "WriteData", "xRFI_2"]
+colors = ["b", "g", "k", "m"]
+### constants end
+def fileAction(ffile, sigs):
+    '''
+    Generic log file parser
+
+    Arguments
+    ---------
+    ffile : str
+        Log file to read
+    sigs : list
+        List of signatures in expanded form
+    '''
+    ret = {k:[] for k in sigs}
+    #
+    with open(ffile, "r") as f:
+        for line in f.readlines():
+            toks = line.strip().split()
+            for k,v in ret.items():
+                if k.startswith(toks[0]):
+                    if toks[0].find("Profiling") != -1:
+                        # generic case
+                        v.append( float(toks[-1]) )
+                    elif toks[2].startswith("nfull") and toks[1].find("readbuf") != -1:
+                        # nfull
+                        ooo = toks[2].split("=")[-1]
+                        if len(ooo) >= 5:
+                            v.append( -1 )
+                        else:
+                            v.append( int(ooo) )
+    #
+    return ret
+
+def make_patch_spines_invisible(ax):
+    # https://matplotlib.org/3.1.1/gallery/ticks_and_spines/multiple_yaxis_with_spines.html
+    ax.set_frame_on(True)
+    ax.patch.set_visible(False)
+    for sp in ax.spines.values():
+        sp.set_visible(False)
+
+def ParseArgs():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='aglogs', description='Asgard tool for coadder log analysis.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('dir', help = 'Directory with rank.?? sub-dirs, each having std{err,out}.', type=str)
+    # plot 
+    add('-p', help = 'Plot filename', dest = 'plot', default=None)
+    # to plot 
+    add('--asig', help = 'Signature on left side.', default='readbuf', dest='asig', choices=LogSigChoice) 
+    # to plot against
+    add('--bsig', help = 'Signature on right side.', default=[], dest='bsigs', nargs='*', choices=RTChoice)
+    # maxbufs
+    add('--maxbufs', help="Max buffers in the configuration.", default=8, type=int)
+    # done
+    return ap.parse_args()
+
+if __name__ == "__main__":
+    args = ParseArgs()
+    asigs = ["DADACoadd::Coadder {0}".format(args.asig)]
+    bsigs = ["DADACoadd::Profiling::{0}".format(x) for x in args.bsigs]
+    sigs = asigs + bsigs
+    plotfile = args.plot or "aglogs_"+os.path.dirname(args.dir).lower()+".pdf"
+    rankdir = os.listdir(args.dir)
+    RANKS = map(lambda x : int( x.split('.')[-1] ), rankdir )
+    files = [os.path.join(args.dir, rdir,"stdout") for rdir in rankdir]
+    # sort
+    idx = sorted(range(len(RANKS)), key=lambda k : RANKS[k])
+    RANKS = [RANKS[r] for r in idx] 
+    files = [files[r] for r in idx]
+    ##
+    with PdfPages(plotfile) as pdf:
+        for rank,f in zip(RANKS,files):
+            r = fileAction(f, sigs)
+            fig = plt.figure(dpi=300)
+            axa = plt.gca()
+            axa.set_title("rank={0} work={1}".format(rank,args.dir))
+            axb = [axa.twinx() for sig in args.bsigs]
+            for wid, bx in enumerate(axb):
+                bx.spines["right"].set_position(("axes", 1.0 + (wid * 0.2)))
+                make_patch_spines_invisible(bx)
+                bx.spines["right"].set_visible(True)
+            #
+            axa.plot( r[asigs[0]], "r." )
+            axa.set_ylabel(args.asig)
+            axa.tick_params('y', colors="r")
+            axa.set_ylim((0, args.maxbufs))
+            for kbsig,labelbsig, axl,cc in zip(bsigs, args.bsigs, axb, colors):
+                axl.plot( r[kbsig], cc+"." )
+                axl.set_ylabel(labelbsig)
+                axl.tick_params('y', colors=cc)
+            ##
+            plt.tight_layout()
+            pdf.savefig()
+            plt.clf()
+            plt.close()
