@@ -132,38 +132,23 @@ class DADACoadd  {
             eod = 0;
             incomplete = 0;
           }
+          else {
+            // weird condidtion
+            // read_chunk > bytes_chunk
+            // treat as eod
+            std::fill(data_f, data_f + sample_chunk, 0.0f);
+            // log
+            std::cerr << "DADACoadd::wEOD node=" << env.processor_name() << " ridx=" << running_index; 
+            eod = 1;
+            incomplete = 0;
+
+          }
           std::cout << "DADACoadd::Coadder read=" << read_chunk << " buffsz=" << bytes_chunk << std::endl;
           std::cout << "DADACoadd::Coadder readbuf nfull=" << dadain.UsedDataBuf() << " nbuf=" << num_readbuffs << std::endl;
           // sanity checks like local indices are same
           ctime = dHead.tstart + (running_index * nsamps * dHead.tsamp * 1E-6f / 86400.f);
           std::cout << "DADACoadd::Coadder ctime=" << std::dec << std::setprecision(double_maxprecision)<< ctime;
           std::cout << " rank=" << std::setprecision(6) << world.rank() << std::endl;
-          // BARRIER
-          #ifdef RT_PROFILE
-          rtimer.restart();
-          mpi::gather(world, ctime, vec_ctime, world_root);
-          std::cout << "DADACoadd::Profiling::Gather_ctime " << rtimer.elapsed() << std::endl;
-          #endif // RT_PROFILE
-          if (world.rank() == world_root) {
-            std::set<double> rtime (vec_ctime.begin(), vec_ctime.end());
-            if( rtime.size() == 1 ) {
-              // reset vec_rindex for future use
-              vec_ctime.clear();
-              participate = true;
-            }
-            else {
-              // loose hell
-              std::cerr << "DADACoadd::syncheck #1 failed!" << std::endl;
-              std::cerr << "Abort!" << std::endl;
-              int i_ = 0;
-              for (auto k_ : rtime) {
-                std::cerr << "\trtime["<< std::dec << i_++ << "]="; 
-                std::cerr << std::setprecision(double_maxprecision) << k_ << std::endl;
-                std::cerr << std::setprecision(6);
-              }
-              participate = false;
-            }
-          }
           // RFI excision -- level 1
           #ifdef RT_PROFILE
           rtimer.restart();
@@ -179,19 +164,34 @@ class DADACoadd  {
           #endif // RT_PROFILE
           participate = ctime == rtime;
           if (!participate) {
-            std::cerr << "DADACoadd::Coadder not participating" << std::endl;
-            std::cerr << "My   ctime=" << std::setprecision(double_maxprecision) << ctime << std::endl;
-            std::cerr << "Root ctime=" << std::setprecision(double_maxprecision) << rtime << std::endl;
+            std::cout << "DADACoadd::Coadder not participating" << std::endl;
+            std::cout << "My   ctime=" << std::setprecision(double_maxprecision) << ctime << std::endl;
+            std::cout << "Root ctime=" << std::setprecision(double_maxprecision) << rtime << std::endl;
           }
           #ifdef RT_PROFILE
           rtimer.restart();
-          mpi::reduce(world, participate ? yes : no, numants, std::plus<unsigned int>(), world_root);
+          world.barrier();
+          std::cout << "DADACoadd::Profiling::BeforeN " << rtimer.elapsed() << std::endl;
+          rtimer.restart();
+    mpi::reduce(world, participate ? yes : no, numants, std::plus<unsigned int>(), world_root);
+    //PMPI_Reduce(participate ? yes : no, numants, 1, MPI_UNSIGNED_INT, MPI_SUM, world_root, world);
           std::cout << "DADACoadd::Profiling::Reduce_numant " << rtimer.elapsed() << std::endl;
+          rtimer.restart();
+          world.barrier();
+          std::cout << "DADACoadd::Profiling::AfterN " << rtimer.elapsed() << std::endl;
           #endif // RT_PROFILE
           #ifdef RT_PROFILE
           rtimer.restart();
-          mpi::reduce(world, participate ? data_f : zero_data_f, sample_chunk, o_data_f, std::plus<float>(), world_root);
+          //mpi::reduce(world, participate ? data_f : zero_data_f, sample_chunk, o_data_f, std::plus<float>(), world_root);
+          world.barrier();
+          std::cout << "DADACoadd::Profiling::BeforeB " << rtimer.elapsed() << std::endl;
+          rtimer.restart();
+  PMPI_Reduce(participate ? data_f : zero_data_f, o_data_f, 
+    sample_chunk, MPI_FLOAT, MPI_SUM, world_root, world);
           std::cout << "DADACoadd::Profiling::Reduce_coadd " << rtimer.elapsed() << std::endl;
+          rtimer.restart();
+          world.barrier();
+          std::cout << "DADACoadd::Profiling::AfterB " << rtimer.elapsed() << std::endl;
           #endif // RT_PROFILE
           // WRITING
           if(world.rank() == world_root) {

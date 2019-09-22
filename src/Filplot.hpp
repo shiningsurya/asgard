@@ -87,7 +87,8 @@ class CandSummary : protected Plotter {
 						}
 						////////////////////////////////////////////////// 
 						cpgsci(1); // color index
-						cpgmtxt("T",1, .5, .5, cant[0][0].group.c_str());
+						auto cc = cant[0][0];
+						cpgmtxt("T",1, .5, .5, cc.group.c_str());
 						count++;
 						iant++;
 				}

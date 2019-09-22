@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python2.7
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')

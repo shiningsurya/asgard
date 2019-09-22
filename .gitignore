@@ -61,3 +61,6 @@ test/Test*.cpp
 test/testcompi
 testdada
 testrun
+
+# slack token
+bin/.ag_slackrc

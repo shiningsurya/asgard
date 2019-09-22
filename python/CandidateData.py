@@ -5,12 +5,16 @@ All for the sake of efficiency
 '''
 import numpy as np
 import datetime as dt
-import astropy.time as at
-from astropy.coordinates import SkyCoord
+try:
+  import astropy.time as at
+  from astropy.coordinates import SkyCoord
+except:
+  print "Astropy not found"
 import os
 import copy
 
 DATEFMT = "%Y%m%d_%H%M%S"
+TSAMP = 781.25E-6
 
 class Candidates(object):
     '''
@@ -46,9 +50,9 @@ def OneLine(line):
         return float(lt[0]), float(lt[1]), None, None
     else:
         pt = float(lt[2])
-        tsamp = pt / int(lt[1])
-        diff = int(lt[8]) - int(lt[7])
-        return float(lt[0]), pt, float(lt[5]), diff * tsamp
+        #diff = int(lt[8]) - int(lt[7]) -- this is not exactly filterwidth
+        diff = int(lt[3])
+        return float(lt[0]), pt, float(lt[5]), diff * TSAMP
 
 class NullCandidateData(object):
     '''
@@ -164,7 +168,7 @@ def FilterCandidateData(cdata, sncut=[0,10], dmcut=[0,100]):
     ret.n = ret.sn.size
     return ret
 
-def WriteCandidateData(cdata, filename=None, tsamp=781.25E-6):
+def WriteCandidateData(cdata, filename=None, tsamp=TSAMP):
     '''
     Writes out candidates in Heimdall format
     If filename is None, filename is constructed from cdata.

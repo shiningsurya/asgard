@@ -70,7 +70,10 @@ CandidateList ReadCandidates(const std::string st, double ts) {
 		fs::ifstream ifs(st);
 		std::string group = GetGroup(st);
 		std::string ant = GetAntenna(st);
-		while(std::getline(ifs,line)) ret.push_back(Candidate(line, ts, group, ant));
+		while(std::getline(ifs,line)) {
+		  if (line.length() > )
+      ret.push_back(Candidate(line, ts, group, ant));
+  }
 		ifs.close();
 		return ret;
 }

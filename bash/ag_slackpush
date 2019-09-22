@@ -1,0 +1,31 @@
+#!/bin/bash
+####################################################################################
+# Slack Bash console script for sending messages.
+# Heavily modified from https://gist.githubusercontent.com/andkirby/67a774513215d7ba06384186dd441d9e/raw 
+## Usage
+# accepts messages as arguments or from pipe
+####################################################################################
+
+set -o errexit
+set -o nounset
+#set -o xtrace
+
+. /home/vlite-master/surya/asgard/bash/.ag_slackrc
+
+if [[ $# -eq 0 ]]; then
+  while read msg; do
+    MSG="$(printf "{\"text\": \"%s\"}" \
+          "${msg}" \
+      )"
+    curl --silent -X POST -H 'Content-type: application/json' --data "${MSG}" ${APP_SLACK_WEBHOOK}
+  done
+else
+  for msg in "$@"; do
+    MSG="$(printf "{\"text\": \"%s\"}" \
+          "${msg}" \
+      )"
+    curl --silent -X POST -H 'Content-type: application/json' --data "${MSG}" ${APP_SLACK_WEBHOOK}
+  done
+fi
+
+echo

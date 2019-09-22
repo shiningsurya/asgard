@@ -1,0 +1,28 @@
+#!/bin/bash
+#set -x
+# computes duration of the run
+# from the coadder logs
+
+#1 directory to logs
+if [[ $# -eq 0 ]]; then
+  echo "Usage: rundur <path-to-coadder-logs>"
+  exit 0
+fi
+
+LOGFILE="${1}/rank.00/stdout"
+# defaults to rank0 logs
+
+
+TSTART=$( egrep "\[.*\] PsrDADA::ReadData" ${LOGFILE}| head -n1 | cut -d" " -f1)
+# starting
+
+TEND=$(egrep "\[.*\] PsrDADA::ReadData" ${LOGFILE} | tail -n1 | cut -d" " -f1)
+# ending
+
+
+if hash ts_dur 2> /dev/null; then
+  exec ts_dur "${TSTART}" "${TEND}" -l
+else
+  echo "START: ${TSTART}"
+  echo "END:   ${TEND}"
+fi

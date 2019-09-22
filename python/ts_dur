@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/local/bin/python2.7
 from datetime import datetime
 
 def ParseArgs():
@@ -6,16 +6,28 @@ def ParseArgs():
     ap = argparse.ArgumentParser(prog='ts_dur', description='Asgard minitool to find duration between two timestamps', epilog='Part of Asgard')
     add = ap.add_argument
     add('ts', help = 'multilog timestamps', nargs=2)
+    add('-l', help = 'scripted input', action='store_true',dest='script')
     return ap.parse_args()
 
-DATEFMT = "%Y-%m-%d-%H:%M:%S"
+DATEFMT  = "%Y-%m-%d-%H:%M:%S"
+DATEFMTL = "[%Y-%m-%d-%H:%M:%S]"
 
 if __name__ == "__main__":
     args = ParseArgs()
     assert len(args.ts) == 2 
-    one = datetime.strptime(args.ts[0], DATEFMT)
-    two = datetime.strptime(args.ts[1], DATEFMT)
-    print two - one
+    try:
+      one = datetime.strptime(args.ts[0], DATEFMTL)
+      two = datetime.strptime(args.ts[1], DATEFMTL)
+    except ValueError:
+      print "args = ", args.ts
+    if args.script:
+      # proper printing
+      sf = "{0: <10} {1}"
+      print sf.format("START:", one)
+      print sf.format("STOP:", two)
+      print sf.format("DURATION:", two-one)
+    else:
+      print two - one
 
 
 
