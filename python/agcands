@@ -29,17 +29,21 @@ def parseArgs():
     add('-o,ofile', help='Plot output file', dest='ofile')
     add('-p,plot', help='Plot type', choices=PlotTypes)
     add('--ant', help='Antenna', default='ea99', dest='ant')
+    add('--snmax', help='S/N Max', default=100, dest='snmax', type=int)
+    add('--snmin', help='S/N Min', default=5, dest='snmin', type=int)
     #
     return pap.parse_args()
 
 if __name__ == '__main__':
     args = parseArgs()
+    cp.snmax = args.snmax
+    cp.snmin = args.snmin
     
     with PdfPages(args.ofile) as pdf:
-        plt.figure(dpi=300)
+        fig = plt.figure(dpi=300)
         for cfile in args.cands:
-            cx = {args.ant:cs.CandidateData (cfile)}
-            cp.VsTime(cx)
+            cx = cs.CandidateData (cfile)
+            cp.CVsTime(cx, afig=fig)
             pdf.savefig()
             plt.clf()
         plt.close()

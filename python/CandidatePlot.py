@@ -4,6 +4,7 @@ import sys
 import cPickle as cpk
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
 import CandidateData as cd
 import CandidateSet as cs
 import CandidateJSON as cj
@@ -145,7 +146,54 @@ def AllScatter(xx, saveas=None):
         plt.savefig(fi)
         plt.close()
 
-def VsTime(xx, saveas=None):
+def CVsTime(xx, saveas=None, afig=None):
+    '''
+    Performs a vs time plot of S/N, DM, and width of a CandidateData
+
+    Arguments
+    ---------
+    xx : instance of CandidateData
+    '''
+    if not isinstance(xx, cd.CandidateData):
+        raise TypeError("Type of input not understood.")
+    fig = afig or plt.figure(dpi=300)
+    ## Width vs PeakTime
+    ax1 = fig.add_axes([0.1, 0.05, 0.8, 0.3])
+    ax1.set_yscale('log')
+    ax1.set_ylabel('Width (s)')
+    ax1.set_ylim([wdmin, wdmax])
+    ax1.set_xlabel('Time (s)')
+    ## S/N vs PeakTime
+    ax2 = fig.add_axes([0.1, 0.35, 0.8, 0.3])
+    ax2.set_yscale('log')
+    ax2.set_ylabel('S/N')
+    ax2.set_ylim([snmin, snmax])
+    ax2.yaxis.tick_right()
+    ax2.set_xticks([])
+    ## DM vs PeakTime
+    ax3 = fig.add_axes([0.1, 0.65, 0.8, 0.3])
+    ax3.set_yscale('log')
+    ax3.set_ylabel('DM (pc/cc)')
+    ax3.set_ylim([dmmin, dmmax])
+    ax3.set_xticks([])
+    ## join axes
+    ax1.get_shared_x_axes().join(ax1,ax2)
+    ax1.get_shared_x_axes().join(ax1,ax3)
+    ## colors
+    lcolors = cm.rainbow(np.linspace(0,1,xx.n))
+    ## plotting
+    for pt,px,lc in zip(xx.peak_time,xx.width,lcolors):
+        ax1.scatter(pt,px,edgecolors='none', alpha=0.8, c=lc)
+    for pt,px,lc in zip(xx.peak_time,xx.sn,lcolors):
+        ax2.scatter(pt,px,edgecolors='none', alpha=0.8, c=lc)
+    for pt,px,lc in zip(xx.peak_time,xx.dm,lcolors):
+        ax3.scatter(pt,px,edgecolors='none', alpha=0.8, c=lc)
+    ax3.set_title("T{0} @ J{1}".format(xx.tstart, xx.coord.to_string("hmsdms")))
+    if isinstance(xx, str):
+        plt.savefig(fi)
+        plt.close()
+
+def VsTime(xx, saveas=None, afig=None):
     '''
     Performs a vs time plot of S/N, DM, and width.
 
@@ -161,7 +209,7 @@ def VsTime(xx, saveas=None):
         fi = saveas 
     else:
         raise TypeError("Type of xx not understood.")
-    fig = plt.figure(dpi=300)
+    fig = afig or plt.figure(dpi=300)
     ## Width vs PeakTime
     ax1 = fig.add_axes([0.1, 0.05, 0.8, 0.3])
     ax1.set_yscale('log')

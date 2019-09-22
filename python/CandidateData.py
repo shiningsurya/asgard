@@ -6,6 +6,7 @@ All for the sake of efficiency
 import numpy as np
 import datetime as dt
 import astropy.time as at
+from astropy.coordinates import SkyCoord
 import os
 import copy
 
@@ -86,6 +87,7 @@ class CandidateData(Candidates):
         filename
     ra: Galactic lat in ra
     dec: Galactic lon in dec
+    coord: astropy.SkyCord
     '''
     def __init__(self, ff, ant=None, tstart_=None):
         if isinstance(ff, str):
@@ -117,6 +119,12 @@ class CandidateData(Candidates):
             tds = map(lambda t : dt.timedelta(seconds=t), self.peak_time)
             time = map(lambda t : self.tstart + t, tds)
             self.mjd = map(lambda t : at.Time(t).mjd, time)
+        # ra,dec
+        if self.ra and self.dec:
+            self.coord = SkyCoord(self.ra, self.dec, unit="rad")
+        else:
+            self.coord = None
+
 
 class CandidateGroup(object):
     '''
