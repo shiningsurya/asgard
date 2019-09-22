@@ -10,7 +10,7 @@ LOGROOT = "/home/shining/wtf/logs"
 LogSig = "DADACoadd::Coadder"
 LogSigChoice = ["readbuf"]
 RTSig = "DADACoadd::Profiling"
-RTChoice = ["DataLoop", "ReadData", "Reduce_coadd", "xRFI_1", "Gather_ctime", "Bcast_rtime", "Reduce_numant", "WriteData", "xRFI_2"]
+RTChoice = ["DataLoop", "ReadData", "Reduce_coadd", "xRFI_1", "Gather_ctime", "Bcast_rtime", "Reduce_numant", "WriteData", "xRFI_2", "BeforeB", "AfterB"]
 colors = ["b", "g", "k", "m"]
 ### constants end
 def fileAction(ffile, sigs):
@@ -65,6 +65,8 @@ def ParseArgs():
     add('--bsig', help = 'Signature on right side.', default=[], dest='bsigs', nargs='*', choices=RTChoice)
     # maxbufs
     add('--maxbufs', help="Max buffers in the configuration.", default=8, type=int)
+    # maxbufs
+    add('--log', help="Toggle log scale.", action='store_true')
     # done
     return ap.parse_args()
 
@@ -75,7 +77,7 @@ if __name__ == "__main__":
     sigs = asigs + bsigs
     plotfile = args.plot or "aglogs_"+os.path.dirname(args.dir).lower()+".pdf"
     rankdir = os.listdir(args.dir)
-    RANKS = map(lambda x : int( x.split('.')[-1] ), rankdir )
+    RANKS = list(map(lambda x : int( x.split('.')[-1] ), rankdir ))
     files = [os.path.join(args.dir, rdir,"stdout") for rdir in rankdir]
     # sort
     idx = sorted(range(len(RANKS)), key=lambda k : RANKS[k])
@@ -89,6 +91,9 @@ if __name__ == "__main__":
             axa = plt.gca()
             axa.set_title("rank={0} work={1}".format(rank,args.dir))
             axb = [axa.twinx() for sig in args.bsigs]
+            if args.log:
+                for b in axb:
+                    b.set_yscale('log')
             for wid, bx in enumerate(axb):
                 bx.spines["right"].set_position(("axes", 1.0 + (wid * 0.2)))
                 make_patch_spines_invisible(bx)
@@ -101,6 +106,7 @@ if __name__ == "__main__":
             for kbsig,labelbsig, axl,cc in zip(bsigs, args.bsigs, axb, colors):
                 axl.plot( r[kbsig], cc+"." )
                 axl.set_ylabel(labelbsig)
+                axl.yaxis.label.set_color(cc)
                 axl.tick_params('y', colors=cc)
             ##
             plt.tight_layout()

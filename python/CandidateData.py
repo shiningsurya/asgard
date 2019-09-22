@@ -33,10 +33,10 @@ def ExtractDTandAnt(fname):
         ant = toks[3]
         ret = dt.datetime.strptime(date_str, DATEFMT) 
     except:
-        print toks
-        print "Error reading Candidate ", fname
-        print "     ant ", ant
-        print "     dt  ", ret 
+        print (toks)
+        print ( "Error reading Candidate ", fname )
+        print ( "     ant ", ant )
+        print ( "     dt  ", ret  )
     return ret, ant
 
 def OneLine(line):

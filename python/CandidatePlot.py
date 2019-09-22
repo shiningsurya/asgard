@@ -1,7 +1,10 @@
 # imports
 import os
 import sys
-import cPickle as cpk
+try:
+    import cPickle as cpk
+except:
+    import pickle as cpk
 import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm

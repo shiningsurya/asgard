@@ -1,4 +1,4 @@
-#!/usr/local/bin/python2.7
+#!/usr/bin/python3
 import os
 import numpy as np
 # asgard python in
@@ -40,19 +40,19 @@ if __name__ == '__main__':
     else:
         DMLOW, DMHIGH = map(float, args.dm[:2])
     if args.verbose:
-        print "SN in [{0}, {1}]".format(SNLOW, SNHIGH)
-        print "DM in [{0}, {1}]".format(DMLOW, DMHIGH)
+        print ("SN in [{0}, {1}]".format(SNLOW, SNHIGH))
+        print ("DM in [{0}, {1}]".format(DMLOW, DMHIGH))
     #
     for cfile in args.cands:
         cx  = cd.CandidateData(cfile)
         fcx = cd.FilterCandidateData(cx, sncut=[SNLOW,SNHIGH], dmcut=[DMLOW,DMHIGH])
         if fcx.n >= args.n:
-            print "{0}\tFound {1} candidates.".format(cfile, fcx.n)
+            print("{0}\tFound {1} candidates.".format(cfile, fcx.n))
             if args.printcand:
                 pformat = "{0: <16}  {1: <12}  {2: <12}"
-                print pformat.format("PeakTime(s)", "S/N", "DM (pc/cc)")
+                print (pformat.format("PeakTime(s)", "S/N", "DM (pc/cc)"))
                 for pt, sn, dm in zip(fcx.peak_time, fcx.sn, fcx.dm):
-                    print pformat.format(pt, sn, dm)
+                    print (pformat.format(pt, sn, dm))
             #
             if args.overwrite:
                 ofile = AddSelToFilename(cfile)

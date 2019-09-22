@@ -27,7 +27,7 @@ def Read(fname):
                 with open(ff, "rb") as f:
                     ret.append( ubjson.loadb(f.read()) )
             except:
-                print "Error with file ", ff
+                print ( "Error with file ", ff )
     return ret
 
 def ReadDir(dirname):
@@ -88,8 +88,8 @@ def PrintSON(x):
 
     '''
     # XXX maybe I should just put it in a class
-    print "---------------------------------------------"
-    print "S/N: {0:3.2f}   DM: {1:3.2f} pc/cc".format(x["sn"], x['dm'])
+    print ( "---------------------------------------------" )
+    print ( "S/N: {0:3.2f}   DM: {1:3.2f} pc/cc".format(x["sn"], x['dm']) )
 
 def Unpack(ix, nsamps, nchans, nbits):
     '''
