@@ -1,4 +1,5 @@
-#!/usr/local/bin/python2.7
+#!/usr/bin/env python
+import os
 import numpy as np
 import matplotlib
 matplotlib.use('Agg')
@@ -26,26 +27,80 @@ def parseArgs():
     pap = argparse.ArgumentParser(prog='agcands', description='Command line to tool to visualize, vet candidates.', epilog='Part of Asgard', add_help=True)
     add = pap.add_argument
     add('cands', help='Candidates files', nargs='*')
-    add('-o,ofile', help='Plot output file', dest='ofile')
-    add('-p,plot', help='Plot type', choices=PlotTypes)
+    add('-o,ofile', help='Plot output file. Becomes directory with png mode.', dest='ofile')
+    add('-p,plot', help='Plot type', choices=PlotTypes, dest='plot')
     add('--ant', help='Antenna', default='ea99', dest='ant')
     add('--snmax', help='S/N Max', default=100, dest='snmax', type=int)
     add('--snmin', help='S/N Min', default=5, dest='snmin', type=int)
+    add('--bins', help='Bins in corner plot.', default=500, dest='bins', type=int)
+    add('--png', help='Write new png for each candidate file.', action='store_true', dest='png')
     #
     return pap.parse_args()
 
 if __name__ == '__main__':
     args = parseArgs()
+    plotfile = args.ofile or "agcands_"+os.path.dirname(args.plot).lower()+".pdf"
     cp.snmax = args.snmax
     cp.snmin = args.snmin
     
-    with PdfPages(args.ofile) as pdf:
+    if args.plot == "DMtime":
+        if args.png:
+            fig = plt.figure(dpi=300)
+            odir = args.ofile or "./"
+            for cfile in args.cands:
+                ofile = os.path.splitext(os.path.basename( cfile ))[0] + ".png"
+                cx = cs.CandidateData (cfile)
+                cp.CVsTime(cx, afig=fig)
+                plt.savefig(os.path.join(odir, ofile))
+                plt.clf()
+            plt.close()
+        else:
+            with PdfPages(plotfile) as pdf:
+                fig = plt.figure(dpi=300)
+                for cfile in args.cands:
+                    cx = cs.CandidateData (cfile)
+                    cp.CVsTime(cx, afig=fig)
+                    pdf.savefig()
+                    plt.clf()
+                plt.close()
+    elif args.plot == "corner":
+        plotfile = args.ofile or "agcands_corner.pdf"
         fig = plt.figure(dpi=300)
+        ax = plt.gca()
+        # --
+        count = 0
+        nbins = args.bins
+        hh = np.zeros((nbins, nbins))
+        dmedges = np.linspace(cp.dmmin, cp.dmmax, nbins+1)
+        snedges = np.linspace(cp.snmin, cp.snmax, nbins+1)
+        ax.set_xlim(cp.dmmin, cp.dmmax)
+        ax.set_ylim(cp.snmin, cp.snmax)
+        ax.set_xlabel('DM (pc/cc)')
+        ax.set_ylabel('S/N')
+        ax.set_xscale('log')
+        ax.set_yscale('log')
         for cfile in args.cands:
             cx = cs.CandidateData (cfile)
-            cp.CVsTime(cx, afig=fig)
-            pdf.savefig()
-            plt.clf()
+            count = count + cx.n
+            a, _, _ = np.histogram2d( 
+                    cx.dm, cx.sn,
+                    bins = (dmedges, snedges),
+                    density=True
+                    )
+            hh = hh + np.nan_to_num(a)
+        xx, yy, cc = [],[],[]
+        zas = np.argsort(hh.ravel())
+        for iz in zas:
+            izx = iz//nbins
+            izy = iz - (nbins*izx)
+            xx.append(dmedges[izx])
+            yy.append(snedges[izy])
+            cc.append(hh[izx,izy])
+        plt.scatter(xx,yy,c=cc,
+                marker='.',cmap=plt.cm.jet )
+        plt.title("ncands = {0}".format(count))
+        plt.tight_layout()
+        plt.savefig(plotfile)
         plt.close()
 
 

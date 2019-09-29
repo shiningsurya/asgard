@@ -47,8 +47,8 @@ colors['ea99'] = "#ff0000"
 colors['ea00'] = "#ff0000"
 
 # limits
-snmin, snmax = 5, 100
-wdmin, wdmax = 1e-3, 1
+snmin, snmax = 6, 100
+wdmin, wdmax = 781.25E-6, 50e-3
 dmmin, dmmax = 10, 1000
 
 def ReadPkl(f):
@@ -183,14 +183,12 @@ def CVsTime(xx, saveas=None, afig=None):
     ax1.get_shared_x_axes().join(ax1,ax2)
     ax1.get_shared_x_axes().join(ax1,ax3)
     ## colors
-    lcolors = cm.rainbow(np.linspace(0,1,xx.n))
+    maxpt = np.ceil(xx.peak_time.max())
+    normer = plt.Normalize(vmin = 0, vmax = maxpt)
     ## plotting
-    for pt,px,lc in zip(xx.peak_time,xx.width,lcolors):
-        ax1.scatter(pt,px,edgecolors='none', alpha=0.8, c=lc)
-    for pt,px,lc in zip(xx.peak_time,xx.sn,lcolors):
-        ax2.scatter(pt,px,edgecolors='none', alpha=0.8, c=lc)
-    for pt,px,lc in zip(xx.peak_time,xx.dm,lcolors):
-        ax3.scatter(pt,px,edgecolors='none', alpha=0.8, c=lc)
+    ax1.scatter(xx.peak_time, xx.width, edgecolors='none', alpha=0.8, cmap=plt.cm.rainbow, c=normer( np.ceil( xx.peak_time ) ), s=8)
+    ax2.scatter(xx.peak_time, xx.sn, edgecolors='none', alpha=0.8, cmap=plt.cm.rainbow, c=normer( np.ceil( xx.peak_time ) ), s=8)
+    ax3.scatter(xx.peak_time, xx.dm, edgecolors='none', alpha=0.8, cmap=plt.cm.rainbow, c=normer( np.ceil( xx.peak_time ) ), s=8)
     ax3.set_title("T{0} @ J{1}".format(xx.tstart, xx.coord.to_string("hmsdms")))
     if isinstance(xx, str):
         plt.savefig(fi)
