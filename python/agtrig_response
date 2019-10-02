@@ -1,0 +1,78 @@
+#!/usr/bin/env python2.7
+import os
+import re
+import datetime as dt
+import pytz
+import numpy as np
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+### constants begin
+LOGROOT = "/home/shining/wtf/logs"
+READ_S  = "PsrDADA::ReadData"
+CTIM_S  = "DADACoadder ctime="
+LOG_TS  = "[%Y-%m-%d-%H:%M:%S]"
+TRI_TS  = "%Y-%m-%d-%H:%M:%S"
+TRIG_S  = 
+DIF     = dt.timedelta(hours=6) # pytz is hard and full of bugs
+### constants end
+def fileAction(ffile):
+    '''
+    Generic log file parser
+
+    Arguments
+    ---------
+    ffile : str
+        Log file to read
+
+    Returns
+    -------
+    lag : array of floats
+        Seconds of lag
+    '''
+    ret = []
+    sigs = ['(writer)', 'received', 'a', 'trigger', 'with']
+    #
+    with open(ffile, "r") as f:
+        for line in f.readlines():
+            toks = line.strip().split()
+            if toks[1:6] == sigs:
+                logtime = dt.datetime.strptime(toks[0], LOG_TS)  # logtime toks[0]
+                offset  = dt.timedelta(seconds=float(toks[-1]))  # trigger offset toks[-1]
+                meta    = dt.datetime.strptime(toks[-3], TRI_TS) # trigger meta toks[-3]
+                #
+                diff = ((logtime+DIF) - (meta + offset))
+                #print "trigger at {0} & logtime={1} diff={2}".format(meta+offset, logtime+DIF, diff)
+                ret.append( diff.seconds )
+    #
+    return np.array(ret)
+
+def ParseArgs():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='agtrig_response', description='Asgard tool to scrap writer logs for trigger info.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('files', help = 'Writer log files.', type=str, nargs='*')
+    # plot 
+    add('-p', help = 'Plot filename', dest = 'plot', default=None)
+    # done
+    return ap.parse_args()
+
+if __name__ == "__main__":
+    args = ParseArgs()
+    sf="{3: <40} = {0} triggers with mean delay {1:4.2f} (+- {2:2.2f})"
+    #
+    for f in args.files:
+      ret = fileAction(f)
+      print sf.format(ret.size, ret.mean(), ret.std(), f)
+
+
+
+
+
+
+
+
+
+

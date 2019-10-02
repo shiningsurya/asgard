@@ -1,0 +1,137 @@
+#!/usr/bin/env python2.7
+import os
+import glob
+import datetime as dt
+from astropy.time import Time
+mjder = lambda x : Time(x, format='mjd').datetime
+import numpy as np
+import matplotlib
+import matplotlib.cm as cm
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
+##
+TEST="/home/vlite-master/surya/logs/forgot_run/rank.15/stdout"
+LogSig = "DADACoadd::Coadder"
+LogSigChoice = ["readbuf"]
+READ_S  = "PsrDADA::ReadData"
+CTIM_S  = "DADACoadder ctime="
+LOG_TS  = "[%Y-%m-%d-%H:%M:%S]"
+TRI_TS  = "%Y-%m-%d-%H:%M:%S"
+DIF     = dt.timedelta(hours=6) # pytz is hard and full of bugs
+# Time handling in python sucks big time. 
+# astropy time makes it more worse.
+sf1 = "{0: <10} {1: <10} {2: <10}"
+sf = "{0} {1} {2}"
+##
+def ParseArgs():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='agrtdiag', description='Asgard tool to examine realtime-ness.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('dir', help = 'Directory with rank.?? sub-dirs, each having std{err,out}.', type=str)
+    # plot 
+    add('-p', help = 'Plot filename', dest = 'plot', default=None)
+    # maxbufs
+    add('--maxbufs', help="Max buffers in the configuration.", default=16, type=int)
+    # done
+    return ap.parse_args()
+
+def file_RC (ffile):
+    '''Lag between readtimes and ctimes'''
+    ret = []
+    reads = []
+    ctime = []
+    with open(ffile,"r") as f:
+        for line in f.readlines():
+            toks = line.strip().split()
+            if READ_S in toks and toks[2].startswith("key"):
+                reads.append( dt.datetime.strptime(toks[0], LOG_TS) )
+            elif len(toks) == 3 and toks[1].startswith("ctime="):
+                ctime.append (mjder( (float(toks[1].split("=")[-1])) ))
+        #
+        print len(reads), len(ctime)
+        assert len(reads) == len(ctime)
+        print sf.format("ctime", "rtime", "lag")
+        for cc,rr in zip(ctime, reads):
+            print sf.format(cc, rr + DIF, 86400.0 - (cc - rr - DIF).seconds)
+            ret.append(86400.0 - (cc - rr - DIF).seconds)
+        return ret
+
+def file_trig(ffile):
+    '''
+    Arguments
+    ---------
+    ffile : str
+        Log file to read
+
+    Returns
+    -------
+    lag : array of floats
+        Seconds of lag
+    '''
+    ret = []
+    sigs = ['(writer)', 'received', 'a', 'trigger', 'with']
+    #
+    with open(ffile, "r") as f:
+        for line in f.readlines():
+            toks = line.strip().split()
+            if toks[1:6] == sigs:
+                logtime = dt.datetime.strptime(toks[0], LOG_TS)  # logtime toks[0]
+                offset  = dt.timedelta(seconds=float(toks[-1]))  # trigger offset toks[-1]
+                meta    = dt.datetime.strptime(toks[-3], TRI_TS) # trigger meta toks[-3]
+                #
+                diff = ((logtime+DIF) - (meta + offset))
+                #print "trigger at {0} & logtime={1} diff={2}".format(meta+offset, logtime+DIF, diff)
+                ret.append( diff.seconds )
+    #
+    return np.array(ret)
+
+def file_readbuf(ffile):
+    ret = []
+    with open(ffile,"r") as f:
+        for line in f.readlines():
+            toks = line.strip().split()
+            if len(toks) == 4 and toks[1] in LogSigChoice:
+                # nfull
+                ooo = toks[2].split("=")[-1]
+                if len(ooo) >= 5:
+                    ret.append( -1 )
+                else:
+                    ret.append( int(ooo) )
+    return ret
+                
+if __name__ == "__main__":
+    args = ParseArgs()
+    r = file_RC(TEST)
+    import sys; sys.exit()
+    plotfile = args.plot or "agrtdiag_"+os.path.dirname(args.dir).lower()+".pdf"
+    rankdir = os.listdir(args.dir)
+    RANKS = map(lambda x : int( x.split('.')[-1] ), rankdir )
+    files = [os.path.join(args.dir, rdir,"stdout") for rdir in rankdir]
+    # sort
+    idx = sorted(range(len(RANKS)), key=lambda k : RANKS[k])
+    RANKS = [RANKS[r] for r in idx] 
+    files = [files[r] for r in idx]
+    ##
+    with PdfPages(plotfile) as pdf:
+        for rank,f in zip(RANKS,files):
+            rbufs = file_readbuf(f)
+            rclag = file_RC(f)
+            fig = plt.figure(dpi=300)
+            axa = plt.gca()
+            axa.set_title("rank={0} work={1}".format(rank,args.dir))
+            axa.set_ylim((0, args.maxbufs))
+            axa.set_ylabel("readbuf")
+            axa.tick_params('y', colors="r")
+            axb = axa.twinx()
+            axb.set_ylabel("read lag (s)")
+            axb.tick_params('y', colors="b")
+            rf = "rank {0}"
+            axa.plot( rbufs, "r." )
+            axb.plot( rclag, "b." )
+            plt.tight_layout()
+            pdf.savefig()
+            plt.clf()
+            plt.close()
+

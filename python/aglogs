@@ -10,7 +10,7 @@ LOGROOT = "/home/shining/wtf/logs"
 LogSig = "DADACoadd::Coadder"
 LogSigChoice = ["readbuf"]
 RTSig = "DADACoadd::Profiling"
-RTChoice = ["DataLoop", "ReadData", "Reduce_coadd", "xRFI_1", "Gather_ctime", "Bcast_rtime", "Reduce_numant", "WriteData", "xRFI_2"]
+RTChoice = ["DataLoop", "ReadData", "Reduce_coadd", "xRFI_1", "Gather_ctime", "Bcast_rtime", "Reduce_numant", "WriteData", "xRFI_2", "BeforeB", "AfterB", "BeforeN","AfterN"]
 colors = ["b", "g", "k", "m"]
 ### constants end
 def fileAction(ffile, sigs):
