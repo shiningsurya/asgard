@@ -105,6 +105,8 @@ class DADACoadd  {
           std::cout << "DADACoadd::Profiling::ReadData " << rtimer.elapsed() << std::endl;
           #endif // RT_PROFILE
           // if Read header for the first time
+          #ifdef RT_PROFILE
+          rtimer.restart();
           if(!running_index) {
             dHead = std::move(dadain.GetHeader());
             dadain.PrintHeader();
@@ -112,9 +114,10 @@ class DADACoadd  {
           if( read_chunk == -1 ) {
             // fill zeros because read failed
             // EOD read fail
-            std::fill(data_f, data_f + sample_chunk, 0.0f);
+            // std::fill(data_f, data_f + sample_chunk, 0.0f);
+            // ^ don't need this fill
             // log
-            std::cerr << "DADACoadd::EOD node=" << env.processor_name() << " ridx=" << running_index; 
+            std::cerr << "DADACoadd::EOD node=" << env.processor_name() << " ridx=" << running_index << std::endl; 
             eod = 1;
             incomplete = 0;
           }
@@ -125,7 +128,7 @@ class DADACoadd  {
             incomplete = 1;
             eod = 0;
             // log
-            std::cerr << "DADACoadd::Incomplete node=" << env.processor_name() << " ridx=" << running_index; 
+            std::cerr << "DADACoadd::Incomplete node=" << env.processor_name() << " ridx=" << running_index << std::endl; 
           }
           else if( read_chunk == bytes_chunk) {
             // perfect world case
@@ -136,13 +139,15 @@ class DADACoadd  {
             // weird condidtion
             // read_chunk > bytes_chunk
             // treat as eod
-            std::fill(data_f, data_f + sample_chunk, 0.0f);
+            // std::fill(data_f, data_f + sample_chunk, 0.0f);
+            // ^ don't need this fill
             // log
-            std::cerr << "DADACoadd::wEOD node=" << env.processor_name() << " ridx=" << running_index; 
+            std::cerr << "DADACoadd::wEOD node=" << env.processor_name() << " ridx=" << running_index << std::endl; 
             eod = 1;
             incomplete = 0;
-
           }
+          std::cout << "DADACoadd::Profiling::PostRead " << rtimer.elapsed() << std::endl;
+          #endif // RT_PROFILE
           std::cout << "DADACoadd::Coadder read=" << read_chunk << " buffsz=" << bytes_chunk << std::endl;
           std::cout << "DADACoadd::Coadder readbuf nfull=" << dadain.UsedDataBuf() << " nbuf=" << num_readbuffs << std::endl;
           // sanity checks like local indices are same
