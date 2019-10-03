@@ -1,6 +1,7 @@
 #!/bin/bash
 # BASH script to filter out candidates
 # when C++, python is too hifi for the problem
+#set -x
 
 usage() {
 		echo "Asgard::agcandfilter"
@@ -11,7 +12,9 @@ usage() {
 
 mightdm=false
 mightsn=false
+SN_LOWER=10.0
 SN_HIGHER=1000.0
+DM_LOWER=100.0
 DM_HIGHER=4000.0
 # getopt 
 while getopts ":hs:d:o:" arg
@@ -49,16 +52,16 @@ do
 		esac
 done
 
-echo "--Diagnostic"
-echo "sn ${SN_LOWER} ${SN_HIGHER}"
-echo "dm ${DM_LOWER} ${DM_HIGHER}"
-echo "odir ${ODIR}"
-
 if [[ "$#" -eq 0 ]]; then
 		echo "No arguments provided!"
 		exit 0
 fi
 
+CFILE=${@:${OPTIND}:1}
+
 # awk
+awk     -v snl="${SN_LOWER}" -v snu="${SN_HIGHER}" \
+				-v dml="${DM_LOWER}" -v dmu="${DM_HIGHER}" \
+				'{if(NF>2)if($1>snl && $1<snu)if($6>dml && $6<dmu)print}' $1
 
 # 

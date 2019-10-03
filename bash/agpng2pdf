@@ -13,8 +13,15 @@ fi
 GROUP=$1
 NUM=$(ls | egrep "^${GROUP}" | wc -l)
 echo "Found $NUM of $GROUP"
-ARG=${GROUP}_{2..${NUM}}
 OUT=${GROUP/%png/pdf}
 
-eval convert ${GROUP} ${ARG} ${OUT}
+if [ ${NUM} -ge 3 ]; then
+		ARG=${GROUP}_{2..${NUM}}
+		eval convert ${GROUP} ${ARG} ${OUT}
+elif [ ${NUM} -eq 2 ]; then
+		ARG=${GROUP}_2
+		eval convert ${GROUP} ${1} ${ARG} ${OUT}
+elif [ ${NUM} -eq 1 ]; then
+		eval convert ${GROUP} $1 ${OUT}
+fi
 

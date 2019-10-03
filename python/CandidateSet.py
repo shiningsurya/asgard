@@ -220,8 +220,8 @@ def AllCandidates(cpath, fpath):
     '''
     ret = dict()
     allgroup = GetGroups(cpath, fpath)
-    print allgroup
-    print len(allgroup)
+    print ( allgroup )
+    print ( len(allgroup) )
     for ag in allgroup:
         ret[ ag ] = CandidateSet(cpath, ag, fpath)
     return ret

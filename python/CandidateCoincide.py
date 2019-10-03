@@ -1,6 +1,7 @@
 import os
 import numpy as np
 from CandidateSet import CandidateSet
+from CandidateData import CandidateData
 
 '''
 Coinciding class
@@ -8,9 +9,8 @@ Coinciding class
 - Friend of Friend
 - DBSCAN
 
-Idea is to do clustering on 4D space
-    SN, PEAK_TIME, DM, WIDTH
-and then checking which all antennas are there
+Idea is to do clustering on time-axis
+    temporally close candidates should have same mask.
 '''
 
 class Coincide(object):
@@ -59,11 +59,8 @@ class Coincide(object):
 
         Arguments
         ---------
-        x: instance of CandidateSet
-            which is basically a dict
+        x: instance of CandidateData
         '''
-        # merge all the arrays into one big arrays
-        total_num = sum([v.n for v in x.values()])
         dat  = np.zeros((5,total_num))
         ants = []
         lasti = 0
@@ -259,3 +256,56 @@ def FigureAnt(li, et):
                 ret.append(ant)
                 break
     return ret
+
+def TCoincide(x, tol=0.1):
+    '''Perform temporal coincidence.
+    Only uses peak_time to do grouping.
+
+    Arguments
+    ---------
+    x : instance of CandidateData
+    tol : max. time difference
+
+    Returns
+    -------
+    array of size x.n
+
+    '''
+    ret = np.zeros(x.n, dtype=np.uint32)
+    last_group = 0
+    ret[0] = last_group
+
+    for i in range(1,x.n):
+        if ( x.peak_time[i] - x.peak_time[i-1] ) >= tol:
+            last_group = last_group + 1
+        ret[i] = last_group
+
+    assert ret.max() < x.n
+
+    return ret
+
+def Disparity(x, mask):
+    '''Measures disparity of the masked candidates.
+    Arguments
+    ---------
+    x : CandidateData array
+    mask : as returned by TCoincide
+    parameter: paramter to measure disparity of
+    Returns
+    -------
+    disparity array
+    '''
+    unique_masks = np.unique(mask)
+    ret = np.zeros(unique_masks.size)
+
+    for i,u in enumerate(unique_masks):
+        masked = x[mask == u]
+        pmin = masked.min()
+        pmax = masked.max()
+        
+        ret[i] = (pmax - pmin)/(pmax + pmin)
+
+    return ret
+
+
+
