@@ -9,7 +9,7 @@ using std::endl;
 int main() {
   PtrFloat f = nullptr;
   PtrByte  b = nullptr;
-  key_t kk = 0x60;
+  key_t kk = 0x20;
   PsrDADA my(kk, 10240, 4096, 2, "/home/vlite-master/surya/logs/dadaout.log");  
   std::cout << " sizes=" << my.GetByteChunkSize() << std::endl;
   std::cout << " stride=" << my.GetStride() << std::endl;
@@ -39,7 +39,7 @@ int main() {
     my.WriteLock(true);
     my.WriteHeader();
     int xx = 0;
-    while(++xx <= obs) {
+    while(++xx <= 4) {
       // write Data
       my.WriteData(f, b, 1);
       // sleep

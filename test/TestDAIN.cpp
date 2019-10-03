@@ -1,11 +1,18 @@
 #include "asgard.hpp"
 #include "PsrDADA.hpp"
+#include <thread>
+#include <chrono>
 
 using std::cout;
 using std::endl;
 
-int main() {
- key_t kk = 0x60;
+int main(int ac, char* av[]) {
+unsigned delay = 1;
+ if(ac == 2) {
+    delay = std::atoi(av[1]);
+ }
+  cout << "Delay is " << delay << endl;
+ key_t kk = 0x20;
  uint64_t obs = 0;
  //
  while(true) // for every observation 
@@ -32,6 +39,8 @@ int main() {
 		// perfect case
 		going = true;
 	 }
+  // sleep
+  std::this_thread::sleep_for(std::chrono::seconds(delay));
 	} // for span of each observation
 	my.ReadLock(false);
 	delete[] f;
