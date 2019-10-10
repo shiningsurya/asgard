@@ -16,65 +16,65 @@ class CandidateJSON {
  PtrFloat dd_fb_fs, d_fb_fs;
  const unsigned int chanout, bitsout;
  inline FloatVector VectorizeFloat(PtrFloat in, timeslice size) {
-	// returns a FloatVector from pointer to be fed into json
-	FloatVector ret(in, in + size);
-	return ret;
+   // returns a FloatVector from pointer to be fed into json
+   FloatVector ret(in, in + size);
+   return ret;
  } 
  inline std::vector<unsigned char> VectorizeByte(PtrFloat in, timeslice size, unsigned int nbits) {
-	// returns a ByteVector from pointer to be fed into json
-	std::vector<unsigned char> ret;
-	ret.reserve(size * nbits / 8);
-	float alpha, beta, gamma, delta;
-	float rmean = 1.12f, rstd = 0.92f;
-	if(nbits == 2) {
-	 // 4 floats into one byte
-	 for(timeslice i = 0; i < size;) {
-  alpha = (in[i++] - rmean) / rstd;
-  beta  = (in[i++] - rmean) / rstd;
-  gamma = (in[i++] - rmean) / rstd;
-  delta = (in[i++] - rmean) / rstd;
-		ret.push_back(dig2bit(alpha, beta, gamma, delta));
-	 }
-	}
-	else if(nbits == 4) {
-	 // 2 floats into one byte
-	 for(timeslice i = 0; i < size;) {
-  alpha = (in[i++] - rmean) / rstd;
-  beta  = (in[i++] - rmean) / rstd;
-		ret.push_back(dig4bit(alpha, beta));
-	 }
-	}
-	else if(nbits == 8) {
-	 // 1 float into one byte
-	 for(timeslice i = 0; i < size;) {
-  alpha = (in[i++] - rmean) / rstd;
-		ret.push_back(dig8bit(alpha));
-	 }
-	}
-	return ret;
+     // returns a ByteVector from pointer to be fed into json
+     std::vector<unsigned char> ret;
+     ret.reserve(size * nbits / 8);
+     float alpha, beta, gamma, delta;
+     float rmean = 1.12f, rstd = 0.92f;
+     if(nbits == 2) {
+      // 4 floats into one byte
+      for(timeslice i = 0; i < size;) {
+      alpha = (in[i++] - rmean) / rstd;
+      beta  = (in[i++] - rmean) / rstd;
+      gamma = (in[i++] - rmean) / rstd;
+      delta = (in[i++] - rmean) / rstd;
+      ret.push_back(dig2bit(alpha, beta, gamma, delta));
+    }
+   }
+   else if(nbits == 4) {
+    // 2 floats into one byte
+    for(timeslice i = 0; i < size;) {
+    alpha = (in[i++] - rmean) / rstd;
+    beta  = (in[i++] - rmean) / rstd;
+    ret.push_back(dig4bit(alpha, beta));
+    }
+   }
+   else if(nbits == 8) {
+    // 1 float into one byte
+    for(timeslice i = 0; i < size;) {
+    alpha = (in[i++] - rmean) / rstd;
+    ret.push_back(dig8bit(alpha));
+    }
+   }
+   return ret;
  }
  bool write(const json&  j, const std::string& filename) const {
-	auto op = opath / filename;
-	 std::ofstream o(op.string());
-	 if(!o.is_open()) {
-		std::cerr << "CandidateJSON::File not open!\n";
-		return false;
-	 }
-	if(o_bson) {
-	 // write to BSON
-	 std::vector<std::uint8_t> j_bson = json::to_ubjson(j);
-	 std::cout << " count=" << count << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB";
-	 std::cout << " dm=" << j["dm"] << " dd_nsamps=" << j["indices"]["dd_nsamps"]  << std::endl;
-	 std::ostream_iterator<uint8_t> oo(o);
-	 std::copy(j_bson.begin(), j_bson.end(), oo);
-	}
-	else {
-	 // defaults to JSON
-	 o << j;
-	}
-	 o << std::endl;
-	 o.close();
-	return true;
+   auto op = opath / filename;
+    std::ofstream o(op.string());
+    if(!o.is_open()) {
+      std::cerr << "CandidateJSON::File not open!\n";
+      return false;
+    }
+   if(o_bson) {
+    // write to BSON
+    std::vector<std::uint8_t> j_bson = json::to_ubjson(j);
+    std::cout << " count=" << count << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB";
+    std::cout << " dm=" << j["dm"] << " dd_nsamps=" << j["indices"]["dd_nsamps"]  << std::endl;
+    std::ostream_iterator<uint8_t> oo(o);
+    std::copy(j_bson.begin(), j_bson.end(), oo);
+   }
+   else {
+    // defaults to JSON
+    o << j;
+   }
+    o << std::endl;
+    o.close();
+   return true;
  }
  public:
  CandidateJSON(std::string path = std::string("./"), bool _bson = false, unsigned int chanout_ = 64, unsigned int bitsout_ = 2):

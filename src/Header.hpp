@@ -15,7 +15,19 @@ struct Header {
  // frequency
  double fch1, foff, cfreq, bandwidth;
  // time
- double tsamp, tstart;
+ double tsamp, tstart, epoch;
  // memory
  int nbits, nchans, nifs, npol;
 };
+
+typedef struct Header Header_t;
+
+typedef struct {
+  double i0;
+  double i1;
+  float sn;
+  float dm;
+  float width;
+  float peak_time;
+  char meta[128];
+} trigger_t;

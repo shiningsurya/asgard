@@ -49,7 +49,7 @@ class PsrDADA {
 	// frequency
 	double fch1, foff, cfreq, bandwidth;
 	// time
-	double tsamp, tstart;
+	double tsamp, tstart, epoch;
 	// memory
 	int nbits, nchans, nifs, npol;
 	// sizes
@@ -298,6 +298,11 @@ class PsrDADA {
      std::cerr << "PsrDADA::ReadHeader SCANSTART read fail" << std::endl;
      dada_error = true;
    }
+   // unix epoch
+   if(ascii_header_get(header, "UNIXEPOCH", "%lf", &epoch) < 0) {
+     std::cerr << "PsrDADA::ReadHeader UNIXEPOCH read fail" << std::endl;
+     dada_error = true;
+   }
    if(ascii_header_get(header, "RA", "%lf", &ra) < 0) {
      std::cerr << "PsrDADA::ReadHeader RA read fail" << std::endl;
      dada_error = true;
@@ -401,6 +406,10 @@ class PsrDADA {
      std::cerr << "PsrDADA::WriteHeader SCANSTART write fail" << std::endl;
      dada_error = true;
    }
+   if(ascii_header_set(header, "UNIXEPOCH", "%lf", epoch) < 0) {
+     std::cerr << "PsrDADA::WriteHeader UNIXEPOCH write fail" << std::endl;
+     dada_error = true;
+   }
    if(ascii_header_set(header, "RA", "%lf", ra) < 0) {
      std::cerr << "PsrDADA::WriteHeader RA write fail" << std::endl;
      dada_error = true;
@@ -451,6 +460,7 @@ class PsrDADA {
    // time
    std::cout << "TSAMP  " << tsamp << std::endl;
    std::cout << "TSTART " << tstart << std::endl;
+   std::cout << "EPOCH  " << epoch << std::endl;
    // memory
    std::cout << "NCHANS " << nchans<< std::endl;
    std::cout << "NBITS  " << nbits << std::endl;
@@ -469,6 +479,7 @@ class PsrDADA {
    // time
    ret.tsamp    = tsamp;
    ret.tstart   = tstart;
+   ret.epoch    = epoch;
    // memory
    ret.nchans   = nchans;
    ret.nbits    = nbits;
@@ -494,6 +505,7 @@ class PsrDADA {
    // time
    tsamp    = in.tsamp;
    tstart   = in.tstart;
+   epoch    = in.epoch;
    // memory
    nchans   = in.nchans;
    nbits    = in.nbits;
@@ -581,6 +593,21 @@ class PsrDADA {
   pack(data, nants, sample_chunk, packout);
   nbits = old_nbits;
   return true;
+ }
+ timeslice ZeroReadData() {
+   if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) {
+     return -1;
+   }
+   // READ -- this blocks
+   timeslice chunk_read = ipcio_read(hdu->data_block, NULL, bytes_chunk);
+   if(chunk_read == -1) {
+     multilog(log,LOG_INFO,"PsrDADA::ZeroReadData key=%x ipcio_read failed\n", dada_key);
+   }
+   multilog(log,LOG_INFO,"PsrDADA::ZeroReadData key=%x d_readtimes=%" PRIu64 "\n",dada_key,d_readtimes++);
+   return chunk_read; 
+ }
+ char* GetCurrDataBuff () {
+  return hdu->data_block->curbuf;  
  }
 };
 // static variable initialization
