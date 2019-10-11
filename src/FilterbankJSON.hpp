@@ -18,8 +18,8 @@ class FilterbankJSON {
     char group[16];
     json j;
     std::vector<Byte> v_fb;
-    timeslice nsamps;
   public:
+    timeslice nsamps;
     FilterbankJSON ( std::string path_ ) : dirpath(path_) {}
     // 
     bool WritePayload (timeslice siz) {
@@ -69,7 +69,8 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       //j["indices"]["maxdelay"] = fbc.maxdelay;
       //j["indices"]["istart"] = fbc.istart;
       //j["indices"]["istop"] = fbc.istop;
-      nsamps = trig.i1 >= trig.i0 ? (trig.i1 - trig.i0) * head.nchans * head.nbits / 8 : 0L;
+      float dur = std::ceil(trig.i1 - trig.i0);
+      nsamps = trig.i1 >= trig.i0 ? dur/head.tsamp/1e-6 * head.nchans * head.nbits / 8 : 0L;
       j["indices"]["nsamps"] = nsamps;
       // header parameters
       j["parameters"]["nbits"] = head.nbits;
@@ -78,7 +79,7 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       j["parameters"]["source_name"] = head.name;
 
       // some book-keeping 
-      j["time"]["duration"] = nsamps * head.tsamp * 1E-6;
+      j["time"]["duration"] = dur;
       double sec_from_start = trig.i0 - head.epoch;
       j["time"]["tstart"] = head.tstart + (sec_from_start/86400.0f);
       j["time"]["peak_time"] = trig.peak_time - sec_from_start;
@@ -99,6 +100,5 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
           ptr + start, ptr + start + off,
           std::back_inserter(v_fb)
       );
-      std::cout << "\tvsize=" << v_fb.size() << " off=" << off<< std::endl;
     }
 };

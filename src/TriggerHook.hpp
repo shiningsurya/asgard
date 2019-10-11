@@ -396,7 +396,7 @@ class TriggerHook {
       double this_start, this_end;
       fbson.DumpHead (header, trig);
       timeslice tstride = nchans * nbits / 8 / header.tsamp * 1E6;
-      timeslice size = trig.i1 >= trig.i0 ? (trig.i1 - trig.i0) * tstride : 0L;
+      timeslice size = fbson.nsamps;
       timeslice fullsize = size;
       for(unsigned int ibuf = bstart; ibuf <= bstop; ibuf++) {
           this_start = epoch_cb[ibuf];

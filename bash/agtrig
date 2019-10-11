@@ -1,0 +1,80 @@
+#!/usr/bin/env bash
+# one script to analyse trigger responses
+
+# wrapper around pythonic scripts to offload 
+# log file parsing using bash
+
+#set -x
+
+good() {
+  # good dumps
+  egrep "\.\.\." -B1 $1 > $2
+}
+
+fail() {
+  # fail dumps
+  egrep "Dumping out 0" -B1 $1 > $2
+}
+
+usage() {
+  echo " Asgard::agtrig"
+  echo " BASH wrapper to identify, collate and locate trigger dumps."
+  echo 
+  echo " Usage: agtrig [-h] [-gG] [-fG] writer-log"
+}
+
+phelp() {
+  usage
+  echo "  -h     Print this help."
+  echo "  -g     Print good dumps."
+  echo "  -G     Print good dumps and put in file."
+  echo "  -f     Print failed dumps."
+  echo "  -F     Print failed dumps and put in file."
+}
+
+# getopt
+dogood=0
+dofail=0
+while getopts ":hgf" arg
+do
+  case "$arg" in 
+    "h")
+      phelp 
+      exit 0
+      ;;
+    "g")
+      # good dumps
+      dogood=1
+      GFILE=$(mktemp agtrig_good.XXXX)
+      ;;
+    "f")
+      # failed dumps
+      dofail=1
+      FFILE=$(mktemp agtrig_fail.XXXX)
+      ;;
+    *)
+      # doboth
+      dogood=1
+      dofail=1
+      ;;
+  esac
+done
+
+if [[ "$#" -eq 0 ]]; then
+		echo "No arguments provided!"
+		exit 0
+fi
+
+CFILE=${@:${OPTIND}:1}
+
+if [[ dogood -eq 1 ]]; then
+  good ${CFILE} ${GFILE}
+fi
+
+if [[ dofail -eq 1 ]]; then
+  fail ${CFILE} ${FFILE}
+fi
+
+
+#[[ -f ${GFILE} && rm -f ${GFILE} ]]
+#[[ -f ${FFILE} && rm -f ${FFILE} ]]
