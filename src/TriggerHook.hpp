@@ -1,3 +1,4 @@
+#pragma once
 #include "asgard.hpp"
 using std::cout;
 using std::cerr;
@@ -66,10 +67,10 @@ static VF_CMD mc_cmd_resolve ( const std::string& s ) {
 
 }
 
-static int MC_MAXHOSTNAME = 200;
-static int MC_MAXCONNECTIONS = 5;
-static unsigned int MAX_TRIG = 16;
-static int MC_MAXRECV = MAX_TRIG * sizeof(trigger_t);
+constexpr static int MC_MAXHOSTNAME = 200;
+constexpr static int MC_MAXCONNECTIONS = 5;
+constexpr static unsigned int MAX_TRIG = 16;
+constexpr static int MC_MAXRECV = MAX_TRIG * sizeof(trigger_t);
 
 // adapted from heimdall multicast socket action
 // which was written by me.
@@ -172,29 +173,20 @@ class MulticastSocket {
         return true;
     }
 
-    int recv ( std::string& s ) const
+    std::size_t recv ( PtrByte s ) const
     {
 
-      char buf [ MC_MAXRECV + 1 ];
+      memset ( s, 0, MC_MAXRECV + 1 );
 
-      s = "";
-
-      memset ( buf, 0, MC_MAXRECV + 1 );
-
-      int status= ::recv ( mc_sock, buf, MC_MAXRECV, 0 );
+      auto status= ::recv ( mc_sock, s, MC_MAXRECV, 0 );
 
       if ( status == -1 )
       {
         std::cout << "status == -1   errno == " << errno << "  in MulticastSocket::recv\n";
         return 0;
       }
-      else if ( status == 0 )
-      {
-        return 0;
-      }
       else
       {
-        s = buf;
         return status;
       }
     }
@@ -300,6 +292,7 @@ public:
 
 class TriggerHook {
   private:
+    unsigned char trig_buf[MC_MAXRECV +1]; 
     FilterbankJSON fbson;
     MulticastSocket mc_socket;
     FDSelect fds;
@@ -353,10 +346,10 @@ class TriggerHook {
     bool TriggerCheck (trigger_t& tt) {
       fds.Select ( ifds );
       if ( ifds.size() >= 1 ) {
-        std::string s;
-        mc_socket.recv (s);
+        PtrByte sbuf;
+        mc_socket.recv (sbuf);
         // trigger interception
-        auto to = reinterpret_cast<const trigger_t*>(s.c_str());
+        auto to = reinterpret_cast<const trigger_t*>(sbuf);
         // copy to tt
         std::memcpy (&tt, to, sizeof(trigger_t));
         // resetting
@@ -369,16 +362,12 @@ class TriggerHook {
       tt.clear();
       fds.Select ( ifds );
       if ( ifds.size() >= 1 ) {
-        std::string s;
-        mc_socket.recv (s);
+        std::size_t mcrsz = mc_socket.recv (trig_buf);
         // trigger interception
-        auto to = reinterpret_cast<const trigger_t*>(s.c_str());
-        // 
-        int numtrigs = s.size() / sizeof(trigger_t);
-        std::copy( to, to + numtrigs, std::back_inserter(tt) );
-        std::cout << "\t receiving numtrig=" << numtrigs;
-        std::cout << " size=" << tt.size() << std::endl;
-        std::cout << "\t lenstr=" << s.size() << " sizeof=" << sizeof(trigger_t) << std::endl;
+        int numtrigs = mcrsz / sizeof(trigger_t);
+        std::cout << "TriggerHook::TriggerCheck numtrig=" << numtrigs << std::endl;
+        trigger_t * mctrig = reinterpret_cast<trigger_t*>(trig_buf);
+        std::copy(mctrig, mctrig + numtrigs, std::back_inserter(tt));
         // resetting
         ifds.clear();
         return true;
@@ -406,8 +395,9 @@ class TriggerHook {
       timeslice start, offs; 
       double this_start, this_end;
       fbson.DumpHead (header, trig);
-      timeslice tstride = nchans * nbits / 8 / header.tsamp / 1E6;
-      timeslice size = (trig.i1 - trig.i0) * tstride;
+      timeslice tstride = nchans * nbits / 8 / header.tsamp * 1E6;
+      timeslice size = trig.i1 >= trig.i0 ? (trig.i1 - trig.i0) * tstride : 0L;
+      timeslice fullsize = size;
       for(unsigned int ibuf = bstart; ibuf <= bstop; ibuf++) {
           this_start = epoch_cb[ibuf];
           // logic time
@@ -425,7 +415,7 @@ class TriggerHook {
             size -= offs;
           }
       }
-      fbson.WritePayload ();
+      fbson.WritePayload (fullsize);
     }
     // dada interface
     // MAIN method
@@ -472,7 +462,7 @@ class TriggerHook {
             // trigger
             if (TriggerCheck(trigs)) {
               for(const auto& trig : trigs) {
-                DiagPrint();
+                //DiagPrint();
                 PrintTriggerAction (trig);
                 // iterate over cb to find triggers
                 bstart = bstop = -1;
@@ -492,7 +482,8 @@ class TriggerHook {
                   if (bstart < 0 || bstart >= nbufs) 
                     cerr << "TriggerHook::start unclear." << endl;
                   else if (bstop < 0 || bstop >= nbufs) 
-                    cerr << "TriggerHook::stop unclear." << endl;
+                    if(trig.i1 <= (epoch_cb.back() + bufflen)) bstop = epoch_cb.size()-1;
+                    else cerr << "TriggerHook::stop unclear." << endl;
                   else {
                     // valid bstart, bstop
                     cout << "TriggerHook::b bstart=" << bstart;

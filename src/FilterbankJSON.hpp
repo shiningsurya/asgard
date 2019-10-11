@@ -22,13 +22,13 @@ class FilterbankJSON {
   public:
     FilterbankJSON ( std::string path_ ) : dirpath(path_) {}
     // 
-    bool WritePayload () {
+    bool WritePayload (timeslice siz) {
       // check if we have full data
-      if (v_fb.size() != nsamps) {
+      if (v_fb.size() != siz) {
         // oh boi
         // this shouldn't happen
-        std::cerr << "Mismatch in array size! nsamps="  << nsamps;
-        std::cerr << " should be=" << v_fb.size() << std::endl;
+        std::cerr << "Mismatch in size! should be size="  << nsamps;
+        std::cerr << " but is=" << v_fb.size() << std::endl;
       }
       j["fb"] = v_fb;
       // write json as ubjson to file
@@ -40,7 +40,7 @@ class FilterbankJSON {
       }
       // write to BSON
       std::vector<std::uint8_t> j_bson = json::to_ubjson(j);
-std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB";
+std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << std::endl;
       std::ostream_iterator<uint8_t> oo(ofs);
       std::copy(j_bson.begin(), j_bson.end(), oo);
       ofs << std::endl;
@@ -69,7 +69,7 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB";
       //j["indices"]["maxdelay"] = fbc.maxdelay;
       //j["indices"]["istart"] = fbc.istart;
       //j["indices"]["istop"] = fbc.istop;
-      nsamps = (trig.i1 - trig.i0) * head.nchans * head.nbits / 8;
+      nsamps = trig.i1 >= trig.i0 ? (trig.i1 - trig.i0) * head.nchans * head.nbits / 8 : 0L;
       j["indices"]["nsamps"] = nsamps;
       // header parameters
       j["parameters"]["nbits"] = head.nbits;
@@ -94,9 +94,11 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB";
       );
     }
     void DumpData (Byte* ptr, timeslice start, timeslice off) {
+      std::cout << "FilterbankJSON::DumpData start=" << start << " off=" << off<< std::endl;
       std::copy (
           ptr + start, ptr + start + off,
           std::back_inserter(v_fb)
       );
+      std::cout << "\tvsize=" << v_fb.size() << " off=" << off<< std::endl;
     }
 };
