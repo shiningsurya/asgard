@@ -111,7 +111,7 @@ class FBSON(object):
     ----------
     all the shebang
     '''
-    def __init__(self, filename):
+    def __init__(self, filename, _lazy = True):
         '''
         Takes filename
         '''
@@ -125,11 +125,18 @@ class FBSON(object):
                 self.__dict__[k] = v
         #
         self.nsamps = len(x['fb']) / self.nchans /self.nbits * 8
-        self.fb = Unpack(x['fb'], self.nsamps, self.nchans, self.nbits)
+        self.lazy = _lazy
+        self.fb = None
+        if not self.lazy:
+            self.fb = Unpack(x['fb'], self.nsamps, self.nchans, self.nbits)
 
     def __str__(self):
+        if self.fb is None:
+            size = self.nsamps * self.nchans * self.nbits / 8e6
+        else:
+            size = self.fb.nbytes / 1e6
         return  \
             "S/N: {0:3.2f}\nDM: {1:3.2f} pc/cc\nWidth: {2:3.2f} ms\nPeak Time: {3:3.2f} s\nAntenna: {4}\nSource: {5}\n"\
             "Tstart(MJD): {7:7.2f}\nNbits: {8:1d}\nNchans: {9:4d}\nSizeFB: {10:3.2f}MB".format(
             self.sn, self.dm, self.width, self.peak_time, 
-            self.antenna, self.source_name, self.duration, self.tstart, self.nbits, self.nchans, self.fb.nbytes/1e6)
+            self.antenna, self.source_name, self.duration, self.tstart, self.nbits, self.nchans, size)

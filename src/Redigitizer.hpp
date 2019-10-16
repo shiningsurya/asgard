@@ -496,4 +496,18 @@ unsigned char dig4bit(float a, float b) {
 unsigned char dig8bit(float a) {
 		return (unsigned char) quant8bit(a);
 }
+
+void unpack2bit(unsigned char& dc, float& a, float& b, float& c, float& d) {
+  a  = (float) (dc & LO2BITS); 
+  b  = (float) ((dc & LOMED2BITS) >> 2); 
+  c  = (float) ((dc & UPMED2BITS) >> 4); 
+  d  = (float) ((dc & HI2BITS) >> 6); 
+}
+void unpack4bit(unsigned char& dc, float& a, float& b) {
+  a  = (float) (dc & LO4BITS); 
+  b  = (float) ((dc & UP4BITS) >> 2); 
+}
+void unpack8bit(unsigned char& dc, float& a) {
+  a  = (float) (dc); 
+}
 #endif // _REDIGIT_H_

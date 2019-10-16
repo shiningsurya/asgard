@@ -407,7 +407,7 @@ class TriggerHook {
           // sanity-check time
           if ( start < 0 || start >= buffsz ) 
             std::cerr << "TriggerHook::Dumper Invalid start." << std::endl;
-          else if ( offs < 0 || offs >= buffsz ) 
+          else if ( offs < 0 || start+offs >= buffsz ) 
             std::cerr << "TriggerHook::Dumper Invalid offs." << std::endl;
           else {
             // call time

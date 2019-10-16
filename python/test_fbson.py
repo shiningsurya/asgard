@@ -4,6 +4,9 @@ import sys
 
 filename = sys.argv[1]
 
-f_fbson = fbson.FBSON(filename)
+ff = fbson.FBSON(filename)
 
-print f_fbson
+#sf = "{0:3.2f}\t{1:3.2f}"
+#print sf.format(ff.sn, ff.dm)
+
+print ff

@@ -19,6 +19,18 @@ namespace operations {
 		FloatVector TimeAxis(float dt, timeslice start, timeslice stop); 
 		auto Delay = [](float f1, float f2, double dm) ->  double {return(4148.741601*((1.0/f1/f1)-(1.0/f2/f2))*dm);};
 		void DynamicColor(PtrFloat inp, timeslice nsamps, int nchans, int csize);
+		void InCoherentDD(PtrFloat input, const std::vector<timeslice>& idlays, timeslice ns, PtrFloat out);
+}
+void operations::InCoherentDD(PtrFloat input, const std::vector<timeslice>& idlays, timeslice nsamps, PtrFloat output){
+  auto nchans = idlays.size();
+  int ridx;
+  for(timeslice i = 0; i < nsamps; i++) {
+    for(int j = 0; j < nchans; j++) {
+      ridx = nchans*(i + idlays[j]) + j;
+      output[nchans*i + j] = input[ridx]; 
+      //std::cout << "fb[" << i << "," << j << "]=" << input[ridx] << std::endl;
+    }
+  }
 }
 void operations::TimeFreqShape(PtrFloat in, timeslice nsamps, int nchans, PtrFloat timeshape, PtrFloat bandshape) {
 		// optimized
