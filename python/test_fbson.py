@@ -1,5 +1,5 @@
 #!/usr/bin/env python2.7
-import fBSON as fbson
+import FilterbankBSON as fbson
 import sys
 
 filename = sys.argv[1]
