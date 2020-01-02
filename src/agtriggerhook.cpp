@@ -32,10 +32,10 @@ int main(int ac, char * av[]) {
 		opt.add_options()
 ("help,h", "Prints help")
 ("key,k",  po::value<std::string>(&s_dadakey)->default_value(d_dadakey), "Input DADA key[def=0x60]")
-("nbufs,n",   po::value<unsigned int>(&nbufs)->default_value(12), "nbufs[def=12]")
+("nbufs,N",   po::value<unsigned int>(&nbufs)->default_value(12), "nbufs[def=12]")
 ("nbits,b",   po::value<unsigned int>(&nbits)->default_value(2), "nbits[def=2]")
 ("nchans,c",  po::value<uint64_t>(&nchans)->default_value(4096), "nchans[def=4096]")
-("nsamps,s",  po::value<uint64_t>(&nsamps)->default_value(10240), "nsamps[def=10240]")
+("nsamps,n",  po::value<uint64_t>(&nsamps)->default_value(10240), "nsamps[def=10240]")
 ("bufsz,s",  po::value<uint64_t>(&bufsz)->default_value(10485760), "buffer size[def=10485760]")
 ("odir,o", po::value<std::string>(&odir)->default_value(d_odir), "dump directory[def=/mnt/ssd/dumps]");
 		// parsing

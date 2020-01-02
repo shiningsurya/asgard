@@ -17,6 +17,7 @@ int main(int ac, char * av[]) {
   bool plotme = false;
   bool headme = false;
   std::string oplot, dstr("fbsons_candplot.png/png");
+  std::string odir, ddir("./");
   StringVector args;
 		// po
 		po::variables_map vm;
@@ -55,14 +56,21 @@ int main(int ac, char * av[]) {
   if(plotme) {
     FBDPlot myp(oplot);
     for(const auto& arg : args) {
-      FBDump fbd(arg); 
-      myp.Plot1(fbd);
+      try {
+        FBDump fbd(arg); 
+        myp.Plot1(fbd);
+
+      } catch (std::exception& e) {
+        std::cerr << "Error here: " << e.what() << std::endl;
+        std::cerr << "Error here: filename=" << arg << std::endl;
+      }
     }
   }
   if(headme) {
     for(const auto& arg : args) {
       FBDump fbd(arg); 
-      std::cout << fbd;
+      //std::cout << fbd;
+      std::cout << arg << "  " << fbd.width*1e3f << std::endl;
     }
   }
   return 0;

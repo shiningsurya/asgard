@@ -8,7 +8,6 @@ using json = nlohmann::json;
 #include <iomanip>
 // Digitizing
 #include "Redigitizer.hpp"
-#include "Operations.hpp"
 // Plotting
 #include "Plotter.hpp"
 
@@ -26,12 +25,11 @@ class FilterbankJSON {
     FilterbankJSON ( std::string path_ ) : dirpath(path_) {}
     // 
     bool WritePayload (timeslice siz) {
-      std::cout << "TriggerHook::WritePayload" << std::endl;
       // check if we have full data
       if (v_fb.size() != siz) {
         // oh boi
         // this shouldn't happen
-        std::cerr << "Mismatch in size! should be size="  << nsamps;
+        std::cerr << "Mismatch in size! should be size="  << siz;
         std::cerr << " but is=" << v_fb.size() << std::endl;
       }
       j["fb"] = v_fb;
@@ -47,7 +45,7 @@ class FilterbankJSON {
 std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << std::endl;
       std::ostream_iterator<uint8_t> oo(ofs);
       std::copy(j_bson.begin(), j_bson.end(), oo);
-      // ofs << std::endl;
+      ofs << std::endl;
       ofs.close();
       // clear payloads
       v_fb.clear();
@@ -81,7 +79,8 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       //j["parameters"]["isKur"] = fbc.isKur;
       j["parameters"]["antenna"] = head.stationid;
       j["parameters"]["source_name"] = head.name;
-
+      j["parameters"]["ra"] = head.ra;
+      j["parameters"]["dec"] = head.dec;
       // some book-keeping 
       j["time"]["duration"] = dur;
       double sec_from_start = trig.i0 - head.epoch;
@@ -100,7 +99,6 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
     }
     void DumpData (Byte* ptr, timeslice start, timeslice off) {
       std::cout << "FilterbankJSON::DumpData start=" << start << " off=" << off<< std::endl;
-      std::cout << "FilterbankJSON::DumpData ptr=" << ptr << std::endl;
       std::copy (
           ptr + start, ptr + start + off,
           std::back_inserter(v_fb)
@@ -231,6 +229,7 @@ std::ostream& operator<<(std::ostream& os, const FBDump& f) {
   os << "Peak_time    " << f.peak_time << std::endl;
   os << "Source       " << f.name << std::endl;
   os << "Antenna      ea" << f.stationid<< std::endl;
+  os << "tsamp        " << f.tsamp << std::endl;
   os << "Nsamps=" << f.nsamps << "  Nchans=" << f.nchans << "  Nbits=" << f.nbits << std::endl;
   return os;
 };
@@ -262,6 +261,7 @@ class FBDPlot: protected Plotter {
     char txt[256];
     unsigned int txtrow, csize;
     float txtheight;
+    float tmax;
   public:
     FBDPlot(std::string fn, int _chout = 512) : Plotter(fn) {
       cpgpap (0.0,0.618); //10.0, width and aspect ratio
@@ -285,6 +285,7 @@ class FBDPlot: protected Plotter {
       // freq axis
       axfreq_vec = operations::FreqTable((float)fcl.fch1, (float)fcl.foff*fcl.nchans/chanout, chanout);
       auto axfreq_vec_full = operations::FreqTable((float)fcl.fch1, (float)fcl.foff, fcl.nchans);
+      assert (axfreq_vec_full.size() == fcl.nchans);
       // dm
       auto idelays = operations::Delays( 
         axfreq_vec_full, fcl.dm, fcl.tsamp/1E6
@@ -292,6 +293,8 @@ class FBDPlot: protected Plotter {
       wid = fcl.nsamps - idelays.back();
       // time axis
       axtime_vec = operations::TimeAxis(fcl.tsamp/1E6, 0L, wid);
+      tmax = fcl.peak_time + (10*fcl.width);
+      tmax = tmax <= 1 ? tmax : 1.0f;
       fb_dd = new float[wid * fcl.nchans]();
       operations::InCoherentDD(
         fcl.fb, idelays, wid, fb_dd
@@ -307,16 +310,16 @@ class FBDPlot: protected Plotter {
       //// plotting
       sn = fcl.sn;
       dm = fcl.dm;
-      width = fcl.width;
+      width = fcl.width*1e3;
       group = fcl.group;
       stationid = fcl.stationid;
       tstart = fcl.tstart;
       name = fcl.name;
       peak_time = fcl.peak_time;
       nbits = fcl.nbits;
-      operations::DynamicColor(
-        fb_fscrunched, wid, chanout, fcl.nbits
-      );
+      //operations::DynamicColor(
+      //  fb_fscrunched, wid, chanout, fcl.nbits
+      //);
       tr[3] = axfreq_vec.front(); 
       tr[0] = axtime_vec.front(); 
       tr[2] = (float)fcl.tsamp/1E6;
@@ -357,10 +360,10 @@ class FBDPlot: protected Plotter {
       float blue[]  = {0.0f, 0.5f, 0.0f, 0.0f, 0.3f, 1.0f};
       // dedispersed waterfall
       cpgsvp(0.1, 0.65, 0.1, 0.65); // de-dispersed waterfall
-      cpgswin(axtime_vec.front(), axtime_vec.back(), axfreq_vec.front(), axfreq_vec.back());
+      cpgswin(axtime_vec.front(), tmax, axfreq_vec.front(), axfreq_vec.back());
       cpgbox("BCN",0.0,0,"BCNV",0.0,0);
       cpgsfs(1);
-      cpgctab (light, red, green, blue, csize, contrast, brightness);
+      cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), heat_l.size(), contrast, brightness);
       cpgimag (
           fb_fscrunched, chanout, wid, 
           1, chanout, 1, wid,
@@ -390,7 +393,7 @@ class FBDPlot: protected Plotter {
       dd_range = max - min;
       xxmin = min - .1 * dd_range;
       xxmax = max + .1 * dd_range;
-      cpgswin(axtime_vec.front(), axtime_vec.back(), xxmin, xxmax );
+      cpgswin(axtime_vec.front(), tmax, xxmin, xxmax );
       cpgbox("BC",0.0,0,"BCNV",0.0,0);
       cpgline(wid, axtime_vec.data(), fb_tshape); 
       cpgmtxt("R",1.2,0.5,0.5,"Intensity (a.u.)");

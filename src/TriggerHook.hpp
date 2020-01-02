@@ -5,7 +5,7 @@ using std::cerr;
 using std::endl;
 
 #include "PsrDADA.hpp"
-
+#include "Operations.hpp"
 #include "FilterbankJSON.hpp"
 
 #include <sys/time.h>
@@ -26,7 +26,8 @@ using std::endl;
 static const char mc_vlitegrp[] = "224.3.29.71";
 static int mc_heimdall_stream_port = 20001;
 // triggers
-static const char mc_trigrp[] = "224.3.29.71";
+// XXX This is FBSON_trigger group
+static const char mc_trigrp[] = "224.3.29.81";
 static int mc_trig_port = 20003;
 
 
@@ -299,6 +300,7 @@ class TriggerHook {
     std::vector<int> ifds;
     // header
     struct Header header;
+    struct Header oldheader;
     // cbuffers
     boost::circular_buffer<double> epoch_cb;
     boost::circular_buffer<char*> buffs_cb;
@@ -315,6 +317,8 @@ class TriggerHook {
     unsigned int nbufs;
     timeslice readret;
     unsigned int numobs;
+    // ecounts
+    unsigned int ecounts;
   public:
     TriggerHook (
       key_t key_, unsigned int nbufs_,  
@@ -322,6 +326,7 @@ class TriggerHook {
       std::string odir
     ) :
       numobs(0), bstart(-1), bstop(-1),
+      ecounts(0),
       dkey(key_), nbufs(nbufs_),
       nsamps(nsamps_), nchans(nchans_), nbits(nbits_),
       fbson (odir),
@@ -383,18 +388,23 @@ class TriggerHook {
       cout << " sn=" << tt.sn << " dm=" << tt.dm << endl;
     }
     void DiagPrint() {
+      char ss[256];
       cout << " size=" << epoch_cb.size() << endl;
-      cout << "\t\ti\ttmjd" << endl;
+      cout << "\ti\ttmjd\tptr" << endl;
       cout.precision(17);
       for(int i = 0; i < epoch_cb.size(); i++) {
-        cout << "\t\t" << i << "\t" << epoch_cb[i] << endl;
+        snprintf(ss, sizeof(ss), "\t%d\t%lf\t%p\n", i, epoch_cb[i], buffs_cb[i]);
+        cout << ss;
       }
       cout.precision(6);
     }
     void Dumper(const trigger_t& trig) {
       timeslice start, offs; 
       double this_start, this_end;
-      fbson.DumpHead (header, trig);
+      if (trig.i0 >= oldheader.epoch && trig.i0 < header.epoch)
+        fbson.DumpHead (oldheader, trig);
+      else
+        fbson.DumpHead (header, trig);
       timeslice tstride = nchans * nbits / 8 / header.tsamp * 1E6;
       timeslice size = fbson.nsamps;
       timeslice fullsize = size;
@@ -404,18 +414,25 @@ class TriggerHook {
           if ( trig.i0 <= this_start ) start = 0; 
           else start = (trig.i0 - this_start) * tstride;
           offs  = std::min( (buffsz - start), size);
+          std::cout << "TriggerHook::Dumper start=" << start << " offs=" << offs << std::endl;
           // sanity-check time
           if ( start < 0 || start >= buffsz ) 
-            std::cerr << "TriggerHook::Dumper Invalid start." << std::endl;
-          else if ( offs < 0 || start+offs >= buffsz ) 
-            std::cerr << "TriggerHook::Dumper Invalid offs." << std::endl;
+            std::cout << "TriggerHook::Dumper Invalid start="<< start << std::endl;
+          else if ( offs < 0 || start+offs > buffsz ) 
+            std::cout << "TriggerHook::Dumper Invalid offs="<<offs << std::endl;
           else {
             // call time
             fbson.DumpData ( reinterpret_cast<unsigned char*>(buffs_cb[ibuf]), start, offs );
             size -= offs;
           }
       }
-      fbson.WritePayload (fullsize);
+      DiagPrint ();
+      try {
+        fbson.WritePayload (fullsize);
+      }
+      catch (...) {
+        cout << "[EE] EXCEPTION@TRIGGERHOOK ecounts=" << ecounts++ << endl;
+      }
     }
     // dada interface
     // MAIN method
@@ -431,6 +448,7 @@ class TriggerHook {
             if(!going) {
               // first epoch
               dadain.PrintHeader();
+              oldheader = header;
               header = dadain.GetHeader();
               bufflen = nsamps * header.tsamp / 1e6;
             }
@@ -448,7 +466,7 @@ class TriggerHook {
                 );
               // push_back data block
               buffs_cb.push_back (
-                dadain.GetCurrDataBuff ()
+                dadain.GetBufPtr()
               );
               // push_back going
               tmjd_cb.push_back ( 
@@ -460,7 +478,7 @@ class TriggerHook {
             if (readret < bytes_chunk) going = 0;
            std::cout << "TriggerHook::FollowDADA going merry=" << going << std::endl;
             // trigger
-            if (TriggerCheck(trigs)) {
+            while (TriggerCheck(trigs)) {
               for(const auto& trig : trigs) {
                 //DiagPrint();
                 PrintTriggerAction (trig);
