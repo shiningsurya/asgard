@@ -1,0 +1,27 @@
+#!/bin/bash
+
+
+if [ $# -eq 0 ]
+then
+		echo "Asgard::kill"
+		echo "Usage: agkill <arg>"
+		exit 0
+fi
+
+# lets talk about the ethics
+
+if [[ "$1" == "all" ]]; then
+  echo "Killing everything!"
+  killall process_baseband
+  killall agtriggerhook
+  killall writer
+elif [[ "$1" == "pb" ]]; then
+  echo "Killing process_baseband!"
+  killall process_baseband
+elif [[ "$1" == "writer" ]]; then
+  echo "Killing writer!"
+  killall writer
+elif [[ "$1" == "triggerhook" ]]; then
+  echo "Killing agtriggerhook!"
+  killall agtriggerhook
+fi
