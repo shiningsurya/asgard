@@ -1,34 +1,39 @@
 #!/usr/bin/env python
 import datetime as dt
 DATEFMT = "%Y%m%d_%H%M%S"
+import os
 import numpy as np
 # 20191219_043911_muos_ea99_dm224.75_sn8.50.fbson
 # 0-------1------2----3----4--------5
+# 20200120_080541_muos_ea99_dm203.69_sn8.71_wd76.56.fbson
+# 0-------1------2----3----4--------5------6
 def oneAction (filename):
     '''Takes filename and returns 
-    datetime object, ant, sn, dm'''
-    fname = filename.strip()
+    datetime object, ant, sn, dm and wd'''
+    fname,_ = os.path.splitext(filename.strip())
     toks = fname.split ("_")
     date_str, ant = None, None
-    sn, dm = None, None
+    sn, dm, wd = None, None, None
     ret = None
     try:
         date_str = "_".join(toks[:2])
         ant = toks[3]
         ret = dt.datetime.strptime(date_str, DATEFMT) 
         dm  = float(toks[4][2:])
-        sn  = float(toks[5][2:-6]) 
+        sn  = float(toks[5][2:]) 
+        if len(toks) == 7:
+            wd  = float(toks[6][2:]) 
     except Exception as e:
         print ("exp=", e)
         print ( "Error reading fbson:", fname )
-    return ret, ant, sn, dm
+    return ret, ant, sn, dm, wd
 
 def ParseArgs():
     import argparse
     '''For argument parsing'''
     ap = argparse.ArgumentParser(prog='agdatelog', description='Asgard tool for fbson dump logkeeping.', epilog='Part of Asgard')
     add = ap.add_argument
-    add('dir', help = 'Directory/list of fbsons.', type=str, default="/mnt/ssd/dumps")
+    add('dir', help = 'List of fbsons. Files like *.list', type=str, default="/mnt/ssd/dumps", nargs='+')
     # last known
     add('--later', help = 'Last known/processed fbson. Either *.list or *.fbson.', default=None, dest='last')
     # maxgap
@@ -48,20 +53,19 @@ if __name__ == "__main__":
     args = ParseArgs()
     print ("")
     # INPUT stage
-    INPUT = None
-    if args.dir.endswith ("list"):
-        with open (args.dir, "r") as f:
-            INPUT = f.readlines()
-    elif os.path.isdir (args.dir):
-        INPUT = glob.glob (os.path.join(args.dir, "*.fbson"))
+    INPUT = []
+    for of in args.dir:
+        with open (of, "r") as f:
+            INPUT = INPUT + f.readlines()
     # DATE stage
-    DATE, ANT, SN, DM = [],[],[],[]
+    DATE, ANT, SN, DM, WD = [],[],[],[], []
     for f in INPUT:
-        d,a,s,m = oneAction (f)
+        d,a,s,m,w = oneAction (f)
         DATE.append (d)
         ANT.append  (a)
         SN.append   (s)
         DM.append   (m)
+        WD.append   (w)
     # FILTER stage
     uDATE = np.unique (DATE)
     udD   = np.diff (uDATE)
