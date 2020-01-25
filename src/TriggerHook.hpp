@@ -20,6 +20,9 @@ using std::endl;
 
 #include <boost/circular_buffer.hpp>
 
+// logging
+#include <fstream>
+static const char logdir[] = "/home/vlite-master/surya/logs/triggerlogs";
 
 //Multicast IPs
 // commands
@@ -364,20 +367,23 @@ class TriggerHook {
       return false;
     }
     bool TriggerCheck (std::vector<trigger_t>& tt) {
+      bool ret = false;
       tt.clear();
       fds.Select ( ifds );
-      if ( ifds.size() >= 1 ) {
+      while ( ifds.size() >= 1) {
         std::size_t mcrsz = mc_socket.recv (trig_buf);
         // trigger interception
         int numtrigs = mcrsz / sizeof(trigger_t);
-        std::cout << "TriggerHook::TriggerCheck numtrig=" << numtrigs << std::endl;
         trigger_t * mctrig = reinterpret_cast<trigger_t*>(trig_buf);
         std::copy(mctrig, mctrig + numtrigs, std::back_inserter(tt));
         // resetting
         ifds.clear();
-        return true;
+        fds.Select ( ifds );
+        ret = true;
       }
-      return false;
+      if (ret)
+        std::cout << "TriggerHook::TriggerCheck numtrig=" << tt.size () << std::endl;
+      return ret;
     }
     // action based on trigger
     void PrintTriggerAction (const trigger_t& tt) const noexcept {
@@ -439,7 +445,7 @@ class TriggerHook {
     void FollowDADA () {
      while(++numobs) {
          std::cout << "TriggerHook::FollowDADA numobs=" << numobs << std::endl;
-         PsrDADA dadain(dkey,nsamps,nchans, nbits, "/home/vlite-master/surya/logs/triggerhook.log");  
+         PsrDADA dadain(dkey,nsamps,nchans, nbits, "/home/vlite-master/surya/logs/tthhooookk.log");  
          auto bytes_chunk = dadain.GetByteChunkSize();
          dadain.ReadLock(true);
          unsigned int going = 0;

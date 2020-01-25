@@ -67,6 +67,7 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       // header indices
       j["indices"]["i0"] = trig.i0;
       j["indices"]["i1"] = trig.i1;
+      j["indices"]["epoch"] = head.epoch;
       //j["indices"]["peak_index"] = fbc.peak_index;
       //j["indices"]["maxdelay"] = fbc.maxdelay;
       //j["indices"]["istart"] = fbc.istart;
@@ -94,7 +95,7 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       strftime (group, sizeof(group), "%Y%m%d_%H%M%S", &utc_time);
       j["parameters"]["group"] = std::string(group);
       snprintf(filename, sizeof(filename),
-          "%s_muos_ea%02d_dm%3.2f_sn%2.2f.fbson", group, head.stationid,trig.dm,trig.sn 
+          "%s_muos_ea%02d_dm%04.2f_sn%04.2f_wd%04.2f_pt%04.1f.fbson", group, head.stationid,trig.dm,trig.sn,trig.width*1e3f,trig.peak_time 
       );
     }
     void DumpData (Byte* ptr, timeslice start, timeslice off) {

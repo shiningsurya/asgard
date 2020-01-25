@@ -616,16 +616,18 @@ class PsrDADA {
  }
  char* GetBufPtr() {
   auto g = GetIndex();
-  return hdu->data_block->buf.buffer[g];  
+  return hdu->data_block->buf.buffer[g];
  }
  char* GetBufPtr(unsigned int ibuf) {
   return hdu->data_block->buf.buffer[ibuf];  
  }
  timeslice GetIndex () const {
   // modulo subtract 1
-  auto ss = hdu->data_block->buf.sync;
-  return (ss->r_bufs[0] + ss->nbufs - 1) % ss->nbufs;
-}
+  auto buf = hdu->data_block->buf;
+  auto ss = buf.sync;
+  auto ii = buf.iread;
+  return (ss->r_bufs[ii] + ss->nbufs - 1) % ss->nbufs;
+ }
 };
 // static variable initialization
 uint64_t PsrDADA::d_readtimes = 0;
