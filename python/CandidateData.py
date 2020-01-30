@@ -9,7 +9,7 @@ try:
   import astropy.time as at
   from astropy.coordinates import SkyCoord
 except:
-  print "Astropy not found"
+  print ( "Astropy not found" )
 import os
 import copy
 
