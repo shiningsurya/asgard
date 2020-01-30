@@ -282,7 +282,7 @@ class DADACoadd  {
         nsamps(nsamps_),
         nchans(nchans_),
         nbits(nbits_),
-        fb_nbits(2),
+        fb_nbits(nbits_),
         eparam(_xp),
         xrfi(eparam, nsamps, nchans),
         running_index(0),

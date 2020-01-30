@@ -15,6 +15,8 @@
 #include <Header.hpp>
 #include <inttypes.h>
 
+//#define AG_RUNNING
+
 constexpr char LOGDIR[] = "/home/vlite-master/surya/logs";
 
 class PsrDADA {
@@ -60,18 +62,21 @@ class PsrDADA {
  void pack(PtrFloat ret, int numants, timeslice nsamps, PtrByte dd) {
    timeslice ii = 0;
    float rmean = 0.0f, rstd = 0.0f;
-   rmean = 1.389f * numants;
+   float bmax = pow(2,nbits) -1; 
+   rmean = 0.5 * bmax * numants;
    rstd  = sqrt(numants);
+   if (nbits == 8)      rstd *= 33.818;
+   else if (nbits == 4) rstd *= 3.137;
 #ifdef AG_RUNNING
    // the running mean idea
    // two pass mean, std estimate
    rmean = 0.0f;
    rstd = 0.0f;
-   std::for_each(ret, ret + datasamps, [&rmean](const float& xx) { rmean += xx; });
-   rmean /= datasamps;
-   std::for_each(ret, ret + datasamps, [&rstd, &rmean](const float& xx) { rstd += pow(xx - rmean, 2); });
-   rstd = sqrt(rstd / (datasamps - 1)); // Bessel correction
-   std::cout << " rmean=" << rmean << " rstd=" << rstd << std::endl;
+   std::for_each(ret, ret + nsamps, [&rmean](const float& xx) { rmean += xx; });
+   rmean /= nsamps;
+   std::for_each(ret, ret + nsamps, [&rstd, &rmean](const float& xx) { rstd += pow(xx - rmean, 2); });
+   rstd = sqrt(rstd / (nsamps - 1)); // Bessel correction
+   //std::cout << " rmean=" << rmean << " rstd=" << rstd << std::endl;
 #endif
    if(nbits == 2) {
      for(it = 0; it < nsamps;) {
@@ -445,7 +450,7 @@ class PsrDADA {
      multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x ipcio_write failed\n",dada_key);
      return false;
    }
-   multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x d_writetimes=%" PRIu64 "\n",dada_key,d_writetimes++);
+   multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x d_writetimes=%" PRIu64 "nant=%d\n",dada_key,d_writetimes++, numants);
    return bytes_written;
  }
  void PrintHeader() {
@@ -608,6 +613,20 @@ class PsrDADA {
  }
  char* GetCurrDataBuff () {
   return hdu->data_block->curbuf;  
+ }
+ char* GetBufPtr() {
+  auto g = GetIndex();
+  return hdu->data_block->buf.buffer[g];
+ }
+ char* GetBufPtr(unsigned int ibuf) {
+  return hdu->data_block->buf.buffer[ibuf];  
+ }
+ timeslice GetIndex () const {
+  // modulo subtract 1
+  auto buf = hdu->data_block->buf;
+  auto ss = buf.sync;
+  auto ii = buf.iread;
+  return (ss->r_bufs[ii] + ss->nbufs - 1) % ss->nbufs;
  }
 };
 // static variable initialization

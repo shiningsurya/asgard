@@ -32,12 +32,13 @@ int main(int ac, char * av[]) {
 		opt.add_options()
 ("help,h", "Prints help")
 ("key,k",  po::value<std::string>(&s_dadakey)->default_value(d_dadakey), "Input DADA key[def=0x60]")
-("nbufs,n",   po::value<unsigned int>(&nbufs)->default_value(12), "nbufs[def=12]")
+("nbufs,N",   po::value<unsigned int>(&nbufs)->default_value(12), "nbufs[def=12]")
 ("nbits,b",   po::value<unsigned int>(&nbits)->default_value(2), "nbits[def=2]")
 ("nchans,c",  po::value<uint64_t>(&nchans)->default_value(4096), "nchans[def=4096]")
-("nsamps,s",  po::value<uint64_t>(&nsamps)->default_value(10240), "nsamps[def=10240]")
+("nsamps,n",  po::value<uint64_t>(&nsamps)->default_value(10240), "nsamps[def=10240]")
 ("bufsz,s",  po::value<uint64_t>(&bufsz)->default_value(10485760), "buffer size[def=10485760]")
-("odir,o", po::value<std::string>(&odir)->default_value(d_odir), "dump directory[def=/mnt/ssd/dumps]");
+("odir,o", po::value<std::string>(&odir)->default_value(d_odir), "dump directory[def=/mnt/ssd/dumps]")
+("trigcoadd,t", po::bool_switch()->default_value(false), "True if should be listening to coadd trigger channel. Otherwise listen to single_trigger channel.");
 		// parsing
 		try {
 				po::store(po::command_line_parser(ac,av).options(opt).run(), vm);
@@ -65,9 +66,12 @@ int main(int ac, char * av[]) {
 		}
 		// key 0d to 0x
 		dadakey = dx(s_dadakey);
+		// trigger channel
+		bool ctrig = vm.count("trigcoadd");
 		TriggerHook th(
 		  dadakey, nbufs,
 		  nsamps, nchans, nbits,
+		  ctrig,
 	   odir	
 		);
   th.FollowDADA();

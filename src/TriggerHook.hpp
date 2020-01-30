@@ -1,11 +1,10 @@
 #pragma once
 #include "asgard.hpp"
 using std::cout;
-using std::cerr;
 using std::endl;
 
 #include "PsrDADA.hpp"
-
+#include "Operations.hpp"
 #include "FilterbankJSON.hpp"
 
 #include <sys/time.h>
@@ -20,13 +19,18 @@ using std::endl;
 
 #include <boost/circular_buffer.hpp>
 
+// logging
+#include <fstream>
+static const char logdir[] = "/home/vlite-master/surya/logs/triggerlogs";
 
 //Multicast IPs
 // commands
 static const char mc_vlitegrp[] = "224.3.29.71";
 static int mc_heimdall_stream_port = 20001;
 // triggers
-static const char mc_trigrp[] = "224.3.29.71";
+// XXX This is FBSON_trigger group
+static const char mc_single_trig[]  = "224.3.29.81";
+static const char mc_coadd_trig[]   = "224.3.29.91";
 static int mc_trig_port = 20003;
 
 
@@ -106,6 +110,8 @@ class MulticastSocket {
     }
     bool Setup ( const char * ip, int port )
     {
+      // logging
+      std::cout << "MulticastSocket::Setup ip=" << ip << endl;
       // port (int -> char[6])
       char port_str[6];
       snprintf(port_str, 6, "%d", port);
@@ -299,6 +305,7 @@ class TriggerHook {
     std::vector<int> ifds;
     // header
     struct Header header;
+    struct Header oldheader;
     // cbuffers
     boost::circular_buffer<double> epoch_cb;
     boost::circular_buffer<char*> buffs_cb;
@@ -315,13 +322,17 @@ class TriggerHook {
     unsigned int nbufs;
     timeslice readret;
     unsigned int numobs;
+    // ecounts
+    unsigned int ecounts;
   public:
     TriggerHook (
       key_t key_, unsigned int nbufs_,  
       timeslice nsamps_, int nchans_, int nbits_,
+      bool _ctrig,
       std::string odir
     ) :
       numobs(0), bstart(-1), bstop(-1),
+      ecounts(0),
       dkey(key_), nbufs(nbufs_),
       nsamps(nsamps_), nchans(nchans_), nbits(nbits_),
       fbson (odir),
@@ -329,7 +340,9 @@ class TriggerHook {
       {
         // setup socket
         if (
-          ! mc_socket.Setup ( mc_trigrp, mc_trig_port )
+          ! mc_socket.Setup ( 
+            _ctrig ? mc_coadd_trig : mc_single_trig
+            , mc_trig_port )
           ) {
           std::cerr << "Multicast setup failed!" << std::endl;
         }
@@ -359,20 +372,23 @@ class TriggerHook {
       return false;
     }
     bool TriggerCheck (std::vector<trigger_t>& tt) {
+      bool ret = false;
       tt.clear();
       fds.Select ( ifds );
-      if ( ifds.size() >= 1 ) {
+      while ( ifds.size() >= 1) {
         std::size_t mcrsz = mc_socket.recv (trig_buf);
         // trigger interception
         int numtrigs = mcrsz / sizeof(trigger_t);
-        std::cout << "TriggerHook::TriggerCheck numtrig=" << numtrigs << std::endl;
         trigger_t * mctrig = reinterpret_cast<trigger_t*>(trig_buf);
         std::copy(mctrig, mctrig + numtrigs, std::back_inserter(tt));
         // resetting
         ifds.clear();
-        return true;
+        fds.Select ( ifds );
+        ret = true;
       }
-      return false;
+      if (ret)
+        std::cout << "TriggerHook::TriggerCheck numtrig=" << tt.size () << std::endl;
+      return ret;
     }
     // action based on trigger
     void PrintTriggerAction (const trigger_t& tt) const noexcept {
@@ -383,18 +399,23 @@ class TriggerHook {
       cout << " sn=" << tt.sn << " dm=" << tt.dm << endl;
     }
     void DiagPrint() {
+      char ss[256];
       cout << " size=" << epoch_cb.size() << endl;
-      cout << "\t\ti\ttmjd" << endl;
+      cout << "\ti\ttmjd\tptr" << endl;
       cout.precision(17);
       for(int i = 0; i < epoch_cb.size(); i++) {
-        cout << "\t\t" << i << "\t" << epoch_cb[i] << endl;
+        snprintf(ss, sizeof(ss), "\t%d\t%lf\t%p\n", i, epoch_cb[i], buffs_cb[i]);
+        cout << ss;
       }
       cout.precision(6);
     }
     void Dumper(const trigger_t& trig) {
       timeslice start, offs; 
       double this_start, this_end;
-      fbson.DumpHead (header, trig);
+      if (trig.i0 >= oldheader.epoch && trig.i0 < header.epoch)
+        fbson.DumpHead (oldheader, trig);
+      else
+        fbson.DumpHead (header, trig);
       timeslice tstride = nchans * nbits / 8 / header.tsamp * 1E6;
       timeslice size = fbson.nsamps;
       timeslice fullsize = size;
@@ -404,25 +425,32 @@ class TriggerHook {
           if ( trig.i0 <= this_start ) start = 0; 
           else start = (trig.i0 - this_start) * tstride;
           offs  = std::min( (buffsz - start), size);
+          std::cout << "TriggerHook::Dumper start=" << start << " offs=" << offs << std::endl;
           // sanity-check time
           if ( start < 0 || start >= buffsz ) 
-            std::cerr << "TriggerHook::Dumper Invalid start." << std::endl;
-          else if ( offs < 0 || start+offs >= buffsz ) 
-            std::cerr << "TriggerHook::Dumper Invalid offs." << std::endl;
+            std::cout << "TriggerHook::Dumper Invalid start="<< start << std::endl;
+          else if ( offs < 0 || start+offs > buffsz ) 
+            std::cout << "TriggerHook::Dumper Invalid offs="<<offs << std::endl;
           else {
             // call time
             fbson.DumpData ( reinterpret_cast<unsigned char*>(buffs_cb[ibuf]), start, offs );
             size -= offs;
           }
       }
-      fbson.WritePayload (fullsize);
+      DiagPrint ();
+      try {
+        fbson.WritePayload (fullsize);
+      }
+      catch (...) {
+        cout << "[EE] EXCEPTION@TRIGGERHOOK ecounts=" << ecounts++ << endl;
+      }
     }
     // dada interface
     // MAIN method
     void FollowDADA () {
      while(++numobs) {
          std::cout << "TriggerHook::FollowDADA numobs=" << numobs << std::endl;
-         PsrDADA dadain(dkey,nsamps,nchans, nbits, "/home/vlite-master/surya/logs/triggerhook.log");  
+         PsrDADA dadain(dkey,nsamps,nchans, nbits, "/home/vlite-master/surya/logs/tthhooookk.log");  
          auto bytes_chunk = dadain.GetByteChunkSize();
          dadain.ReadLock(true);
          unsigned int going = 0;
@@ -431,6 +459,7 @@ class TriggerHook {
             if(!going) {
               // first epoch
               dadain.PrintHeader();
+              oldheader = header;
               header = dadain.GetHeader();
               bufflen = nsamps * header.tsamp / 1e6;
             }
@@ -448,7 +477,7 @@ class TriggerHook {
                 );
               // push_back data block
               buffs_cb.push_back (
-                dadain.GetCurrDataBuff ()
+                dadain.GetBufPtr()
               );
               // push_back going
               tmjd_cb.push_back ( 
@@ -460,37 +489,38 @@ class TriggerHook {
             if (readret < bytes_chunk) going = 0;
            std::cout << "TriggerHook::FollowDADA going merry=" << going << std::endl;
             // trigger
-            if (TriggerCheck(trigs)) {
+            while (TriggerCheck(trigs)) {
               for(const auto& trig : trigs) {
                 //DiagPrint();
                 PrintTriggerAction (trig);
                 // iterate over cb to find triggers
                 bstart = bstop = -1;
-                  for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
-                    if ( trig.i0 <= epoch_cb[ibuf] ) {
-                            bstart = ibuf-1;
-                            break;
-                    }
+                for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
+                  if ( trig.i0 <= epoch_cb[ibuf] ) {
+                    bstart = ibuf-1;
+                    break;
                   }
-                  for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
-                    if ( trig.i1 <= epoch_cb[ibuf] ) {
-                            bstop = ibuf-1;
-                            break;
-                    }
+                }
+                if(bstart == -1 && trig.i0 >= epoch_cb.front()) bstart = 0;
+                for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
+                  if ( trig.i1 <= epoch_cb[ibuf] ) {
+                    bstop = ibuf-1;
+                    break;
                   }
-                  // dumper
-                  if (bstart < 0 || bstart >= nbufs) 
-                    cerr << "TriggerHook::start unclear." << endl;
-                  else if (bstop < 0 || bstop >= nbufs) 
-                    if(trig.i1 <= (epoch_cb.back() + bufflen)) bstop = epoch_cb.size()-1;
-                    else cerr << "TriggerHook::stop unclear." << endl;
-                  else {
-                    // valid bstart, bstop
-                    cout << "TriggerHook::b bstart=" << bstart;
-                    cout << " bstop=" << bstop << endl;
-                    // dump logic
-                    Dumper(trig);
-                  }
+                }
+                if(bstop == -1 && trig.i1 <= (epoch_cb.back() + bufflen)) bstop = epoch_cb.size()-1;
+                // dumper
+                if (bstart < 0 || bstart >= nbufs) 
+                  cout << "TriggerHook::start unclear." << endl;
+                else if (bstop < 0 || bstop >= nbufs) 
+                  cout << "TriggerHook::stop unclear." << endl;
+                else {
+                  // valid bstart, bstop
+                  cout << "TriggerHook::b bstart=" << bstart;
+                  cout << " bstop=" << bstop << endl;
+                  // dump logic
+                  Dumper(trig);
+                }
               }
             }
             // exit condition
