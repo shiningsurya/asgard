@@ -1,7 +1,6 @@
 #pragma once
 #include "asgard.hpp"
 using std::cout;
-using std::cerr;
 using std::endl;
 
 #include "PsrDADA.hpp"
@@ -30,7 +29,8 @@ static const char mc_vlitegrp[] = "224.3.29.71";
 static int mc_heimdall_stream_port = 20001;
 // triggers
 // XXX This is FBSON_trigger group
-static const char mc_trigrp[] = "224.3.29.81";
+static const char mc_single_trig[]  = "224.3.29.81";
+static const char mc_coadd_trig[]   = "224.3.29.91";
 static int mc_trig_port = 20003;
 
 
@@ -110,6 +110,8 @@ class MulticastSocket {
     }
     bool Setup ( const char * ip, int port )
     {
+      // logging
+      std::cout << "MulticastSocket::Setup ip=" << ip << endl;
       // port (int -> char[6])
       char port_str[6];
       snprintf(port_str, 6, "%d", port);
@@ -326,6 +328,7 @@ class TriggerHook {
     TriggerHook (
       key_t key_, unsigned int nbufs_,  
       timeslice nsamps_, int nchans_, int nbits_,
+      bool _ctrig,
       std::string odir
     ) :
       numobs(0), bstart(-1), bstop(-1),
@@ -337,7 +340,9 @@ class TriggerHook {
       {
         // setup socket
         if (
-          ! mc_socket.Setup ( mc_trigrp, mc_trig_port )
+          ! mc_socket.Setup ( 
+            _ctrig ? mc_coadd_trig : mc_single_trig
+            , mc_trig_port )
           ) {
           std::cerr << "Multicast setup failed!" << std::endl;
         }
@@ -490,31 +495,32 @@ class TriggerHook {
                 PrintTriggerAction (trig);
                 // iterate over cb to find triggers
                 bstart = bstop = -1;
-                  for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
-                    if ( trig.i0 <= epoch_cb[ibuf] ) {
-                            bstart = ibuf-1;
-                            break;
-                    }
+                for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
+                  if ( trig.i0 <= epoch_cb[ibuf] ) {
+                    bstart = ibuf-1;
+                    break;
                   }
-                  for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
-                    if ( trig.i1 <= epoch_cb[ibuf] ) {
-                            bstop = ibuf-1;
-                            break;
-                    }
+                }
+                if(bstart == -1 && trig.i0 >= epoch_cb.front()) bstart = 0;
+                for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
+                  if ( trig.i1 <= epoch_cb[ibuf] ) {
+                    bstop = ibuf-1;
+                    break;
                   }
-                  // dumper
-                  if (bstart < 0 || bstart >= nbufs) 
-                    cerr << "TriggerHook::start unclear." << endl;
-                  else if (bstop < 0 || bstop >= nbufs) 
-                    if(trig.i1 <= (epoch_cb.back() + bufflen)) bstop = epoch_cb.size()-1;
-                    else cerr << "TriggerHook::stop unclear." << endl;
-                  else {
-                    // valid bstart, bstop
-                    cout << "TriggerHook::b bstart=" << bstart;
-                    cout << " bstop=" << bstop << endl;
-                    // dump logic
-                    Dumper(trig);
-                  }
+                }
+                if(bstop == -1 && trig.i1 <= (epoch_cb.back() + bufflen)) bstop = epoch_cb.size()-1;
+                // dumper
+                if (bstart < 0 || bstart >= nbufs) 
+                  cout << "TriggerHook::start unclear." << endl;
+                else if (bstop < 0 || bstop >= nbufs) 
+                  cout << "TriggerHook::stop unclear." << endl;
+                else {
+                  // valid bstart, bstop
+                  cout << "TriggerHook::b bstart=" << bstart;
+                  cout << " bstop=" << bstop << endl;
+                  // dump logic
+                  Dumper(trig);
+                }
               }
             }
             // exit condition

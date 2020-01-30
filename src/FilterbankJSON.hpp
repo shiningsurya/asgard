@@ -87,6 +87,7 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       double sec_from_start = trig.i0 - head.epoch;
       j["time"]["tstart"] = head.tstart + (sec_from_start/86400.0f);
       j["time"]["peak_time"] = trig.peak_time - sec_from_start;
+      j["time"]["tpeak"] = trig.peak_time; 
 
       // group
       struct tm utc_time;
@@ -95,7 +96,7 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       strftime (group, sizeof(group), "%Y%m%d_%H%M%S", &utc_time);
       j["parameters"]["group"] = std::string(group);
       snprintf(filename, sizeof(filename),
-          "%s_muos_ea%02d_dm%04.2f_sn%04.2f_wd%04.2f_pt%04.1f.fbson", group, head.stationid,trig.dm,trig.sn,trig.width*1e3f,trig.peak_time 
+          "%s_muos_ea%02d_dm%04.2f_sn%04.2f_wd%04.2f.fbson", group, head.stationid,trig.dm,trig.sn,trig.width*1e3f
       );
     }
     void DumpData (Byte* ptr, timeslice start, timeslice off) {
