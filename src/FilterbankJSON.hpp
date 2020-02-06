@@ -86,7 +86,7 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       j["time"]["duration"] = dur;
       double sec_from_start = trig.i0 - head.epoch;
       j["time"]["tstart"] = head.tstart + (sec_from_start/86400.0f);
-      j["time"]["peak_time"] = trig.peak_time - sec_from_start;
+      j["time"]["peak_time"] = (head.epoch + trig.peak_time) - trig.i0;
       j["time"]["tpeak"] = trig.peak_time; 
 
       // group
