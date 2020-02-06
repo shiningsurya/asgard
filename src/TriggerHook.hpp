@@ -324,6 +324,8 @@ class TriggerHook {
     unsigned int numobs;
     // ecounts
     unsigned int ecounts;
+    // running index
+    unsigned int rindex;
   public:
     TriggerHook (
       key_t key_, unsigned int nbufs_,  
@@ -336,6 +338,7 @@ class TriggerHook {
       dkey(key_), nbufs(nbufs_),
       nsamps(nsamps_), nchans(nchans_), nbits(nbits_),
       fbson (odir),
+      rindex(0),
       mc_socket (2, 0), fds (2, 0)
       {
         // setup socket
@@ -479,6 +482,7 @@ class TriggerHook {
               buffs_cb.push_back (
                 dadain.GetBufPtr()
               );
+              //rindex = ( (rindex+1) % nbufs );
               // push_back going
               tmjd_cb.push_back ( 
                 header.tstart + 
@@ -496,14 +500,20 @@ class TriggerHook {
                 // iterate over cb to find triggers
                 bstart = bstop = -1;
                 for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
-                  if ( trig.i0 <= epoch_cb[ibuf] ) {
+                  if ( 
+                    trig.i0 >= epoch_cb[ibuf-1] && 
+                    trig.i0 < epoch_cb[ibuf] 
+                    ) {
                     bstart = ibuf-1;
                     break;
                   }
                 }
-                if(bstart == -1 && trig.i0 >= epoch_cb.front()) bstart = 0;
+                if(bstart == -1 && trig.i0 >= epoch_cb.back()) bstart = epoch_cb.size()-1;
                 for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
-                  if ( trig.i1 <= epoch_cb[ibuf] ) {
+                  if ( 
+                    trig.i1 >= epoch_cb[ibuf-1] && 
+                    trig.i1 < epoch_cb[ibuf] 
+                    ) {
                     bstop = ibuf-1;
                     break;
                   }

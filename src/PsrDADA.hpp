@@ -615,8 +615,14 @@ class PsrDADA {
   return hdu->data_block->curbuf;  
  }
  char* GetBufPtr() {
-  auto g = GetIndex();
-  return hdu->data_block->buf.buffer[g];
+  auto buf      = hdu->data_block->buf;
+  auto ptr_sync = buf.sync;
+  auto nbufs    = ptr_sync->nbufs;
+  auto iread    = buf.iread;
+  auto xfer     = buf.xfer;
+  // this is modulo subtract
+  auto g = (ptr_sync->r_bufs[iread] + nbufs - 1) % nbufs;
+  return buf.buffer[g];
  }
  char* GetBufPtr(unsigned int ibuf) {
   return hdu->data_block->buf.buffer[ibuf];  
