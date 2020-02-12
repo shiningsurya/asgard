@@ -96,7 +96,7 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       strftime (group, sizeof(group), "%Y%m%d_%H%M%S", &utc_time);
       j["parameters"]["group"] = std::string(group);
       snprintf(filename, sizeof(filename),
-          "%s_muos_ea%02d_dm%04.2f_sn%04.2f_wd%04.2f.fbson", group, head.stationid,trig.dm,trig.sn,trig.width*1e3f
+          "%s_muos_ea%02d_dm%05.2f_sn%05.2f_wd%05.2f.fbson", group, head.stationid,trig.dm,trig.sn,trig.width*1e3f
       );
     }
     void DumpData (Byte* ptr, timeslice start, timeslice off) {
