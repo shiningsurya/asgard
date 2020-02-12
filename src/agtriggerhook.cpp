@@ -66,14 +66,15 @@ int main(int ac, char * av[]) {
 		}
 		// key 0d to 0x
 		dadakey = dx(s_dadakey);
+		auto tkey = 70;
 		// trigger channel
 		bool ctrig = vm.count("trigcoadd");
 		TriggerHook th(
 		  dadakey, nbufs,
 		  nsamps, nchans, nbits,
 		  ctrig,
-	   odir	
+		  0x70
 		);
-  th.FollowDADA();
+  th.Work ();
   return 0;
 }
