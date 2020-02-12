@@ -618,6 +618,7 @@ class PsrDADA {
   auto buf      = hdu->data_block->buf;
   auto ptr_sync = buf.sync;
   auto nbufs    = ptr_sync->nbufs;
+  //auto iread    = 0;
   auto iread    = buf.iread;
   auto xfer     = buf.xfer;
   // this is modulo subtract
