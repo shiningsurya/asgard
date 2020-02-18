@@ -1,0 +1,69 @@
+#!/usr/bin/env python
+RE_PATTERN = " t0=(?P<t0>\d*\.\d*) t1=(?P<t1>\d*\.\d*)\n peak_time=(?P<pt>\d*\.\d*) sn=(?P<sn>\d*\.\d*) dm=(?P<dm>\d*\.\d*)"
+VD_PATTERN = "\d{8}\_\d{6}\_ea\d{2}\_(?P<epc>\d*)\.vdif"
+import re
+rec = re.compile (RE_PATTERN)
+vdc = re.compile (VD_PATTERN)
+import os
+import numpy as np
+
+def ParseArgs():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='agthlog', description='Asgard tool for triggerhook logkeeping.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('thlog', help = 'Triggerhook log file', type=str)
+    # vdif directory
+    add('-v,--vdif', help = 'VDIF list.', default="vdif.list", dest='vdif')
+    # sn
+    add('--sn', help = 'S/N filter for vdif.', default=25, dest='sn', type=int)
+    # o
+    add('-o', help = 'List the matched in a file', dest = 'list', default=None)
+    return ap.parse_args()
+
+if __name__ == "__main__":
+    args = ParseArgs ()
+    print ("")
+    FILE = args.thlog
+    # log file
+    with open(FILE,"r") as f:
+        l = rec.findall (f.read())
+    # vdif file
+    with open(args.vdif,"r") as f:
+        vdifiles = f.readlines ()
+        f.seek (0)
+        o = vdc.findall (f.read())
+    #
+    # t0,t1,pt,sn,dm
+    n = len(l)
+    T0 = np.zeros (n, dtype=np.float64)
+    T1 = np.zeros (n, dtype=np.float64)
+    SN = np.zeros (n, dtype=np.float32)
+    DM = np.zeros (n, dtype=np.float32)
+    for ii,ll in enumerate(l):
+        T0[ii] = ll[0]
+        T1[ii] = ll[1]
+        SN[ii] = ll[3]
+        DM[ii] = ll[4]
+    # VDIF 
+    VDIF = np.zeros (len(vdifiles), dtype=np.uint64)
+    for iv,vl in enumerate (o):
+        fname, _ = os.path.splitext (vl)
+        VDIF[iv] = int( fname.split ("_")[-1] )
+    sncut, = np.where (SN >= args.sn)
+    for i in sncut:
+        print ("SN={0:3.2f} DM={1:4.2f}".format(SN[i], DM[i]))
+        print ("t0={0:10.2f} t1={1:10.2f}".format(T0[i], T1[i]))
+        start = int (T0[i])
+        stop  = int (T1[i])
+        while start <= stop:
+            fid, = np.where (VDIF == start)
+            if len(fid) != 1:
+                print ("[!!] ", end="")
+                print ([vdifiles[ffff] for ffff in fid])
+                start = start + 1
+                continue
+            print (vdifiles[fid[0]].strip())
+            start = start + 1
+        print ("---")
+

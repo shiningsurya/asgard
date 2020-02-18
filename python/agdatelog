@@ -40,6 +40,8 @@ def ParseArgs():
     add('--gap', help = 'Maximum gap between fbsons (in minutes).', default=150, dest='gap', type=int)
     # summary
     add('-s', help = 'Summary statistics', default=False, action='store_true', dest='summary')
+    # last k
+    add('-k', help = 'Last k max candidates.', default=None, dest='k', type=int)
     # o
     add('-o', help = 'List the sieved fbsons in a file', dest = 'list', default=None)
     return ap.parse_args()
@@ -58,7 +60,7 @@ if __name__ == "__main__":
         with open (of, "r") as f:
             INPUT = INPUT + f.readlines()
     # DATE stage
-    DATE, ANT, SN, DM, WD = [],[],[],[], []
+    DATE, ANT, SN, DM, WD = [],[],[],[],[]
     for f in INPUT:
         d,a,s,m,w = oneAction (f)
         DATE.append (d)
@@ -95,7 +97,11 @@ if __name__ == "__main__":
         print ("rate   :{0:4.2f}".format(cfbson / dur.total_seconds()* 3600))
         a = b+1
     # last iteration
-    dur = uDATE[a] - uDATE[b]
+    if len(breaks) == 0:
+        dur = dt.timedelta (0)
+        ib = 0
+    else:
+        dur = uDATE[a] - uDATE[b]
     print ("----------------------------")
     print ("Offsky :", dur)
     OFFDUR = OFFDUR + dur
@@ -120,3 +126,12 @@ if __name__ == "__main__":
         onts = ONDUR.total_seconds()
         ofts = OFFDUR.total_seconds()
         print ("UPTIME[%]=    {0:4.2f}".format(100*onts/(onts+ofts)) )
+        print ("rate     =    {0:4.2f}".format(NFBSON/onts) )
+
+    if args.k:
+        print ("----------------------------")
+        udm, cdm = np.unique (DM, return_counts=True)
+        ac  = np.argsort (cdm)
+        for ii in ac[-args.k:]:
+            print ("DM={0:3.2f} Count={1:04d}".format(udm[ii], cdm[ii]))
+
