@@ -191,7 +191,8 @@ def CVsTime(xx, saveas=None, afig=None):
         ax2.scatter(pt,px,edgecolors='none', alpha=0.8, c=lc)
     for pt,px,lc in zip(xx.peak_time,xx.dm,lcolors):
         ax3.scatter(pt,px,edgecolors='none', alpha=0.8, c=lc)
-    ax3.set_title("T{0} @ J{1}".format(xx.tstart, xx.coord.to_string("hmsdms")))
+    if xx.coord is not None:
+        ax3.set_title("T{0} @ J{1}".format(xx.tstart, xx.coord.to_string("hmsdms")))
     if isinstance(xx, str):
         plt.savefig(fi)
         plt.close()
