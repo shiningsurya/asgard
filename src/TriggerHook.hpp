@@ -10,6 +10,7 @@ using std::endl;
 //#include "TrigDADA.hpp"
 #include "Operations.hpp"
 #include "FilterbankJSON.hpp"
+#include "Timer.hpp"
 
 #include <sys/time.h>
 #include <sys/types.h>
@@ -314,7 +315,6 @@ class TriggerHook {
     boost::circular_buffer<char*> buffs_cb;
     boost::circular_buffer<double> tmjd_cb;
     // trigger
-    std::vector<trigger_t> trigs;
     // dada
     key_t dkey;
     key_t tdkey;
@@ -368,6 +368,8 @@ class TriggerHook {
     void Work () {
       std::thread trig_thread (&TriggerHook::FollowTrig, this);
       trig_thread.detach();
+      // for some reason the followdada call which is a while(1) loop is ending.
+      // I am trying the most basic method 
       FollowDADA ();
       std::cout << "TriggerHook::Work completed numobs=" << numobs << std::endl;
     }
@@ -559,13 +561,21 @@ class TriggerHook {
     }
     // trigger interface
     void FollowTrig () {
+      std::vector<trigger_t> trigs;
+      // timers
+      Timer alltrigtime ("AllTime");
+      Timer trigtime ("TriggerTime");
+      Timer diskiotime ("DiskIO");
       // trigger
       while (true) {
         if (TriggerCheck(trigs)) {
+          alltrigtime.Start ();
           for(const auto& trig : trigs) {
+            // timer
+            trigtime.Start ();
             numtrigs++;
-            // lock_guard ON
-            const std::lock_guard<std::mutex> lock(mutex_cb);
+            // uniquelock ON
+            std::unique_lock<std::mutex> lock(mutex_cb);
             // ----------
             //DiagPrint();
             PrintTriggerAction (trig);
@@ -602,12 +612,53 @@ class TriggerHook {
               cout << "TriggerHook::b bstart=" << bstart;
               cout << " bstop=" << bstop << endl;
               // dump logic
+#if 0
               DumperFBSON(trig, bstart, bstop);
+#else
+              timeslice start, offs; 
+              double this_start, this_end;
+              FilterbankJSON fbson ("/mnt/ssd/dumps/");
+              if (trig.i0 >= oldheader.epoch && trig.i0 < header.epoch)
+                fbson.DumpHead (oldheader, trig);
+              else
+                fbson.DumpHead (header, trig);
+              timeslice tstride = nchans * nbits / 8 / header.tsamp * 1E6;
+              std::cout << "TriggerHook::DumperFBSON::tsamp = " << header.tsamp << std::endl;
+              timeslice size = fbson.nsamps;
+              timeslice fullsize = size;
+              for(unsigned int ibuf = bstart; ibuf <= bstop; ibuf++) {
+                this_start = epoch_cb[ibuf];
+                // logic time
+                if ( trig.i0 <= this_start ) start = 0; 
+                else start = (trig.i0 - this_start) * tstride;
+                offs  = std::min( (buffsz - start), size);
+                std::cout << "TriggerHook::Dumper start=" << start << " offs=" << offs << std::endl;
+                // sanity-check time
+                if ( start < 0 || start >= buffsz ) 
+                  std::cout << "TriggerHook::Dumper Invalid start="<< start << std::endl;
+                else if ( offs < 0 || start+offs > buffsz ) 
+                  std::cout << "TriggerHook::Dumper Invalid offs="<<offs << std::endl;
+                else {
+                  // call time
+                  fbson.DumpData ( reinterpret_cast<PtrByte>(buffs_cb[ibuf]), start, offs );
+                  size -= offs;
+                }
+              }
+              lock.unlock ();
+              DiagPrint ();
+              diskiotime.Start ();
+              try {
+                fbson.WritePayload (fullsize);
+              } catch (...) {
+                std::cout << "TriggerHook::DumperFBSON failed while writing" << std::endl;
+              }
+              diskiotime.StopPrint (std::cout);
+#endif
             }
-            // lock_guard OFF
-            // dtor does it
-            // ----------
+            // Timer
+            trigtime.StopPrint (std::cout);
           }
+          alltrigtime.StopPrint (std::cout);
         }
         else {
           // sleep 4s
