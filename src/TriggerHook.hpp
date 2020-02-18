@@ -2,10 +2,15 @@
 #include "asgard.hpp"
 using std::cout;
 using std::endl;
+#include <chrono>
+#include <thread>
+#include <mutex>
 
 #include "PsrDADA.hpp"
+//#include "TrigDADA.hpp"
 #include "Operations.hpp"
 #include "FilterbankJSON.hpp"
+#include "Timer.hpp"
 
 #include <sys/time.h>
 #include <sys/types.h>
@@ -299,7 +304,6 @@ public:
 class TriggerHook {
   private:
     unsigned char trig_buf[MC_MAXRECV +1]; 
-    FilterbankJSON fbson;
     MulticastSocket mc_socket;
     FDSelect fds;
     std::vector<int> ifds;
@@ -310,11 +314,10 @@ class TriggerHook {
     boost::circular_buffer<double> epoch_cb;
     boost::circular_buffer<char*> buffs_cb;
     boost::circular_buffer<double> tmjd_cb;
-    int bstart, bstop;
     // trigger
-    std::vector<trigger_t> trigs;
     // dada
     key_t dkey;
+    key_t tdkey;
     timeslice nsamps;
     int nchans, nbits;
     timeslice buffsz;
@@ -322,20 +325,22 @@ class TriggerHook {
     unsigned int nbufs;
     timeslice readret;
     unsigned int numobs;
-    // ecounts
-    unsigned int ecounts;
+    unsigned int numtrigs;
+    // running index
+    unsigned int rindex;
+    // mutex
+    std::mutex mutex_cb;
   public:
     TriggerHook (
       key_t key_, unsigned int nbufs_,  
       timeslice nsamps_, int nchans_, int nbits_,
-      bool _ctrig,
-      std::string odir
+      bool _ctrig, key_t tkey_
     ) :
-      numobs(0), bstart(-1), bstop(-1),
-      ecounts(0),
+      numobs(0),
       dkey(key_), nbufs(nbufs_),
+      tdkey(tkey_),
       nsamps(nsamps_), nchans(nchans_), nbits(nbits_),
-      fbson (odir),
+      rindex(0),
       mc_socket (2, 0), fds (2, 0)
       {
         // setup socket
@@ -354,6 +359,19 @@ class TriggerHook {
         tmjd_cb.set_capacity ( nbufs );
         // buffsz
         buffsz = nsamps * nchans * nbits / 8;
+    }
+    ~TriggerHook () {
+      std::cout << "TriggerHook::dtor numobs=" << numobs << std::endl;
+      mc_socket.~MulticastSocket ();
+    }
+    // WORK function
+    void Work () {
+      std::thread trig_thread (&TriggerHook::FollowTrig, this);
+      trig_thread.detach();
+      // for some reason the followdada call which is a while(1) loop is ending.
+      // I am trying the most basic method 
+      FollowDADA ();
+      std::cout << "TriggerHook::Work completed numobs=" << numobs << std::endl;
     }
     // checks for trigger
     bool TriggerCheck (trigger_t& tt) {
@@ -409,13 +427,18 @@ class TriggerHook {
       }
       cout.precision(6);
     }
-    void Dumper(const trigger_t& trig) {
+#if 0
+    void Dumper(const trigger_t& trig, int bstart, int bstop) {
       timeslice start, offs; 
       double this_start, this_end;
+      TrigDADA tdada (tdkey);
+      tdada.WriteLock (true);
       if (trig.i0 >= oldheader.epoch && trig.i0 < header.epoch)
-        fbson.DumpHead (oldheader, trig);
+        tdada.SetHeader (oldheader);
       else
-        fbson.DumpHead (header, trig);
+        tdada.SetHeader (header);
+      tdada.SetTrigger (trig);
+      tdada.WriteHeader ();
       timeslice tstride = nchans * nbits / 8 / header.tsamp * 1E6;
       timeslice size = fbson.nsamps;
       timeslice fullsize = size;
@@ -433,100 +456,214 @@ class TriggerHook {
             std::cout << "TriggerHook::Dumper Invalid offs="<<offs << std::endl;
           else {
             // call time
-            fbson.DumpData ( reinterpret_cast<unsigned char*>(buffs_cb[ibuf]), start, offs );
+            tdada.WriteData ( reinterpret_cast<PtrByte>(buffs_cb[ibuf]), start, offs );
+            size -= offs;
+          }
+      }
+      DiagPrint ();
+      tdada.WriteLock (false);
+    }
+#endif
+    void DumperFBSON(const trigger_t& trig, int bstart, int bstop) {
+      timeslice start, offs; 
+      double this_start, this_end;
+      FilterbankJSON fbson ("/mnt/ssd/dumps/");
+      if (trig.i0 >= oldheader.epoch && trig.i0 < header.epoch)
+        fbson.DumpHead (oldheader, trig);
+      else
+        fbson.DumpHead (header, trig);
+      timeslice tstride = nchans * nbits / 8 / header.tsamp * 1E6;
+      std::cout << "TriggerHook::DumperFBSON::tsamp = " << header.tsamp << std::endl;
+      timeslice size = fbson.nsamps;
+      timeslice fullsize = size;
+      for(unsigned int ibuf = bstart; ibuf <= bstop; ibuf++) {
+          this_start = epoch_cb[ibuf];
+          // logic time
+          if ( trig.i0 <= this_start ) start = 0; 
+          else start = (trig.i0 - this_start) * tstride;
+          offs  = std::min( (buffsz - start), size);
+          std::cout << "TriggerHook::Dumper start=" << start << " offs=" << offs << std::endl;
+          // sanity-check time
+          if ( start < 0 || start >= buffsz ) 
+            std::cout << "TriggerHook::Dumper Invalid start="<< start << std::endl;
+          else if ( offs < 0 || start+offs > buffsz ) 
+            std::cout << "TriggerHook::Dumper Invalid offs="<<offs << std::endl;
+          else {
+            // call time
+            fbson.DumpData ( reinterpret_cast<PtrByte>(buffs_cb[ibuf]), start, offs );
             size -= offs;
           }
       }
       DiagPrint ();
       try {
         fbson.WritePayload (fullsize);
-      }
-      catch (...) {
-        cout << "[EE] EXCEPTION@TRIGGERHOOK ecounts=" << ecounts++ << endl;
+      } catch (...) {
+        std::cout << "TriggerHook::DumperFBSON failed while writing" << std::endl;
       }
     }
+    // MAIN methods
     // dada interface
-    // MAIN method
     void FollowDADA () {
-     while(++numobs) {
-         std::cout << "TriggerHook::FollowDADA numobs=" << numobs << std::endl;
-         PsrDADA dadain(dkey,nsamps,nchans, nbits, "/home/vlite-master/surya/logs/tthhooookk.log");  
-         auto bytes_chunk = dadain.GetByteChunkSize();
-         dadain.ReadLock(true);
-         unsigned int going = 0;
-         // read loop
-         while (going || dadain.ReadHeader()) {
-            if(!going) {
-              // first epoch
-              dadain.PrintHeader();
-              oldheader = header;
-              header = dadain.GetHeader();
-              bufflen = nsamps * header.tsamp / 1e6;
-            }
-            readret = dadain.ZeroReadData();
-            if (readret == -1) {
-               std::cout << "TriggerHook::FollowDADA bad ZeroRead" << std::endl;
-               going = 0;
-               // eod
-            }
-            else {
-              // push_back current epoch
-              epoch_cb.push_back ( 
+      std::cout << "TriggerHook::FollowDADA starting" << std::endl;
+      while(++numobs || true) {
+        std::cout << "TriggerHook::FollowDADA numobs=" << numobs << std::endl;
+        PsrDADA dadain(dkey,nsamps,nchans, nbits, "/home/vlite-master/surya/logs/tthhooookk.log");  
+        auto bytes_chunk = dadain.GetByteChunkSize();
+        dadain.ReadLock(true);
+        unsigned int going = 0;
+        // read loop
+        while (going || dadain.ReadHeader()) {
+          if(!going) {
+            // first epoch
+            dadain.PrintHeader();
+            oldheader = header;
+            header = dadain.GetHeader();
+            bufflen = nsamps * header.tsamp / 1e6;
+          }
+          readret = dadain.ZeroReadData();
+          if (readret == -1) {
+            std::cout << "TriggerHook::FollowDADA bad ZeroRead" << std::endl;
+            going = 0;
+            // eod
+          }
+          else {
+            // lock guard ON
+            const std::lock_guard<std::mutex> lock (mutex_cb);
+            // -----
+            // push_back current epoch
+            epoch_cb.push_back ( 
                 header.epoch + 
                 (going * bufflen) 
                 );
-              // push_back data block
-              buffs_cb.push_back (
+            // push_back data block
+            buffs_cb.push_back (
                 dadain.GetBufPtr()
-              );
-              // push_back going
-              tmjd_cb.push_back ( 
+                );
+            //rindex = ( (rindex+1) % nbufs );
+            // push_back going
+            tmjd_cb.push_back ( 
                 header.tstart + 
                 (going * bufflen / 86400.0f) 
                 );
-              going++;
-            }
-            if (readret < bytes_chunk) going = 0;
-           std::cout << "TriggerHook::FollowDADA going merry=" << going << std::endl;
-            // trigger
-            while (TriggerCheck(trigs)) {
-              for(const auto& trig : trigs) {
-                //DiagPrint();
-                PrintTriggerAction (trig);
-                // iterate over cb to find triggers
-                bstart = bstop = -1;
-                for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
-                  if ( trig.i0 <= epoch_cb[ibuf] ) {
-                    bstart = ibuf-1;
-                    break;
-                  }
-                }
-                if(bstart == -1 && trig.i0 >= epoch_cb.front()) bstart = 0;
-                for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
-                  if ( trig.i1 <= epoch_cb[ibuf] ) {
-                    bstop = ibuf-1;
-                    break;
-                  }
-                }
-                if(bstop == -1 && trig.i1 <= (epoch_cb.back() + bufflen)) bstop = epoch_cb.size()-1;
-                // dumper
-                if (bstart < 0 || bstart >= nbufs) 
-                  cout << "TriggerHook::start unclear." << endl;
-                else if (bstop < 0 || bstop >= nbufs) 
-                  cout << "TriggerHook::stop unclear." << endl;
-                else {
-                  // valid bstart, bstop
-                  cout << "TriggerHook::b bstart=" << bstart;
-                  cout << " bstop=" << bstop << endl;
-                  // dump logic
-                  Dumper(trig);
-                }
+            going++;
+            // lock guard ON
+            // dtor does it
+            // -----
+          }
+          if (readret < bytes_chunk) going = 0;
+          std::cout << "TriggerHook::FollowDADA going merry=" << going << std::endl;
+          // exit condition
+          if (!going) break;
+        }
+        dadain.ReadLock(false);
+      }
+      std::cout << "TriggerHook::FollowDADA stopping" << std::endl;
+    }
+    // trigger interface
+    void FollowTrig () {
+      std::vector<trigger_t> trigs;
+      // timers
+      Timer alltrigtime ("AllTime");
+      Timer trigtime ("TriggerTime");
+      Timer diskiotime ("DiskIO");
+      // trigger
+      while (true) {
+        if (TriggerCheck(trigs)) {
+          alltrigtime.Start ();
+          for(const auto& trig : trigs) {
+            // timer
+            trigtime.Start ();
+            numtrigs++;
+            // uniquelock ON
+            std::unique_lock<std::mutex> lock(mutex_cb);
+            // ----------
+            //DiagPrint();
+            PrintTriggerAction (trig);
+            // iterate over cb to find triggers
+            int bstart = -1;
+            int bstop  = -1;
+            for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
+              if ( 
+                  trig.i0 >= epoch_cb[ibuf-1] && 
+                  trig.i0 < epoch_cb[ibuf] 
+                 ) {
+                bstart = ibuf-1;
+                break;
               }
             }
-            // exit condition
-            if (!going) break;
+            if(bstart == -1 && trig.i0 >= epoch_cb.back()) bstart = epoch_cb.size()-1;
+            for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
+              if ( 
+                  trig.i1 >= epoch_cb[ibuf-1] && 
+                  trig.i1 < epoch_cb[ibuf] 
+                 ) {
+                bstop = ibuf-1;
+                break;
+              }
             }
-         dadain.ReadLock(false);
+            if(bstop == -1 && trig.i1 <= (epoch_cb.back() + bufflen)) bstop = epoch_cb.size()-1;
+            // dumper
+            if (bstart < 0 || bstart >= nbufs) 
+              cout << "TriggerHook::start unclear." << endl;
+            else if (bstop < 0 || bstop >= nbufs) 
+              cout << "TriggerHook::stop unclear." << endl;
+            else {
+              // valid bstart, bstop
+              cout << "TriggerHook::b bstart=" << bstart;
+              cout << " bstop=" << bstop << endl;
+              // dump logic
+#if 0
+              DumperFBSON(trig, bstart, bstop);
+#else
+              timeslice start, offs; 
+              double this_start, this_end;
+              FilterbankJSON fbson ("/mnt/ssd/dumps/");
+              if (trig.i0 >= oldheader.epoch && trig.i0 < header.epoch)
+                fbson.DumpHead (oldheader, trig);
+              else
+                fbson.DumpHead (header, trig);
+              timeslice tstride = nchans * nbits / 8 / header.tsamp * 1E6;
+              std::cout << "TriggerHook::DumperFBSON::tsamp = " << header.tsamp << std::endl;
+              timeslice size = fbson.nsamps;
+              timeslice fullsize = size;
+              for(unsigned int ibuf = bstart; ibuf <= bstop; ibuf++) {
+                this_start = epoch_cb[ibuf];
+                // logic time
+                if ( trig.i0 <= this_start ) start = 0; 
+                else start = (trig.i0 - this_start) * tstride;
+                offs  = std::min( (buffsz - start), size);
+                std::cout << "TriggerHook::Dumper start=" << start << " offs=" << offs << std::endl;
+                // sanity-check time
+                if ( start < 0 || start >= buffsz ) 
+                  std::cout << "TriggerHook::Dumper Invalid start="<< start << std::endl;
+                else if ( offs < 0 || start+offs > buffsz ) 
+                  std::cout << "TriggerHook::Dumper Invalid offs="<<offs << std::endl;
+                else {
+                  // call time
+                  fbson.DumpData ( reinterpret_cast<PtrByte>(buffs_cb[ibuf]), start, offs );
+                  size -= offs;
+                }
+              }
+              lock.unlock ();
+              DiagPrint ();
+              diskiotime.Start ();
+              try {
+                fbson.WritePayload (fullsize);
+              } catch (...) {
+                std::cout << "TriggerHook::DumperFBSON failed while writing" << std::endl;
+              }
+              diskiotime.StopPrint (std::cout);
+#endif
+            }
+            // Timer
+            trigtime.StopPrint (std::cout);
+          }
+          alltrigtime.StopPrint (std::cout);
+        }
+        else {
+          // sleep 4s
+          std::this_thread::sleep_for (std::chrono::seconds(4));
         }
       }
+    }
 };
