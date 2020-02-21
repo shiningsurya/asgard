@@ -31,3 +31,28 @@ typedef struct {
   float peak_time;
   char meta[128];
 } trigger_t;
+
+typedef struct {
+  double i0;
+  double i1;
+  float sn;
+  float dm;
+  float width;
+  float peak_time;
+  float dur;
+  // station
+  int stationid;
+  // positions
+  double ra, dec;
+  // frequency
+  double fch1, foff;
+  // time
+  double tsamp, tstart, epoch;
+  // dm
+  double dm1, dmoff;
+  // memorys
+  unsigned nbits, nchans, ddnsamps, btnsamps, ndm;
+	// strs
+  char name[16];
+  char sigproc_file[64];
+} trigHead_t;
