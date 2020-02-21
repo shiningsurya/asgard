@@ -1,6 +1,13 @@
 #include "asgard.hpp"
 #include "TriggerHook.hpp"
 
+// signal handling
+#include <csignal>
+void d_signal_handle (int sig) {
+  std::cout << "received signal=" << sig << std::endl;
+}
+
+
 // Boost
 #include<boost/program_options/cmdline.hpp>
 #include<boost/program_options/config.hpp>
@@ -21,6 +28,14 @@ inline key_t dx(std::string in) {
 		return ret;
 }
 int main(int ac, char * av[]) {
+    // signal bindings
+    std::signal( SIGABRT, d_signal_handle );
+    std::signal( SIGFPE,  d_signal_handle );
+    std::signal( SIGILL,  d_signal_handle );
+    std::signal( SIGINT,  d_signal_handle );
+    std::signal( SIGTERM, d_signal_handle );
+    std::signal( SIGSEGV, d_signal_handle );
+    // actual start
 		key_t dadakey;
 		std::string s_dadakey, d_dadakey("60"), odir, d_odir("/mnt/ssd/dumps/");
 		unsigned int nbits, nbufs;
