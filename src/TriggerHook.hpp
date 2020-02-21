@@ -414,7 +414,7 @@ class TriggerHook {
       cout << " t0=" << tt.i0 << " t1=" << tt.i1 << endl; 
       cout.precision(6);
       cout << " peak_time=" << tt.peak_time;
-      cout << " sn=" << tt.sn << " dm=" << tt.dm << endl;
+      cout << " sn=" << tt.sn << " dm=" << tt.dm << " wd=" << 1e3f*tt.width << endl;
     }
     void DiagPrint() {
       char ss[256];
@@ -516,9 +516,11 @@ class TriggerHook {
           if(!going) {
             // first epoch
             dadain.PrintHeader();
+            bufflen = nsamps * header.tsamp / 1e6;
+            // lock guard ON
+            const std::lock_guard<std::mutex> lock (mutex_cb);
             oldheader = header;
             header = dadain.GetHeader();
-            bufflen = nsamps * header.tsamp / 1e6;
           }
           readret = dadain.ZeroReadData();
           if (readret == -1) {
