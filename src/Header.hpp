@@ -51,7 +51,7 @@ typedef struct {
   // dm
   double dm1, dmoff;
   // memorys
-  unsigned nbits, nchans, ddnsamps, btnsamps, ndm;
+  unsigned nbits, nchans, nsamps, ndm;
 	// strs
   char name[16];
   char sigproc_file[64];

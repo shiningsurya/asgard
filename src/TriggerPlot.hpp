@@ -2,17 +2,19 @@
 #include "asgard.hpp"
 #include "cpgplot.h"
 
+#define FMAX
+
 class TriggerPlot  {
 	using vf = std::vector<float>;
 	private:
 		// for triggerplot
-    fs::path dir;
-    char filename[256];
-    char group[256];
-    vf   axtm;
-    vf   axdm;
-    vf   tsn;
-    vf   dsn;
+		fs::path dir;
+		char filename[256];
+		char group[256];
+		vf   axtm;
+		vf   axdm;
+		vf   tsn;
+		vf   dsn;
 		// for pgplot
 		static constexpr float contrast = 1.0f; 
 		static constexpr float brightness = 0.5f;
@@ -52,23 +54,27 @@ class TriggerPlot  {
 			cpgpap (0.0,1.);               //10.0, width and aspect ratio
 			// prepare data products for plotting
 			float tleft   = th.i0 - th.epoch;
-			float btdur   = th.btnsamps * th.tsamp / 1E6;
-			float dddur   = th.ddnsamps * th.tsamp / 1E6;
+			float btdur   = th.nsamps * th.tsamp / 1E6;
+			float dddur   = th.nsamps * th.tsamp / 1E6;
 			float dleft   = th.dm1;
 			float dright  = dleft + (th.dmoff*th.ndm);
 			float fleft   = th.fch1;
 			float foff    = th.foff >= 0 ? th.foff : -th.foff;
 			float fright  = fleft - (th.nchans*foff);
+#ifdef FMAX
+			fleft  = 360.0f;
+			fright = 320.0f;
+#endif
 			float pt      = th.peak_time + (0.5*th.width);
 			unsigned ipt  = pt / th.tsamp * 1E6;
-			axtm.resize (th.btnsamps, 0.0f);
-			tsn.resize  (th.btnsamps, 0.0f);
+			axtm.resize (th.nsamps, 0.0f);
+			tsn.resize  (th.nsamps, 0.0f);
 			{
 				float last_time = tleft;
 				float ttsamp = th.tsamp/1E6;
 				unsigned start  = th.ndm/2;
-				unsigned stride = th.btnsamps;
-				for (unsigned i = 0; i < th.btnsamps; i++) {
+				unsigned stride = th.nsamps;
+				for (unsigned i = 0; i < th.nsamps; i++) {
 					axtm[i] = last_time = last_time + ttsamp;
 					tsn[i]  = bt[start*stride + i];
 				}
@@ -76,10 +82,10 @@ class TriggerPlot  {
 			axdm.resize (th.ndm, 0.0f);
 			dsn.resize  (th.ndm, 0.0f);
 			{
-				float last_time = 0.0f;
+				float last_time = th.dm1;
 				float ttdm = th.dmoff;
 				unsigned start  = ipt;
-				unsigned stride = th.btnsamps;
+				unsigned stride = th.nsamps;
 				for (unsigned i = 0; i < th.ndm; i++) {
 					axdm[i] = last_time = last_time + ttdm;
 					dsn[i]  = bt[start + (i*stride)];
@@ -88,30 +94,44 @@ class TriggerPlot  {
 			// PLOTTING
 			// DD
 			cpgsvp (0.1, 0.45, 0.1, 0.45);
-			cpgswin (tleft, tleft+dddur, fleft, fright);
-			cpgbox ("BCN",0.0,0,"BCMV",0.0,0);
+			cpgswin (tleft, tleft+dddur, fright,fleft);
+			cpgbox ("BNTSI",0.0,0,"CMVTSI",10.0,6);
 			cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
 			tr[0] = tleft;   tr[1] = 0.0f;    tr[2] = th.tsamp/1E6;
 			tr[3] = th.fch1; tr[4] = -foff;   tr[5] = 0.0f;
-			cpgimag (dd, th.nchans, th.ddnsamps,
-					1, th.nchans, 1, th.ddnsamps,
+			cpgimag (dd, th.nchans, th.nsamps,
+					1, th.nchans, 1, th.nsamps,
 					0, 255, 
 					tr
 			);
+			//tr[0] = tleft;   tr[2] = 0.0f;    tr[1] = th.tsamp/1E6;
+			//tr[3] = th.fch1; tr[5] = -foff;   tr[4] = 0.0f;
+			//cpgimag (dd, th.nsamps, th.nchans,
+					//1, th.nsamps, 1, th.nchans,
+					//0, 255, 
+					//tr
+			//);
 			cpgmtxt ("B", 2.5, 0.5, 0.5, "Time [s]");
 			cpgmtxt ("L",1,0.5,0.5,"Freq [MHz]");
 			// BT
 			cpgsvp (0.1, 0.45, 0.55, 0.9);
 			cpgswin (tleft, tleft+btdur, dleft, dright);
-			cpgbox ("BCN",0.0,0,"BCMV",0.0,0);
-			cpgctab (rain_l.data(), rain_r.data(), rain_g.data(), rain_b.data(), 5, contrast, brightness);
+			cpgbox ("BNTSI",0.0,0,"CMVTSI",10.0,6);
+			cpgctab (rain_l.data(), rain_r.data(), rain_g.data(), rain_b.data(), 9, contrast, brightness);
 			tr[0] = tleft;   tr[1] = 0.0f;    tr[2] = th.tsamp/1E6;
 			tr[3] = th.dm1; tr[4] = th.dmoff; tr[5] = 0.0f;
-			cpgimag (bt, th.ndm, th.btnsamps,
-					1, th.ndm, 1, th.btnsamps,
+			cpgimag (bt, th.ndm, th.nsamps,
+					1, th.ndm, 1, th.nsamps,
 					0, 255, 
 					tr
 			);
+			//tr[0] = tleft;   tr[1] = 0.0f;    tr[2] = th.tsamp/1E6;
+			//tr[3] = th.dm1; tr[4] = th.dmoff; tr[5] = 0.0f;
+			//cpgimag (bt, th.nsamps, th.ndm,
+					//1, th.nsamps, 1, th.ndm,
+					//0, 255, 
+					//tr
+			//);
 			cpgmtxt ("B", 2.5, 0.5, 0.5, "Time [s]");
 			cpgmtxt ("L",1,0.5,0.5,"DM [pc/cc]");
 			// filesig
@@ -119,7 +139,7 @@ class TriggerPlot  {
 			// dSN
 			cpgsvp (0.55, 0.9, 0.1, 0.45);
 			cpgswin (dleft, dright, 0, 256);
-			cpgbox ("ABN",0.0,0,"",0.0,0);
+			cpgbox ("ABNTS",10.0,6,"",0.0,0);
 			cpgline (th.ndm, axdm.data(), dsn.data());
 			cpgmtxt ("B", 2.5, 0.5, 0.5, "DM [pc/cc]");
 			// source-name
@@ -128,8 +148,8 @@ class TriggerPlot  {
 			// tSN
 			cpgsvp (0.55, 0.9, 0.55, 0.9);
 			cpgswin (tleft, tleft+btdur, 0, 256);
-			cpgbox ("ABN",0.0,0,"",0.0,0);
-			cpgline (th.btnsamps, axtm.data(), tsn.data());
+			cpgbox ("ABNTS",0.0,0,"",0.0,0);
+			cpgline (th.nsamps, axtm.data(), tsn.data());
 			cpgmtxt ("B", 2.5, 0.5, 0.5, "Time [s]");
 			// source-name
 			snprintf (txt, sizeof(txt), "Peak time=%3.2fs",pt+tleft);
