@@ -21,6 +21,7 @@ class TriggerPlot  {
 		float tr[6];
 		float charh;
 		char txt[32];
+		char sig[8];
 	public:
 		static constexpr std::array<float,5> heat_l = {0.0, 0.2, 0.4, 0.6, 1.0};
 		static constexpr std::array<float,5> heat_r = {0.0, 0.5, 1.0, 1.0, 1.0};
@@ -30,7 +31,7 @@ class TriggerPlot  {
 		static constexpr std::array<float,9> rain_r = { 0.0, 0.0,  0.0,  0.0,  0.6,  1.0,  1.0, 1.0, 1.0};
 		static constexpr std::array<float,9> rain_g = { 0.0, 0.0,  0.0,  1.0,  1.0,  1.0,  0.6, 0.0, 1.0};
 		static constexpr std::array<float,9> rain_b = { 0.0, 0.3,  0.8,  1.0,  0.3,  0.0,  0.0, 0.0, 1.0};
-		TriggerPlot (std::string dir_)  : dir(dir_) {
+		TriggerPlot (std::string dir_, const char * sig_ = "png/png")  : dir(dir_) {
 			charh = 0.65;
 			tr[0] = 0.0f;
 			tr[1] = 0.0f;
@@ -38,6 +39,7 @@ class TriggerPlot  {
 			tr[3] = 0.0f;
 			tr[4] = 0.0f;
 			tr[5] = 0.0f;
+			strcpy (sig, sig_);
 		}
 		void Plot (
 			const trigHead_t&     th,
@@ -46,7 +48,7 @@ class TriggerPlot  {
 				) {
 			// ALL PGPLOT routines are here
 			snprintf (group, sizeof(group), "%s_muos_sn%03.2f_dm%04.2f_wd%04.2f", th.sigproc_file, th.sn, th.dm, th.width*1e3f);
-			snprintf (filename, sizeof(filename), "%s.ps/vcps", group);
+			snprintf (filename, sizeof(filename), "%s.%s", group, sig);
 			auto fn = dir / filename;
 			cpgbeg (0,fn.c_str(), 1, 1);      // begin plotting
 			cpgsch(charh);                    // character height

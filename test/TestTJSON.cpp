@@ -11,7 +11,7 @@ int main (int ac, char * av[]) {
 	DBSON x (tpath);
 
 	///////
-	TriggerPlot tp ("/home/shining/work/vlite/dbsons/cpilot");
+	TriggerPlot tp ("/tmp/asgard", "ps/vcps");
 	auto th = x.GetTrigHead ();
 	tp.Plot (th, x.bt.data(), x.dd.data());
 	return 0;
