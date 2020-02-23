@@ -97,6 +97,7 @@ class TriggerPlot  {
 			cpgswin (tleft, tleft+dddur, fright,fleft);
 			cpgbox ("BNTSI",0.0,0,"CMVTSI",10.0,6);
 			cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
+			// this works with asgard generated dbson
 			tr[0] = tleft;   tr[1] = 0.0f;    tr[2] = th.tsamp/1E6;
 			tr[3] = th.fch1; tr[4] = -foff;   tr[5] = 0.0f;
 			cpgimag (dd, th.nchans, th.nsamps,
@@ -104,13 +105,6 @@ class TriggerPlot  {
 					0, 255, 
 					tr
 			);
-			//tr[0] = tleft;   tr[2] = 0.0f;    tr[1] = th.tsamp/1E6;
-			//tr[3] = th.fch1; tr[5] = -foff;   tr[4] = 0.0f;
-			//cpgimag (dd, th.nsamps, th.nchans,
-					//1, th.nsamps, 1, th.nchans,
-					//0, 255, 
-					//tr
-			//);
 			cpgmtxt ("B", 2.5, 0.5, 0.5, "Time [s]");
 			cpgmtxt ("L",1,0.5,0.5,"Freq [MHz]");
 			// BT
@@ -118,20 +112,20 @@ class TriggerPlot  {
 			cpgswin (tleft, tleft+btdur, dleft, dright);
 			cpgbox ("BNTSI",0.0,0,"CMVTSI",10.0,6);
 			cpgctab (rain_l.data(), rain_r.data(), rain_g.data(), rain_b.data(), 9, contrast, brightness);
-			tr[0] = tleft;   tr[1] = 0.0f;    tr[2] = th.tsamp/1E6;
-			tr[3] = th.dm1; tr[4] = th.dmoff; tr[5] = 0.0f;
-			cpgimag (bt, th.ndm, th.nsamps,
-					1, th.ndm, 1, th.nsamps,
-					0, 255, 
-					tr
-			);
 			//tr[0] = tleft;   tr[1] = 0.0f;    tr[2] = th.tsamp/1E6;
 			//tr[3] = th.dm1; tr[4] = th.dmoff; tr[5] = 0.0f;
-			//cpgimag (bt, th.nsamps, th.ndm,
-					//1, th.nsamps, 1, th.ndm,
+			//cpgimag (bt, th.ndm, th.nsamps,
+					//1, th.ndm, 1, th.nsamps,
 					//0, 255, 
 					//tr
 			//);
+			tr[0] = tleft;   tr[2] = 0.0f;    tr[1] = th.tsamp/1E6;
+			tr[3] = th.dm1; tr[5] = th.dmoff; tr[4] = 0.0f;
+			cpgimag (bt, th.nsamps, th.ndm,
+					1, th.nsamps, 1, th.ndm,
+					0, 255, 
+					tr
+			);
 			cpgmtxt ("B", 2.5, 0.5, 0.5, "Time [s]");
 			cpgmtxt ("L",1,0.5,0.5,"DM [pc/cc]");
 			// filesig
