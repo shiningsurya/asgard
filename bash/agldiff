@@ -1,0 +1,65 @@
+#!/bin/bash
+# BASH script to find differences in lists
+#set -x
+
+usage() {
+	echo "Asgard::agldiff"
+	echo "BASH utility to find set differences in lists."
+	echo 
+	echo "Usage: $(basename $0) [ -h ] [-f FBSON.list] [-d DBSON.list] [-p PNG.list] list-a list-b"
+}
+
+# getopt 
+#echo 
+while getopts ":hf:d:p:" arg
+do
+	case "$arg" in
+		"h")
+			usage
+			exit 0
+			;;
+		"f")
+			FL=${OPTARG}
+			;;
+		"d")
+			DL=${OPTARG}
+			;;
+		"p")
+			PL=${OPTARG}
+			;;
+		*)
+			echo "Option not understood"
+			usage
+			exit 1
+			;;
+	esac
+done
+shift $((OPTIND -1))
+AFILE=$1
+BFILE=$2
+#
+
+#echo $AFILE
+#echo $BFILE
+
+ATEMP=$(mktemp agldiff.XXXX)
+BTEMP=$(mktemp agldiff.XXXX)
+
+cat $AFILE | cut -d"." -f1,2,3,4 > $ATEMP
+cat $BFILE | cut -d"." -f1,2,3,4 > $BTEMP
+
+DIFF=$(diff $ATEMP $BTEMP --changed-group-format="%>" --unchanged-group-format="")
+
+rm $ATEMP $BTEMP
+
+#
+if [[ $FL ]]; then
+	echo "$DIFF" | sed 's/$/.fbson/' > $FL
+elif [[ $DL  ]]; then
+	echo "$DIFF" | sed 's/$/.dbson/' > $DL
+elif [[ $PL  ]]; then
+	echo "$DIFF" | sed 's/$/.png/' > $PL
+else
+	echo "$DIFF" 
+fi
+
