@@ -7,30 +7,40 @@ using json = nlohmann::json;
 
 class TriggerJSON {
   using Byte = unsigned char;
+  using vb   = std::vector<Byte>;
+  using vf   = std::vector<float>;
   private:
     fs::path dirpath;           // root directory
     // payloads
     json j;
-    std::vector<Byte> v_bt;
-    std::vector<Byte> v_dd;
+    vb v_bt;
+    vb v_dd;
+    char group[32];
     char filename[256];
     // sizes
     unsigned dm_count;
     unsigned nchans;
-    unsigned ddnsamps;
-    unsigned btnsamps;
+    unsigned nsamps;
     timeslice btsize;
     timeslice ddsize;
+    // slicing logic
+    unsigned start;
+    unsigned stop;
+		static void center (unsigned nsize, unsigned cen, unsigned wid, unsigned& llimit, unsigned& rlimit) {
+			unsigned hwid =  0.5 * wid;
+			// min below because unsigned will overflow
+			llimit = std::max (0, static_cast<int>(cen - hwid));
+			rlimit = std::min (cen + wid + 1, nsize);
+		}
   public:
     TriggerJSON ( 
     		std::string path_,
-    		unsigned btmc = 256,
     		unsigned dmc = 256,
-    		unsigned ddmc = 256,
+    		unsigned nmc = 256,
     		unsigned cmc = 64
-				) : dirpath(path_), dm_count (dmc), ddnsamps(ddmc), nchans(cmc), btnsamps(btmc) {
-			btsize = dm_count * btnsamps;
-			ddsize = ddnsamps * nchans;
+				) : dirpath(path_), dm_count (dmc), nsamps(nmc), nchans(cmc){
+			btsize = dm_count * nsamps;
+			ddsize = nsamps * nchans;
 		}
     bool WritePayload () {
       j["dd"] = v_dd;
@@ -46,7 +56,7 @@ class TriggerJSON {
       std::vector<std::uint8_t> j_bson = json::to_ubjson(j);
       std::ostream_iterator<uint8_t> oo(ofs);
       std::copy(j_bson.begin(), j_bson.end(), oo);
-      ofs << std::endl;
+      //ofs << std::endl;
       ofs.close();
       // clear payloads
       v_dd.clear();
@@ -54,51 +64,109 @@ class TriggerJSON {
       j.clear();
       return true;
     }
-    void DumpHead (const trigHead_t& th) {
+    void DumpHead (const Header_t& h, const trigger_t& t) {
       // header
-      j["sn"]    = th.sn;
-      j["dm"]    = th.dm;
-      j["width"] = th.width;
+      j["sn"]    = t.sn;
+      j["dm"]    = t.dm;
+      j["width"] = t.width;
       // header frequency
-      j["frequency"]["fch1"] = th.fch1;
-      j["frequency"]["foff"] = th.foff;
-      j["frequency"]["nchans"] = th.nchans;
-      // header indices
-      j["indices"]["i0"] = th.i0;
-      j["indices"]["i1"] = th.i1;
-      j["indices"]["epoch"] = th.epoch;
+      j["frequency"]["fch1"] = h.fch1;
+      j["frequency"]["foff"] = h.foff * h.nchans / nchans;
+      j["frequency"]["nchans"] = nchans;
       // header parameters
-      j["parameters"]["nbits"]       = th.nbits;
-      j["parameters"]["antenna"]     = th.stationid;
-      j["parameters"]["source_name"] = th.name;
-      j["parameters"]["ra"] = th.ra;
-      j["parameters"]["dec"] = th.dec;
-      j["parameters"]["group"] = th.name;
-      // dms
-      j["dms"]["dm1"]   = th.dm1;
-      j["dms"]["dmoff"] = th.dmoff;
-      j["dms"]["ndm"]   = th.ndm;
-      j["dms"]["btnsamps"] = th.btnsamps;
+      j["parameters"]["nbits"]       = h.nbits;
+      j["parameters"]["antenna"]     = h.stationid;
+      j["parameters"]["source_name"] = h.name;
+      j["parameters"]["ra"] = h.ra;
+      j["parameters"]["dec"] = h.dec;
       // header time
-      j["time"]["tsamp"] = th.tsamp;
-      j["time"]["duration"] = th.dur;
-      j["time"]["tstart"] = th.tstart;
-      j["time"]["peak_time"] = th.peak_time; 
-      j["time"]["ddnsamps"] = th.ddnsamps;
+      j["time"]["tsamp"] = h.tsamp;
+      j["time"]["tstart"] = h.tstart;
+      j["time"]["nsamps"] = nsamps;
+      float duration = nsamps * h.tsamp / 1E6;
+      j["time"]["duration"] = duration;
+      timeslice ipt = t.peak_time / h.tsamp * 1E6;
+      start = std::max (0, static_cast<int>(ipt - (0.5*nsamps)));
+      stop  = start + nsamps;
+      // header indices
+      float cut = start * h.tsamp / 1e6;
+      j["time"]["peak_time"] = t.peak_time - cut;
+      j["indices"]["i0"] = t.i0 + cut;
+      j["indices"]["i1"] = t.i0 + cut + duration;
+      j["indices"]["epoch"] = h.epoch;
+      // name
+      // group
+      struct tm utc_time;
+      time_t hepoch = h.epoch;
+      gmtime_r (&hepoch, &utc_time);
+      strftime (group, sizeof(group), "%Y%m%d_%H%M%S", &utc_time);
+      j["parameters"]["group"] = std::string(group);
+      snprintf(filename, sizeof(filename),
+          "%s_muos_ea%02d_dm%05.2f_sn%05.2f_wd%05.2f.dbson", group, h.stationid,t.dm,t.sn,t.width*1e3f
+      );
     }
-		void DumpBT (PtrFloat bt) {
-      std::cout << "TriggerJSON::DumpBT" << std::endl;
-			std::copy (
-					bt, bt + btsize,
-					std::back_inserter (v_bt)
-			);
+    // it is assumed that
+    // the data products 
+    // are time-aligned
+    // and if peak_time is the same for both slicing
+    // both slices will be identical
+    // however it is not assumed that 
+    // bt and dd are of same size in time axis
+		void DumpBT (const vf& bt, unsigned nbt, float dm1, float dmoff) {
+      std::cout << "TriggerJSON::DumpBT shape=("<< dm_count << "," << nbt << ")" << std::endl;
+			if (1) {
+				std::ofstream ofs("ubt.dat");
+				std::copy (bt.begin(),bt.end(), std::ostream_iterator<float>(ofs,"\n"));
+			}
+      // dms
+      j["dms"]["dm1"]   = dm1;
+      j["dms"]["dmoff"] = dmoff;
+      j["dms"]["ndm"]   = dm_count;
+      // shouldn't happen but safety first logic
+      auto istop = std::min (nbt, stop);
+      vf ret;
+			for (unsigned idm = 0; idm < dm_count; idm++) {
+				for (timeslice ii = start; ii < istop; ii++) {
+					ret.push_back (bt[ii + nbt*idm]);
+				}
+			}
+			// perform linear coding
+			float mmin = std::numeric_limits<float>::max();
+			float mmax = std::numeric_limits<float>::min();
+			std::for_each (ret.cbegin(), ret.cend(), [&mmin, &mmax] (const float& ss) {
+					if (ss > mmax) mmax = ss;
+					if (ss < mmin) mmin = ss;
+			});
+			// when mmax == mmin (when input is null)
+			// default to 1.0f
+			float idm  = mmax == mmin ? 1.0f : 1.0f / (mmax - mmin);
+			std::transform (ret.cbegin(), ret.cend(), std::back_inserter(v_bt), [&idm, &mmin](const float& ss) -> Byte {
+					return 255 * idm * (ss - mmin);
+			});
+	if (1) {
+		std::ofstream ofs("ssbt.dat");
+		std::copy (v_bt.begin(), v_bt.end(), std::ostream_iterator<float>(ofs,"\n"));
+	}
 		}
-		void DumpDD (PtrFloat dd) {
-      std::cout << "TriggerJSON::DumpDD" << std::endl;
-			std::copy (
-					dd, dd + ddsize,
-					std::back_inserter (v_dd)
-			);
+		void DumpDD (const vb& dd, unsigned ndd, unsigned nchansin) {
+      std::cout << "TriggerJSON::DumpDD shape=(" << nsamps << "," << nchans << ")" << std::endl;
+      timeslice istart = start * nchansin;
+      // shouldn't happen but safety first logic
+      timeslice istop  = std::min (ndd, stop) * nchansin;
+      // fscrunch
+      unsigned fac = nchansin / nchans;
+      float ifac = 1.0f/ fac;
+      float xf = 0.0f;
+      // algo
+      // slicing and fscrunching at the same time
+      vb& ret = v_dd;
+			for (timeslice ii = istart; ii < istop; ii+=fac) {
+				xf = 0.0f;
+				for (unsigned ik = 0; ik < fac; ik++) {
+					xf += dd[ii + ik];
+				}
+				ret.push_back (static_cast<Byte>( xf * ifac ));
+			}
 		}
 };
 
@@ -115,7 +183,9 @@ class DBSON {
 			else {
 				std::cerr << "DBSON::ctor file not open!"<< std::endl;
 			}
-			vb.pop_back();
+			// one endl is causing us have two pop backs?
+			// only one pop back required.
+			vb.pop_back(); 
 			// that parsing step
       json j = json::from_ubjson(vb);
 			// alright now parameter writing
@@ -128,7 +198,7 @@ class DBSON {
 			tstart = j["time"]["tstart"];
 			tsamp = j["time"]["tsamp"];
 			dur =   j["time"]["duration"];
-			ddnsamps = j["time"]["ddnsamps"];
+			nsamps = j["time"]["nsamps"];
 			// header frequency
 			fch1 = j["frequency"]["fch1"];
 			foff = j["frequency"]["foff"];
@@ -148,7 +218,6 @@ class DBSON {
 			dm1 = j["dms"]["dm1"];
 			dmoff = j["dms"]["dmoff"];
 			ndm = j["dms"]["ndm"];
-			btnsamps = j["dms"]["btnsamps"];
 			// data
 			auto bdd = j["dd"];
 			auto bbt = j["bt"];
@@ -181,13 +250,13 @@ class DBSON {
       ret.dm1   = dm1;
       ret.dmoff = dmoff;
       ret.ndm   = ndm;
-      ret.btnsamps = btnsamps;
+      ret.nsamps = nsamps;
       // header time
       ret.tsamp = tsamp > 1 ? tsamp : tsamp * 1E6;
       ret.dur = dur;
       ret.tstart = tstart;
       ret.peak_time = peak_time; 
-      ret.ddnsamps = ddnsamps;
+      ret.nsamps = nsamps;
       //
       return ret;
 		}
@@ -210,7 +279,7 @@ class DBSON {
 		// dm
 		double dm1, dmoff;
 		// memorys
-		unsigned nbits, nchans, ddnsamps, btnsamps, ndm;
+		unsigned nbits, nchans, nsamps, ndm;
 		// strs
 		std::string name, sigproc_file;
 		// data
@@ -229,7 +298,9 @@ std::ostream& operator<<(std::ostream& os, const DBSON& f) {
   os << "Antenna      ea" << f.stationid<< std::endl;
   os << "tsamp        " << f.tsamp << std::endl;
   os << "foff " << f.foff << std::endl;
-  os << "Bowtie shape = (" << f.ndm << "," << f.btnsamps << ")" << std::endl;
-  os << "Ddfb shape = (" << f.ddnsamps << "," << f.nchans << ")" << std::endl;
+  os << "Bowtie shape = (" << f.ndm << "," << f.nsamps << ")" << std::endl;
+  os << "Ddfb shape = (" << f.nsamps << "," << f.nchans << ")" << std::endl;
+  os << "BT.size=" << f.bt.size () << std::endl;
+  os << "DD.size=" << f.dd.size () << std::endl;
   return os;
 };

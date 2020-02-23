@@ -58,8 +58,6 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       j["sn"] = trig.sn;
       j["dm"] = trig.dm;
       j["width"] = trig.width;
-      // header time
-      j["time"]["tsamp"] = head.tsamp;
       // header frequency
       j["frequency"]["fch1"] = head.fch1;
       j["frequency"]["foff"] = head.foff;
@@ -68,21 +66,17 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
       j["indices"]["i0"] = trig.i0;
       j["indices"]["i1"] = trig.i1;
       j["indices"]["epoch"] = head.epoch;
-      //j["indices"]["peak_index"] = fbc.peak_index;
-      //j["indices"]["maxdelay"] = fbc.maxdelay;
-      //j["indices"]["istart"] = fbc.istart;
-      //j["indices"]["istop"] = fbc.istop;
       float dur = std::ceil(trig.i1 - trig.i0);
       nsamps = trig.i1 >= trig.i0 ? dur/head.tsamp/1e-6 * head.nchans * head.nbits / 8 : 0L;
       j["indices"]["nsamps"] = nsamps;
       // header parameters
       j["parameters"]["nbits"] = head.nbits;
-      //j["parameters"]["isKur"] = fbc.isKur;
       j["parameters"]["antenna"] = head.stationid;
       j["parameters"]["source_name"] = head.name;
       j["parameters"]["ra"] = head.ra;
       j["parameters"]["dec"] = head.dec;
-      // some book-keeping 
+      // header time
+      j["time"]["tsamp"] = head.tsamp;
       j["time"]["duration"] = dur;
       double sec_from_start = trig.i0 - head.epoch;
       j["time"]["tstart"] = head.tstart + (sec_from_start/86400.0f);
@@ -108,7 +102,9 @@ std::cout << " size:" << std::setprecision(2) << j_bson.size()/1e6 << " MB" << s
     }
 };
 
-class FBDump {
+class FBDump : public Header_t, public trigger_t {
+	private:
+		std::string filename;
   public:
     FBDump (std::string _file) : filename(_file) {
       // defaulting to ubson
@@ -130,98 +126,69 @@ class FBDump {
       dm = j["dm"];
       width = j["width"];
       // header time
+      peak_time = j["time"]["peak_time"];
+      tpeak     = j["time"]["tpeak"];
+      tstart = j["time"]["tstart"];
       tsamp = j["time"]["tsamp"];
+      duration = j["time"]["duration"];
       // header frequency
       fch1 = j["frequency"]["fch1"];
       foff = j["frequency"]["foff"];
       nchans = j["frequency"]["nchans"];
+      // header indices
       nsamps = j["indices"]["nsamps"];
+      i0 = j["indices"]["i0"];
+      i1 = j["indices"]["i1"];
+      epoch = j["indices"]["epoch"];
       // header parameters
       nbits = j["parameters"]["nbits"];
-      //j["parameters"]["isKur"] = fbc.isKur;
       stationid = j["parameters"]["antenna"];
-      name = j["parameters"]["source_name"];
-      // some book-keeping 
-      duration = j["time"]["duration"];
-      peak_time = j["time"]["peak_time"];
-      tstart = j["time"]["tstart"];
-      group = j["parameters"]["group"];
+      strcpy (name, std::string(j["parameters"]["source_name"]).c_str());
+      ra = j["parameters"]["ra"];
+      dec = j["parameters"]["dec"];
+      strcpy (sigproc_file, std::string(j["parameters"]["group"]).c_str());
       // -- payload
-      auto v_fb = j["fb"];
-      timeslice fb_size = nsamps * 8 / nbits;
-      fb = new float[fb_size];
-      float a,b,c,d;
-      timeslice pi=0, ui=0;
-      unsigned char dc;
-						if(nbits == 2) {
-								for(pi = 0; pi < nsamps;pi++) {
-										dc = (unsigned char) v_fb[pi];
-										unpack2bit(dc, a, b, c, d);
-										fb[ui++] = a;
-										fb[ui++] = b;
-										fb[ui++] = c;
-										fb[ui++] = d;
-								}
-						}
-						else if(nbits == 4) {
-								for(pi = 0; pi < nsamps;pi++) {
-										dc = (unsigned char) v_fb[pi];
-										unpack4bit(dc, a, b);
-										fb[ui++] = a;
-										fb[ui++] = b;
-								}
-						}
-						else if(nbits == 8) {
-								for(pi = 0; pi < nsamps;pi++) {
-										dc = (unsigned char) v_fb[pi];
-										unpack8bit(dc, a);
-										fb[ui++] = a;
-								}
-						}
-      nsamps = duration / tsamp * 1E6;
-      if (nsamps*nchans != ui) {
-          std::cerr << "FBDump::ctor Unpacking error!"<< std::endl;
-          std::cerr << "FBDump::ctor required nsamps=" << nsamps;
-          std::cerr << " received nsamps=" << ui << std::endl;
-      }
-      if(nsamps * nchans * nbits / 8 != v_fb.size()){
-          std::cerr << "FBDump::ctor Critical error!"<< std::endl;
-          std::cerr << "FBDump::ctor payload_size=" << v_fb.size();
-          std::cerr << " received size=" << nsamps * nchans * nbits / 8 << std::endl;
-      }
-      if(fb_size != nsamps * nchans) {
-          std::cerr << "FBDump::ctor fb size error!"<< std::endl;
-          std::cerr << "FBDump::ctor fb_size=" << fb_size;
-          std::cerr << " received size=" << nsamps * nchans << std::endl;
-      }
+      auto fb_ = j["fb"];
+			std::copy (fb_.cbegin(), fb_.cend(), std::back_inserter(fb));
       //
       ifs.close();
     }
-    FBDump() : fb(nullptr) {}
-    ~FBDump() {
-        if( fb ) delete[] fb;
-    }
-    PtrFloat fb;
-    float sn;
-    float dm;
-    float width;
-    float peak_time;
+    FBDump() = default;
+    ~FBDump() = default;
+		std::vector<unsigned char> fb;
+    float tpeak;
     float duration;
-    std::string group, filename, name;
-    // station
-    int stationid;
-    // positions
-    double ra, dec;
-    // frequency
-    double fch1, foff, cfreq, bandwidth;
-    // time
-    double tsamp, tstart, epoch;
-    // memory
-    int nbits, nchans, nifs, npol;
-    //
     timeslice nsamps;
-
 };
+
+Header_t getHead (const FBDump& f) {
+	Header_t dummyhead;
+	dummyhead.stationid = f.stationid;
+	dummyhead.ra        = f.ra;
+	dummyhead.dec       = f.dec;
+	dummyhead.fch1      = f.fch1;
+	dummyhead.foff      = f.foff;
+	dummyhead.tsamp     = f.tsamp;
+	dummyhead.tstart    = f.tstart;
+	dummyhead.epoch     = f.epoch;
+	dummyhead.nbits     = f.nbits;
+	dummyhead.nchans    = f.nchans;
+	strcpy (dummyhead.name, f.name);
+	strcpy (dummyhead.sigproc_file, f.sigproc_file);
+	return dummyhead;
+}
+
+trigger_t getTrig (const FBDump& f) {
+	trigger_t dummytrig;
+	dummytrig.sn        = f.sn;
+	dummytrig.dm        = f.dm;
+	dummytrig.width     = f.width;
+	dummytrig.i0        = f.i0;
+	dummytrig.i1        = f.i1;
+	dummytrig.peak_time = f.tpeak;
+	return dummytrig;
+}
+
 std::ostream& operator<<(std::ostream& os, const FBDump& f) {
   os << std::fixed;
   os << "S/N          " << f.sn << std::endl;
@@ -232,10 +199,12 @@ std::ostream& operator<<(std::ostream& os, const FBDump& f) {
   os << "Source       " << f.name << std::endl;
   os << "Antenna      ea" << f.stationid<< std::endl;
   os << "tsamp        " << f.tsamp << std::endl;
+  os << "foff        " << f.foff << std::endl;
   os << "Nsamps=" << f.nsamps << "  Nchans=" << f.nchans << "  Nbits=" << f.nbits << std::endl;
   return os;
-};
+}
 
+#if 0
 class FBDPlot: protected Plotter {
   private:
     unsigned int count;
@@ -427,3 +396,4 @@ class FBDPlot: protected Plotter {
 
 
 };
+#endif

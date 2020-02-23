@@ -30,11 +30,6 @@ if __name__ == "__main__":
     # log file
     with open(FILE,"r") as f:
         l = rec.findall (f.read())
-    # vdif file
-    with open(args.vdif,"r") as f:
-        vdifiles = f.readlines ()
-        f.seek (0)
-        o = vdc.findall (f.read())
     #
     # t0,t1,pt,sn,dm
     n = len(l)
@@ -48,24 +43,31 @@ if __name__ == "__main__":
         SN[ii] = ll[3]
         DM[ii] = ll[4]
     # VDIF 
-    VDIF = np.zeros (len(vdifiles), dtype=np.uint64)
-    for iv,vl in enumerate (o):
-        fname, _ = os.path.splitext (vl)
-        VDIF[iv] = int( fname.split ("_")[-1] )
-    sncut, = np.where (SN >= args.sn)
-    for i in sncut:
-        print ("SN={0:3.2f} DM={1:4.2f}".format(SN[i], DM[i]))
-        print ("t0={0:10.2f} t1={1:10.2f}".format(T0[i], T1[i]))
-        start = int (T0[i])
-        stop  = int (T1[i])
-        while start <= stop:
-            fid, = np.where (VDIF == start)
-            if len(fid) != 1:
-                print ("[!!] ", end="")
-                print ([vdifiles[ffff] for ffff in fid])
+    if args.vdif:
+        # vdif file
+        with open(args.vdif,"r") as f:
+            vdifiles = f.readlines ()
+            f.seek (0)
+            o = vdc.findall (f.read())
+        VDIF = np.zeros (len(vdifiles), dtype=np.uint64)
+        for iv,vl in enumerate (o):
+            fname, _ = os.path.splitext (vl)
+            VDIF[iv] = int( fname.split ("_")[-1] )
+        sncut, = np.where (SN >= args.sn)
+        for i in sncut:
+            print ("SN={0:3.2f} DM={1:4.2f}".format(SN[i], DM[i]))
+            print ("t0={0:10.2f} t1={1:10.2f}".format(T0[i], T1[i]))
+            start = int (T0[i])
+            stop  = int (T1[i])
+            while start <= stop:
+                fid, = np.where (VDIF == start)
+                if len(fid) != 1:
+                    print ("[!!] ", end="")
+                    print ([vdifiles[ffff] for ffff in fid])
+                    start = start + 1
+                    continue
+                print (vdifiles[fid[0]].strip())
                 start = start + 1
-                continue
-            print (vdifiles[fid[0]].strip())
-            start = start + 1
-        print ("---")
+            print ("---")
+    # 
 
