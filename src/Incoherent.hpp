@@ -55,7 +55,7 @@ class Incoherent {
 		}
 	}
 
-	void SetDM (float_t _dm) {
+	void SetDM (float _dm) {
 		// clear all other delays
 		idelays.clear ();
 		single_dm = _dm;
