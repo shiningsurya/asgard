@@ -56,7 +56,7 @@ class TriggerJSON {
       std::vector<std::uint8_t> j_bson = json::to_ubjson(j);
       std::ostream_iterator<uint8_t> oo(ofs);
       std::copy(j_bson.begin(), j_bson.end(), oo);
-      ofs << std::endl;
+      //ofs << std::endl;
       ofs.close();
       // clear payloads
       v_dd.clear();
@@ -73,10 +73,6 @@ class TriggerJSON {
       j["frequency"]["fch1"] = h.fch1;
       j["frequency"]["foff"] = h.foff * h.nchans / nchans;
       j["frequency"]["nchans"] = nchans;
-      // header indices
-      j["indices"]["i0"] = t.i0;
-      j["indices"]["i1"] = t.i1;
-      j["indices"]["epoch"] = h.epoch;
       // header parameters
       j["parameters"]["nbits"]       = h.nbits;
       j["parameters"]["antenna"]     = h.stationid;
@@ -87,11 +83,17 @@ class TriggerJSON {
       j["time"]["tsamp"] = h.tsamp;
       j["time"]["tstart"] = h.tstart;
       j["time"]["nsamps"] = nsamps;
-      j["time"]["duration"] = nsamps / h.tsamp * 1E6;
+      float duration = nsamps * h.tsamp / 1E6;
+      j["time"]["duration"] = duration;
       timeslice ipt = t.peak_time / h.tsamp * 1E6;
       start = std::max (0, static_cast<int>(ipt - (0.5*nsamps)));
-      j["time"]["peak_time"] = start * h.tsamp / 1e6;
       stop  = start + nsamps;
+      // header indices
+      float cut = start * h.tsamp / 1e6;
+      j["time"]["peak_time"] = t.peak_time - cut;
+      j["indices"]["i0"] = t.i0 + cut;
+      j["indices"]["i1"] = t.i0 + cut + duration;
+      j["indices"]["epoch"] = h.epoch;
       // name
       // group
       struct tm utc_time;
@@ -141,6 +143,10 @@ class TriggerJSON {
 			std::transform (ret.cbegin(), ret.cend(), std::back_inserter(v_bt), [&idm, &mmin](const float& ss) -> Byte {
 					return 255 * idm * (ss - mmin);
 			});
+	if (1) {
+		std::ofstream ofs("ssbt.dat");
+		std::copy (v_bt.begin(), v_bt.end(), std::ostream_iterator<float>(ofs,"\n"));
+	}
 		}
 		void DumpDD (const vb& dd, unsigned ndd, unsigned nchansin) {
       std::cout << "TriggerJSON::DumpDD shape=(" << nsamps << "," << nchans << ")" << std::endl;
@@ -178,7 +184,8 @@ class DBSON {
 				std::cerr << "DBSON::ctor file not open!"<< std::endl;
 			}
 			// one endl is causing us have two pop backs?
-			vb.pop_back(); vb.pop_back ();
+			// only one pop back required.
+			vb.pop_back(); 
 			// that parsing step
       json j = json::from_ubjson(vb);
 			// alright now parameter writing
