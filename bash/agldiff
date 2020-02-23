@@ -6,17 +6,21 @@ usage() {
 	echo "Asgard::agldiff"
 	echo "BASH utility to find set differences in lists."
 	echo 
-	echo "Usage: $(basename $0) [ -h ] [-f FBSON.list] [-d DBSON.list] [-p PNG.list] list-a list-b"
+	echo "Usage: $(basename $0) [ -h ] [-n] [-f FBSON.list] [-d DBSON.list] [-p PNG.list] list-a list-b"
 }
 
+NEGATIVE=0
 # getopt 
 #echo 
-while getopts ":hf:d:p:" arg
+while getopts "hnf:d:p:" arg
 do
 	case "$arg" in
 		"h")
 			usage
 			exit 0
+			;;
+		"n")
+			NEGATIVE=1
 			;;
 		"f")
 			FL=${OPTARG}
@@ -48,7 +52,11 @@ BTEMP=$(mktemp agldiff.XXXX)
 cat $AFILE | cut -d"." -f1,2,3,4 > $ATEMP
 cat $BFILE | cut -d"." -f1,2,3,4 > $BTEMP
 
-DIFF=$(diff $ATEMP $BTEMP --changed-group-format="%>" --unchanged-group-format="")
+if [[ $NEGATIVE -eq 0 ]]; then
+	DIFF=$(diff $ATEMP $BTEMP --changed-group-format="%>" --unchanged-group-format="")
+else 
+	DIFF=$(diff $ATEMP $BTEMP --changed-group-format="" --unchanged-group-format="%=")
+fi
 
 rm $ATEMP $BTEMP
 
