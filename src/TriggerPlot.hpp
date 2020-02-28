@@ -3,13 +3,14 @@
 #include "cpgplot.h"
 
 #define FMAX
+//#define FLIP
 
 class TriggerPlot  {
 	using vf = std::vector<float>;
 	private:
 		// for triggerplot
 		fs::path dir;
-		char filename[256];
+		char filename[512];
 		char group[256];
 		vf   axtm;
 		vf   axdm;
@@ -47,7 +48,7 @@ class TriggerPlot  {
 			PtrFloat              dd
 				) {
 			// ALL PGPLOT routines are here
-			snprintf (group, sizeof(group), "%s_muos_sn%03.2f_dm%04.2f_wd%04.2f", th.sigproc_file, th.sn, th.dm, th.width*1e3f);
+			snprintf (group, sizeof(group), "%s_muos_ea%02d_sn%05.2f_dm%05.2f_wd%05.2f", th.sigproc_file, th.stationid, th.sn, th.dm, th.width*1e3f);
 			snprintf (filename, sizeof(filename), "%s.%s", group, sig);
 			auto fn = dir / filename;
 			cpgbeg (0,fn.c_str(), 1, 1);      // begin plotting
@@ -99,6 +100,16 @@ class TriggerPlot  {
 			cpgswin (tleft, tleft+dddur, fright,fleft);
 			cpgbox ("BNTSI",0.0,0,"CMVTSI",10.0,6);
 			cpgctab (heat_l.data(), heat_r.data(), heat_g.data(), heat_b.data(), 5, contrast, brightness);
+#ifdef FLIP
+			// this works with asgard generated dbson
+			tr[0] = tleft;   tr[2] = 0.0f;    tr[1] = th.tsamp/1E6;
+			tr[3] = th.fch1; tr[5] = -foff;   tr[4] = 0.0f;
+			cpgimag (dd, th.nsamps, th.nchans,
+					1, th.nsamps, 1, th.nchans,
+					0, 255, 
+					tr
+			);
+#else
 			// this works with asgard generated dbson
 			tr[0] = tleft;   tr[1] = 0.0f;    tr[2] = th.tsamp/1E6;
 			tr[3] = th.fch1; tr[4] = -foff;   tr[5] = 0.0f;
@@ -107,6 +118,7 @@ class TriggerPlot  {
 					0, 255, 
 					tr
 			);
+#endif // FLIP
 			cpgmtxt ("B", 2.5, 0.5, 0.5, "Time [s]");
 			cpgmtxt ("L",1,0.5,0.5,"Freq [MHz]");
 			// BT
