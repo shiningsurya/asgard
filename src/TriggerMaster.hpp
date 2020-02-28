@@ -1,7 +1,6 @@
 #pragma once
 #include <asgard.hpp>
 #include <exception>
-#include "Dedisperser.hpp"
 // Header stuff
 #include <Header.hpp>
 
