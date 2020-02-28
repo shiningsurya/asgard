@@ -209,6 +209,14 @@ class TrigDADA {
    multilog(log,LOG_INFO,"TrigDADA::WriteData key=%x d_writetimes=%" PRIu64 "\n",dkey,d_writetimes++);
    return bytes_written;
  }
+ timeslice WriteData(PtrByte data, timeslice start, timeslice bytes_chunk) {
+   timeslice bytes_written = ipcio_write(dhdu->data_block, reinterpret_cast<char*>(data+start), bytes_chunk);
+   if(bytes_written < 0) {
+     multilog(log,LOG_INFO,"TrigDADA::WriteData key=%x ipcio_write failed\n",dkey);
+   }
+   multilog(log,LOG_INFO,"TrigDADA::WriteData key=%x d_writetimes=%" PRIu64 "\n",dkey,d_writetimes++);
+   return bytes_written;
+ }
 };
 // static variable initialization
 uint64_t TrigDADA::d_readtimes  = 0;
