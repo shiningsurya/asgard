@@ -114,7 +114,7 @@ class TriggerJSON {
     // bt and dd are of same size in time axis
 		void DumpBT (const vf& bt, unsigned nbt, float dm1, float dmoff) {
       std::cout << "TriggerJSON::DumpBT shape=("<< dm_count << "," << nbt << ")" << std::endl;
-			if (1) {
+			if (0) {
 				std::ofstream ofs("ubt.dat");
 				std::copy (bt.begin(),bt.end(), std::ostream_iterator<float>(ofs,"\n"));
 			}
@@ -143,10 +143,10 @@ class TriggerJSON {
 			std::transform (ret.cbegin(), ret.cend(), std::back_inserter(v_bt), [&idm, &mmin](const float& ss) -> Byte {
 					return 255 * idm * (ss - mmin);
 			});
-	if (1) {
-		std::ofstream ofs("ssbt.dat");
-		std::copy (v_bt.begin(), v_bt.end(), std::ostream_iterator<float>(ofs,"\n"));
-	}
+			if (0) {
+				std::ofstream ofs("ssbt.dat");
+				std::copy (v_bt.begin(), v_bt.end(), std::ostream_iterator<float>(ofs,"\n"));
+			}
 		}
 		void DumpDD (const vb& dd, unsigned ndd, unsigned nchansin) {
       std::cout << "TriggerJSON::DumpDD shape=(" << nsamps << "," << nchans << ")" << std::endl;
