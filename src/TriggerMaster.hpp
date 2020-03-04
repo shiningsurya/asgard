@@ -14,9 +14,14 @@
 // timer
 #include "Timer.hpp"
 
-DUMP_DIR
 
-
+// There are six functions
+// to be performed for every trigger
+// slicerAndmerger <-- {bter,incoher} <-- {dumper,plotter}
+//                      ^
+//                      |
+//                      \------------{mler}
+// XXX bter crucially changes trigHead_t
 class TriggerMaster {
 	using Byte = unsigned char;
 	using vf   = std::vector<float>;
@@ -29,56 +34,230 @@ class TriggerMaster {
 		// dump-plot
 		TriggerJSON tj;
 		TriggerPlot tp;
+		// data sizes
+		unsigned nsamps;
+    unsigned dm_count;
+    unsigned nchans;
+		unsigned maxdelay;
+		unsigned readnsamps;
+		timeslice datasamps;
+		timeslice reqsamps;
+		timeslice maxdatasamps;
+    // data 
+		vb  bdata;
+		vb  bt;
+		vb  incoh;
+		vf  btf;
+		vf  incohf;
 		// headers
 		Header_t  head;
 		trigger_t trig;
-		// data
-		timeslice datasamps;
-		timeslice maxdatasamps;
-		unsigned nsamps;
-		unsigned maxdelay;
-		vb  bdata;
-		vf  bt;
-		vb  incoh;
+		trigHead_t  th;
+    // slicing logic
+    timeslice start;
+    timeslice stop;
+    float cut;
 		// bter
+		// this makes dmwidth 50
+		static constexpr float h_dmwidth = 25.0f;
 		void bter () {
+		  vf mbt;
 			FDMT<Byte> mybt (head.tsamp/1E6, head.nchans, head.fch1, -head.foff);
 			mybt.SetDM (trig.dm - h_dmwidth, trig.dm + h_dmwidth, dm_count);
-			mybt.Execute (bdata, nsamps, bt);
+			mybt.Execute (bdata, readnsamps, mbt);
 			maxdelay = mybt.MaxSampDelay ();
+			timeslice nbt = std::max (static_cast<int>(readnsamps-maxdelay), 0);
+			// slicing and linear coding
+			float mmin = std::numeric_limits<float>::max();
+			float mmax = std::numeric_limits<float>::min();
+			for (unsigned idm = 0; idm < dm_count; idm++) {
+			  for (timeslice ii = start; ii < stop; ii++) {
+			    auto ss = mbt [ii + nbt*idm];
+			    if (ss > mmax) mmax = ss;
+			    if (ss < mmin) mmin = ss;
+			  }
+			}
+			float imm  = mmax == mmin ? 1.0f : 1.0f / (mmax - mmin);
+			Byte pp;
+			for (unsigned idm = 0; idm < dm_count; idm++) {
+			  for (timeslice ii = start; ii < stop; ii++) {
+			    auto ss = mbt [ii + nbt*idm];
+			    pp = static_cast<Byte>(255 * imm * (ss - mmin));
+			    bt.push_back (pp);
+			    btf.push_back (static_cast<float>(pp));
+			  }
+			}
 			// dump bt
 			const auto& dml = mybt.dm_list;
-			tj.DumpBT (bt, dcnsamps, dml.front(), dml[1] - dml[0]);
+			tj.DumpBT (bt, dml.front(), dml[1] - dml[0]);
+			// XXX some re-arrangement would make this
+			// more transparent
+			th.dm1  = dml.front ();
+			th.dmoff = dml[1] - dml[0];
 		}
 		void incoher () {
+		  vb mincoh;
 			Incoherent<Byte> myincoh (head.tsamp/1E6, head.nchans, head.fch1, head.foff);
 			myincoh.SetDM (trig.dm);
-			myincoh.Execute (bdata, nsamps, incoh);
+			myincoh.Execute (bdata, readnsamps, mincoh);
+			// slicing and fscrunching
+      timeslice istart = start * head.nchans;
+      timeslice istop  = stop  * head.nchans;
+      // fscrunch
+      unsigned fac = head.nchans / nchans;
+      float ifac = 1.0f/ fac;
+      float xf = 0.0f;
+      Byte  pp;
+			for (timeslice ii = istart; ii < istop; ii+=fac) {
+				xf = 0.0f;
+				for (unsigned ik = 0; ik < fac; ik++) {
+					xf += mincoh[ii + ik];
+				}
+        incohf.push_back ( xf * ifac );
+			}
+			// linear coding
+			auto mmin = std::numeric_limits<Byte>::max();
+			auto mmax = std::numeric_limits<Byte>::min();
+			for (const auto& ss : incohf) {
+			  if (ss > mmax) mmax = ss;
+			  if (ss < mmin) mmin = ss;
+			}
+			float imm  = mmax == mmin ? 1.0f : 1.0f / (mmax - mmin);
+			for (auto& ss : incohf) {
+			  ss = imm * (ss - mmin) * 255;
+			  incoh.push_back (static_cast<Byte>(ss)); 
+			}
 			// dump dd
-			tj.DumpDD (incoh, nsamps, x.nchans);
+			tj.DumpDD (incoh);
 		}
 		void dumper () {
-			tj.DumpHead (h, t);
+			tj.DumpHead (th);
 			tj.WritePayload ();
-			tj.Clear ();
 		}
 		void plotter () {
-			tp.Plot (trighead, bt.data(), incoh.data());
+			tp.Plot (th, btf.data(), incohf.data());
 		}
-
+		void slicerAndmerger () {
+		  // clear house
+		  incoh.clear ();
+		  incohf.clear ();
+		  bt.clear ();
+		  btf.clear ();
+		  // slicing logic
+      timeslice ipt = trig.peak_time / head.tsamp * 1E6;
+		  start = std::max (0, static_cast<int>(ipt - (0.5 * nsamps)));
+		  stop  = start + nsamps;
+		  cut   = start * head.tsamp / 1E6;
+		  // merging logic
+		  // header copy
+		  th.stationid = head.stationid;
+		  th.ra        = head.ra;
+		  th.dec       = head.dec;
+		  th.fch1      = head.fch1;
+		  th.foff      = head.foff * head.nchans / nchans;
+		  th.tsamp     = head.tsamp;
+		  th.tstart    = head.tstart;
+		  th.epoch     = head.epoch;
+		  th.nbits     = head.nbits;
+		  // strs
+		  strcpy (th.name, head.name);
+		  strcpy (th.sigproc_file, head.sigproc_file);
+		  // those three
+		  th.nchans    = nchans;
+		  th.ndm       = dm_count;
+		  th.nsamps    = nsamps;
+		  // trigger copy
+		  th.sn    = trig.sn;
+		  th.dm    = trig.dm;
+		  th.width = trig.width;
+		  // adjustments
+		  float duration   = nsamps * head.tsamp / 1E6;
+		  th.peak_time = trig.peak_time - cut;
+		  th.i0    = trig.i0 + cut;
+		  th.i1    = trig.i0 + cut + duration;
+		  th.dur   = duration;
+		}
+		void mler () {
+		  // this is where my ml action
+		  // my telemetry
+		}
 	public:
-		TriggerMaster () : hkey (hkey_), dkey(dkey_), 
-		td (hkey, dkey), tj(dump_dir), tp (plot_dir) {
+		TriggerMaster (
+		  // keys
+		  key_t hkey_,
+		  key_t dkey_,
+		  // paths
+      std::string ddir, std::string pdir,
+      // maxdata samps
+      timeslice maxds,
+      // those three
+      unsigned dmc = 256,
+      unsigned nmc = 256,
+      unsigned cmc = 64
+		) : 
+		hkey (hkey_), dkey(dkey_), 
+		maxdatasamps(maxds),
+		dm_count (dmc), nsamps(nmc), nchans(cmc),
+		td (hkey, dkey), 
+		// vv - DM_COUNT, NSAMPS, NCHANS - vv
+		tj(ddir), tp (pdir) {
 			bdata.resize (maxdatasamps, 0);
+			bt.reserve (dm_count * nsamps);
+			btf.reserve (dm_count * nsamps);
+			incoh.reserve (nsamps * nchans);
+			incohf.reserve (nsamps * nchans);
 		}
 		// main
 		void FollowDADA () {
-			td.ReadLock (true);
-			// false
-			while (false || td.ReadHeader (head, trig)) {
-				datasamps = td.ReadData (bdata.data(), maxdatasamps);
-				// wait for them to complete
-			}
-			td.ReadLock (false);
+      while (true) {
+        td.ReadLock (true);
+        // blocking code vvv
+        td.ReadHeader (head, trig);
+        // blocking code ^^^
+        reqsamps  = std::ceil (trig.i1 - trig.i0) / head.tsamp * 1E6;
+        reqsamps  *= head.nchans * head.nbits / 8;
+        datasamps = td.ReadData (bdata.data(), reqsamps);
+        if (datasamps == -1) {
+          // this is weird
+          std::cout << "TriggerMaster::FollowDADA read EOD" << std::endl;
+          if (head.nchans == 0 && head.nbits == 0) {
+            // this is hella wrong
+            std::cout << "TriggerMaster::FollowDADA shouldn't have read EOD!!!!" << std::endl;
+          }
+        }
+        else {
+          readnsamps = datasamps / head.nchans / head.nbits * 8;
+          // wait for them to complete
+          Singleton ();
+          // clear the header structs
+          head = {};
+          trig = {};
+        }
+        td.ReadLock (false);
+      }
+		}
+		void Singleton () {
+		  using std::cout;
+		  Timer t("");
+		  t.Start ();
+		  slicerAndmerger ();
+		  t.StopPrint (cout << "SlicerAndMerger");
+		  t.Start ();
+		  bter ();
+		  t.StopPrint (cout << "Bowtie");
+		  t.Start ();
+		  incoher ();
+		  t.StopPrint (cout << "Incoh");
+		  t.Start ();
+		  dumper ();
+		  t.StopPrint (cout << "DumpDBSON");
+		  t.Start ();
+		  plotter ();
+		  t.StopPrint (cout << "PlotDBSON");
+		  t.Start ();
+		  plotter ();
+		  mler ();
+		  t.StopPrint (cout << "MLer");
 		}
 };
+//TriggerMaster::h_dmwidth = 25.0f;

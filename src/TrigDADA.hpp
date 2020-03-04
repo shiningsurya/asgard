@@ -151,7 +151,9 @@ class TrigDADA {
  bool ReadHeader (Header_t& h, trigger_t& t) {
    auto hp = &h;
    auto tp = &t;
-   // we won't need eod with header
+   if(ipcbuf_eod((ipcbuf_t*)hhdu->data_block)) {
+     return false;
+   }
    // This has to BLOCK
    timeslice readh = ipcio_read (hhdu->data_block, reinterpret_cast<char*>(hp), sizeof(Header_t));
    if(readh == -1) {
