@@ -155,6 +155,7 @@ class FBDump : public Header_t, public trigger_t {
     }
     FBDump() = default;
     ~FBDump() = default;
+
 		std::vector<unsigned char> fb;
     float tpeak;
     float duration;
