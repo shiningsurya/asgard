@@ -153,15 +153,21 @@ class TriggerPlot  {
 			// source-name
 			snprintf (txt, sizeof (txt), "Source=%s", th.name);
 			cpgmtxt ("T",0.0f, 1.0, 1.0f, txt);
+			// ra-dec
+			snprintf (txt, sizeof(txt), "RA=%3.2f DEC=%3.2f",th.ra, th.dec);
+			cpgmtxt ("T",-1.3*charh, 1.0, 1.0f, txt);
 			// tSN
 			cpgsvp (0.55, 0.9, 0.55, 0.9);
 			cpgswin (tleft, tleft+btdur, 0, 256);
 			cpgbox ("ABNTS",0.0,0,"",0.0,0);
 			cpgline (th.nsamps, axtm.data(), tsn.data());
 			cpgmtxt ("B", 2.5, 0.5, 0.5, "Time [s]");
-			// source-name
+			// peak-time
 			snprintf (txt, sizeof(txt), "Peak time=%3.2fs",pt+tleft);
 			cpgmtxt ("T",0.0f, 1.0, 1.0f, txt);
+			// i0
+			snprintf (txt, sizeof(txt), "I0=%lf",th.i0);
+			cpgmtxt ("T",-1.3*charh, 1.0, 1.0f, txt);
 			cpgend ();
 		}
 };

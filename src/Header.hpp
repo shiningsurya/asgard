@@ -103,6 +103,7 @@ std::ostream& operator<< (std::ostream& os, const Header_t& h) {
   std::cout << "SOURCE " << h.name << std::endl;
   std::cout << "SIGFIL " << h.sigproc_file << std::endl;
   std::cout << "STATID " << h.stationid << std::endl;
+  return os;
 }
 std::ostream& operator<< (std::ostream& os, const trigger_t& t) {
   std::cout << "I0     " << t.i0 << std::endl;
@@ -111,4 +112,5 @@ std::ostream& operator<< (std::ostream& os, const trigger_t& t) {
   std::cout << "DM     " << t.dm << std::endl;
   std::cout << "WD     " << t.width*1e3 << std::endl;
   std::cout << "PT     " << t.peak_time << std::endl;
+  return os;
 }
