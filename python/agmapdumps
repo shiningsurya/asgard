@@ -1,0 +1,61 @@
+#!/usr/bin/env python
+import os
+import glob 
+import numpy as np
+import trishul.dbson as tdb
+print ("")
+#
+def ParseArgs ():
+    import argparse
+    ap = argparse.ArgumentParser (prog='agmapdumps', description='Asgard tool for mapping vdif dumps and *son dumps.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add ("dbsondir", help="Directory of dbsons.", type=str)
+    add ("vdiflist", help="VDIF list", type=str)
+    add ("-u", help="Print UTC epoch as well", action="store_true", default=False, dest='pu')
+    add ("-v", help="Verbosity", action="store_true", default=False, dest='v')
+    #
+    return ap.parse_args ()
+
+if __name__ == "__main__":
+    args = ParseArgs ()
+    DBSON_DIR  = args.dbsondir
+    DBSON_GLOB = DBSON_DIR + "/*.dbson"
+    VDIF_LIST  = args.vdiflist
+    PRINT_U    = args.pu
+    V          = args.v
+    # need to clear duplicates
+    # 
+    fl = glob.glob( DBSON_GLOB )
+    if V:
+        print ("Asgard::MapDumps Found {0} DBSONs.".format(len(fl)))
+    i0 = np.zeros (len(fl), dtype=np.uint64)
+    i1 = np.zeros (len(fl), dtype=np.uint64)
+    for i,f in enumerate(fl):
+        with tdb.DBSON (f) as df:
+            i0[i] = df.i0
+            i1[i] = df.i1
+            
+    with open (VDIF_LIST,"r") as f:
+        vdifs = f.readlines ()
+    vdif_all = np.zeros (len(vdifs), dtype=np.uint64)
+    for i,v in enumerate(vdifs):
+        vdif_all[i] = int(v.strip().split("_")[-1].split(".")[0])
+    vdif_i, idx = np.unique (vdif_all, return_index=True)
+    if V:
+        print ("Asgard::MapDumps Found {0} VDIFs with {1} unique VDIFs.".format(len(vdifs), vdif_i.size))
+    #
+    COUNT=0
+    for i,iv in enumerate(vdif_i):
+        keys, = np.where (np.logical_and(iv >= i0, iv <= i1))
+        if keys.size == 0:
+            continue
+        COUNT = COUNT + 1
+        print ("--")
+        if PRINT_U:
+            print ("UTC={0}".format(iv))
+        print (vdifs[idx[i]].strip())
+        for k in keys:
+            print (os.path.basename(fl[k]))
+    if V:
+        print ("Asgard::MapDumps Found {0} mappings.".format(COUNT))
+
