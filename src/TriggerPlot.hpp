@@ -48,7 +48,7 @@ class TriggerPlot  {
 			PtrFloat              dd
 				) {
 			// ALL PGPLOT routines are here
-			snprintf (group, sizeof(group), "%s_muos_ea%02d_sn%05.2f_dm%05.2f_wd%05.2f", th.sigproc_file, th.stationid, th.sn, th.dm, th.width*1e3f);
+			snprintf (group, sizeof(group), "%s_muos_ea%02d_dm%05.2f_sn%05.2f_wd%05.2f", th.sigproc_file, th.stationid, th.dm, th.sn, th.width*1e3f);
 			snprintf (filename, sizeof(filename), "%s.%s", group, sig);
 			auto fn = dir / filename;
 			cpgbeg (0,fn.c_str(), 1, 1);      // begin plotting
