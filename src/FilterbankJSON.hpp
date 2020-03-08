@@ -122,33 +122,39 @@ class FBDump : public Header_t, public trigger_t {
       json j = json::from_ubjson(vb);
       // alright now parameter writing
       // header
-      sn = j["sn"];
-      dm = j["dm"];
-      width = j["width"];
-      // header time
-      peak_time = j["time"]["peak_time"];
-      tpeak     = j["time"]["tpeak"];
-      tstart = j["time"]["tstart"];
-      tsamp = j["time"]["tsamp"];
-      duration = j["time"]["duration"];
-      // header frequency
-      fch1 = j["frequency"]["fch1"];
-      foff = j["frequency"]["foff"];
-      nchans = j["frequency"]["nchans"];
-      // header indices
-      nsamps = j["indices"]["nsamps"];
-      i0 = j["indices"]["i0"];
-      i1 = j["indices"]["i1"];
-      epoch = j["indices"]["epoch"];
-      // header parameters
-      nbits = j["parameters"]["nbits"];
-      stationid = j["parameters"]["antenna"];
-      strcpy (name, std::string(j["parameters"]["source_name"]).c_str());
-      ra = j["parameters"]["ra"];
-      dec = j["parameters"]["dec"];
-      strcpy (sigproc_file, std::string(j["parameters"]["group"]).c_str());
-      // -- payload
-      auto fb_ = j["fb"];
+			try {
+				sn = j["sn"];
+				dm = j["dm"];
+				width = j["width"];
+				// header time
+				peak_time = j["time"]["peak_time"];
+				tpeak     = j["time"]["tpeak"];
+				tstart = j["time"]["tstart"];
+				tsamp = j["time"]["tsamp"];
+				duration = j["time"]["duration"];
+				// header frequency
+				fch1 = j["frequency"]["fch1"];
+				foff = j["frequency"]["foff"];
+				nchans = j["frequency"]["nchans"];
+				// header indices
+				nsamps = j["indices"]["nsamps"];
+				i0 = j["indices"]["i0"];
+				i1 = j["indices"]["i1"];
+				epoch = j["indices"]["epoch"];
+				// header parameters
+				nbits = j["parameters"]["nbits"];
+				stationid = j["parameters"]["antenna"];
+				strcpy (name, std::string(j["parameters"]["source_name"]).c_str());
+				ra = j["parameters"]["ra"];
+				dec = j["parameters"]["dec"];
+				strcpy (sigproc_file, std::string(j["parameters"]["group"]).c_str());
+			} 
+			catch (json::exception& e) {
+				std::cout << "exception found while reading!" << std::endl;
+				std::cout << "msg: " << e.what () << std::endl;
+			}
+			// -- payload
+			auto fb_ = j["fb"];
 			std::copy (fb_.cbegin(), fb_.cend(), std::back_inserter(fb));
       //
       ifs.close();
