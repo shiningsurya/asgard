@@ -5,6 +5,7 @@
 #include <csignal>
 void d_signal_handle (int sig) {
   std::cout << "received signal=" << sig << std::endl;
+  exit (1);
 }
 
 
