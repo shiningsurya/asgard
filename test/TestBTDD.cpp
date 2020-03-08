@@ -10,7 +10,7 @@
 
 #define PFBSON "/home/shining/work/vlite/searches/b1933+16/fbsons/20191216_222018_muos_ea99_dm158.65_sn8.95.fbson"
 #define FFBSON "/home/shining/work/vlite/searches/soi/20200303_175836_muos_ea99_dm882.06_sn08.65_wd93.75.fbson"
-#define DFBSON "/home/shining/work/vlite/searches/soi/20200129_060053_muos_ea00_dm56.75_sn58.81_wd4.69.fbson"
+#define DFBSON "/home/shining/work/vlite/searches/soi/20200218_221653_muos_ea99_dm26.88_sn17.98_wd09.38.fbson"
 #define HFBSON "/home/shining/work/vlite/searches/snhighlow/20200112_010829_muos_ea99_dm56.75_sn8.50.fbson"
 int main () {
 	std::cout << std::endl;

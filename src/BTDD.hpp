@@ -52,7 +52,7 @@ class BTDD {
 			sec_incoh (tsamp/1E6, nchans, fch1, foff),
 			bter (tsamp/1E6, nchans, fch1, -foff) {
 				sec_incoh.SetDM (hdmwidth);
-				bter.SetDM (0, hdmwidth, dmcount);
+				bter.SetDM (0, dmwidth, dmcount);
 				fmaxd = 0;
 				bmaxd = bter.MaxSampDelay ();
 				smaxd = sec_incoh.MaxSampDelay ();
