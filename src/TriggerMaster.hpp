@@ -13,6 +13,8 @@
 #include "TriggerPlot.hpp"
 // timer
 #include "Timer.hpp"
+// fbson read
+#include "FilterbankJSON.hpp"
 
 
 // There are six functions
@@ -99,7 +101,9 @@ class TriggerMaster {
 		  vb mincoh;
 			Incoherent<Byte> myincoh (head.tsamp/1E6, head.nchans, head.fch1, head.foff);
 			myincoh.SetDM (trig.dm);
-			myincoh.Execute (bdata, readnsamps, mincoh);
+			auto lmaxdelay = myincoh.MaxSampDelay ();
+			auto lnsamps   = std::max (0, static_cast<int>(readnsamps-lmaxdelay));
+			myincoh.Execute (bdata, lnsamps, mincoh);
 			// slicing and fscrunching
       timeslice istart = start * head.nchans;
       timeslice istop  = stop  * head.nchans;
@@ -207,6 +211,27 @@ class TriggerMaster {
 			incoh.reserve (nsamps * nchans);
 			incohf.reserve (nsamps * nchans);
 		}
+		// for file reading
+		TriggerMaster (
+		  // paths
+      std::string ddir, std::string pdir,
+      // maxdata samps
+      timeslice maxds,
+      // those three
+      unsigned dmc = 256,
+      unsigned nmc = 256,
+      unsigned cmc = 64
+		) : 
+		maxdatasamps(maxds),
+		dm_count (dmc), nsamps(nmc), nchans(cmc),
+		// vv - DM_COUNT, NSAMPS, NCHANS - vv
+		tj(ddir), tp (pdir) {
+			bdata.resize (maxdatasamps, 0);
+			bt.reserve (dm_count * nsamps);
+			btf.reserve (dm_count * nsamps);
+			incoh.reserve (nsamps * nchans);
+			incohf.reserve (nsamps * nchans);
+		}
 		// main
 		void FollowDADA () {
       while (true) {
@@ -258,6 +283,31 @@ class TriggerMaster {
 		  plotter ();
 		  mler ();
 		  t.StopPrint (cout << "MLer");
+		}
+		void FollowFile (const std::string& ss) {
+      FBDump fbson (ss);
+      head = dynamic_cast<Header_t&>(fbson);
+      trig = dynamic_cast<trigger_t&>(fbson);
+      reqsamps  = std::ceil (trig.i1 - trig.i0) / head.tsamp * 1E6;
+      reqsamps  *= head.nchans * head.nbits / 8;
+      std::copy (fbson.fb.begin(), fbson.fb.end(), bdata.begin());
+      datasamps = fbson.fb.size();
+      if (datasamps == -1) {
+        // this is weird
+        std::cout << "TriggerMaster::FollowFile read error" << std::endl;
+        if (head.nchans == 0 && head.nbits == 0) {
+          // this is hella wrong
+          std::cout << "TriggerMaster::FollowFile shouldn't have read EOD!!!!" << std::endl;
+        }
+      }
+      else {
+        readnsamps = datasamps / head.nchans / head.nbits * 8;
+        // wait for them to complete
+        Singleton ();
+        // clear the header structs
+        head = {};
+        trig = {};
+      }
 		}
 };
 //TriggerMaster::h_dmwidth = 25.0f;
