@@ -21,12 +21,16 @@ using vb = std::vector<unsigned char>;
 #include "Timer.hpp"
 #endif
 
+#define restrict __restrict
+
 template<typename T>
 class FDMT {
 	private:
 		// Main state	
 		timeslice nsamps;
 		std::vector<float> State;
+		float * restrict  pState;
+		float * restrict  qState;
 		// strides for state
 		timeslice      salpha;
 		timeslice      sbeta;
@@ -104,7 +108,6 @@ class FDMT {
 			}
 			aDT   =  idelays.front ();
 			bDT   =  idelays.back  ();
-			std::cout << "maxdelay=" << bDT << std::endl;
 		}
 
 
@@ -124,6 +127,10 @@ class FDMT {
 			timeslice alpha = nsamps;
 			timeslice beta  = alpha*( deltaT+2 );
 
+			//float * pOut = Output.data ();
+			//pState = State.data ();
+			//qState = State.data ();
+
 			for (unsigned iF = 0; iF < fjumps; iF++) {
 				float fstart = fmax - ( deltaF*iF );
 				float fend   = fmax - ( deltaF*( iF+1 ) );
@@ -140,17 +147,29 @@ class FDMT {
 					timeslice midtl= std::round ( idt * dff (fstart, fmidl) / dff (fstart, fend));
 					timeslice bp   = nsamps - midtl;
 					// 
-					for (timeslice itt = bp; itt <nsamps; itt++) 
-						//Output.at (iF, idt, itt) = State.at (2*iF, midt, itt);
-						Output [itt   +alpha*idt   + beta*iF]    =
-						State  [itt   +salpha*midt + sbeta*2*iF] ;
-					// 
-					for (timeslice itt = 0; itt <bp; itt++)
+					//pState = State.data () + (2*iF*sbeta) + (midt*nsamps);
+					//qState = State.data () + (2*iF*sbeta) + sbeta + ((idt-midtl)*nsamps);
+					//qState += midtl;
+					for (timeslice itt = 0; itt <bp; itt++) {
 						//Output.at (iF,idt, itt) = State.at (2*iF   , midt, itt) + State.at (2*iF +1, idt-midtl, itt+midtl);
-					{
 						Output [itt       +alpha*idt                +beta*iF]              =
 						State  [itt       +salpha*midt              +sbeta*2*iF]           +
 						State  [itt+midtl +salpha*idt -salpha*midtl +sbeta*2*iF +sbeta]    ;
+						// --
+						//*pOut = *pState + *qState; 
+						//pOut   ++;
+						//pState ++;
+						//qState ++;
+					}
+					// 
+					for (timeslice itt = bp; itt <nsamps; itt++)  {
+						//Output.at (iF, idt, itt) = State.at (2*iF, midt, itt);
+						Output [itt	 +alpha*idt	 + beta*iF]		=
+						State	[itt	 +salpha*midt + sbeta*2*iF] ;
+						// --
+						//*pOut = *pState;
+						//pOut   ++;
+						//pState ++;
 					}
 				}
 			}
@@ -169,19 +188,32 @@ class FDMT {
 					dff (fmin, fmax)
 					);
 
-			State.resize (Image.size()* (deltaT+2), 0.0f);
-			salpha = nsamps;
-			sbeta  = salpha*(deltaT+2);
+#ifdef TIMING
+			Timer vv ("FDMT::Initialization::Vector_resize");
+			vv.Start ();
+#endif
+			std::vector<float> Output(Image.size()* (deltaT+2), 0.0f);
+			timeslice alpha = nsamps;
+			timeslice beta  = alpha*(deltaT+2);
 
 #ifdef TIMING
+			vv.StopPrint (std::cout);
 			Timer ii ("FDMT::Initialization::Transpose");
 			ii.Start ();
 #endif
 			// This is a transpose operation
-			for (unsigned ichan = 0; ichan < nchans; ichan++)
-				for (unsigned isamp = 0; isamp < nsamps; isamp++)
+			pState = Output.data ();
+			for (unsigned ichan = 0; ichan < nchans; ichan++) {
+				const T * pImage = Image.data () + ichan; 
+				pState = Output.data () + (ichan*beta);
+				for (unsigned isamp = 0; isamp < nsamps; isamp++) {
 					// Output.at (ichan, 0, isamp) = Image.at (ichan, isamp)
-					State [isamp + sbeta*ichan] = Image [ichan + nchans*isamp];
+					//State [isamp + sbeta*ichan] = Image [ichan + nchans*isamp];
+					*pState = *pImage;
+					pImage += nchans;
+					pState ++;
+				}
+			}
 
 #ifdef TIMING
 			ii.StopPrint (std::cout);
@@ -191,16 +223,39 @@ class FDMT {
 			Timer jj ("FDMT::Initialization::Linear");
 			jj.Start ();
 #endif
-			for (unsigned ichan = 0; ichan < nchans; ichan++)
-				for (timeslice idt = 1; idt <= deltaT; idt++) 
-					for (unsigned isamp = idt; isamp < nsamps; isamp++)
-						//Output.at (isamp, ichan, idt) = Output.at (isamp, ichan, idt-1) + Image.at  (nsamps-isamp+1, ichan);
-						State [isamp +salpha*idt     +sbeta*ichan]    =
-						State [isamp +salpha*(idt-1) +sbeta*ichan]    +
-						Image  [ichan +nchans*(nsamps-isamp)];
+			qState = Output.data ();
+			pState = Output.data () + nsamps;
+			timeslice isize = Image.size();
+			for (unsigned ichan = 0; ichan < nchans; ichan++) {
+				for (timeslice idt = 1; idt <= deltaT; idt++)    {
+					const T * pImage = Image.data () +isize - ichan - (idt*nchans); 
+					pState += idt;
+					qState += idt;
+					for (unsigned isamp = idt; isamp < nsamps; isamp++) {
+						//Output.at (isamp, ichan, idt) = Output.at (isamp, ichan, idt-1) + Image.at	(nsamps-isamp+1, ichan);
+							//State [isamp +salpha*idt		 +sbeta*ichan]		=
+							//State [isamp +salpha*(idt-1) +sbeta*ichan]		+
+							//Image	[ichan +nchans*(nsamps-isamp)];
+							//
+							*pState = *qState + *pImage;
+							pImage -= nchans;
+							pState ++;
+							qState ++; 
+					}
+				}
+			}
 
 #ifdef TIMING
 			jj.StopPrint (std::cout);
+			Timer mm ("FDMT::Initialization::Move");;
+			mm.Start ();
+#endif
+
+			State  = std::move (Output);
+			salpha = alpha;
+			sbeta  = beta;
+#ifdef TIMING
+			mm.StopPrint (std::cout);
 #endif
 		}
 
@@ -213,6 +268,7 @@ class FDMT {
 #ifdef TIMING
 			Timer ini("Initialization");
 			Timer step("Iteration");
+			Timer slicer ("Slicing");
 #endif
 
 			// FDMT start
@@ -241,11 +297,25 @@ class FDMT {
 			// output is float
 			// XXX I err'd by coding before slicing
 			// which caused us to not use the entire dyn spec
+#ifdef TIMING
+			slicer.Start ();
+#endif
 			auto ddnsamps = nsamps-maxDT;
 			out.resize (idelays.size() * ddnsamps);
-			for (timeslice idt = 0  ; idt<idelays.size(); idt++)
-				for (timeslice isamp = 0; isamp <ddnsamps	 ; isamp++)
-					out [isamp +ddnsamps*idt] =  State [isamp +salpha*idelays[idt]];
+			auto pOut = out.data ();
+			pState = State.data ();
+			for (timeslice idt = 0  ; idt<idelays.size(); idt++) {
+				pState = State.data () + (idelays[idt]*nsamps);
+				for (timeslice isamp = 0; isamp <ddnsamps	 ; isamp++) {
+					//out [isamp +ddnsamps*idt] =	State [isamp +salpha*idelays[idt]];
+					*pOut = *pState;
+					pOut   ++;
+					pState ++;
+				}
+			}
+#ifdef TIMING
+			slicer.StopPrint (std::cout);
+#endif
 			//
 #else
 			out = State;
