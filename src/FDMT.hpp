@@ -3,6 +3,12 @@
 #include <limits>
 
 // Adapted from trishul/Dedispersion/FDMT_CPU
+// alpha (right-most-dim), beta (second-right-most)
+// Reference ordering   = (F,dT,T)
+// Cache aware ordering = (F,dT,T)
+// deltaT --> dimension is deltaT+2 because sometimes we go 
+// to deltaT+1 (inclusive) in the iteration steps
+// Usually towards the end of iterations
 // Written by me
 
 using vf = std::vector<float>;
@@ -10,6 +16,10 @@ using vb = std::vector<unsigned char>;
 
 // input output should be byte arrays
 // internally all should be floats
+
+#ifdef TIMING
+#include "Timer.hpp"
+#endif
 
 template<typename T>
 class FDMT {
@@ -68,7 +78,10 @@ class FDMT {
 			freq_off = _freq_off;
 			fmin     = fmax - (( nchans-1 )*freq_off);
 		}
-		~FDMT () = default;
+		~FDMT () {
+			std::cout << "FDMT::dtor called." << std::endl;
+			std::cout << "FDMT::dtor State.size=" << State.size () << std::endl;
+		}
 
 		// please don't call this before initialization
 		// i beg of you
@@ -96,6 +109,7 @@ class FDMT {
 
 
 		void Iteration (const unsigned& i) {
+			//std::cout << "FDMT::Iteration begin="<< i << std::endl;
 			float deltaF    = std::pow (2, i) * freq_off;
 			unsigned fjumps = nchans / std::pow (2,i);
 			float    corr   = i > 0 ? 0.5 * freq_off : 0.0f;
@@ -106,9 +120,9 @@ class FDMT {
 					dff (fmax, fmin)
 					);
 
-			std::vector<float> Output (fjumps*nsamps*(deltaT+1));
-			timeslice alpha = deltaT+1;
-			timeslice beta  = alpha*fjumps;
+			std::vector<float> Output (fjumps*nsamps*(deltaT+2));
+			timeslice alpha = nsamps;
+			timeslice beta  = alpha*( deltaT+2 );
 
 			for (unsigned iF = 0; iF < fjumps; iF++) {
 				float fstart = fmax - ( deltaF*iF );
@@ -128,22 +142,23 @@ class FDMT {
 					// 
 					for (timeslice itt = bp; itt <nsamps; itt++) 
 						//Output.at (iF, idt, itt) = State.at (2*iF, midt, itt);
-						Output [idt  +alpha*iF    + beta*itt]   =
-							State  [midt +salpha*iF*2 + sbeta*itt]  ;
+						Output [itt   +alpha*idt   + beta*iF]    =
+						State  [itt   +salpha*midt + sbeta*2*iF] ;
 					// 
 					for (timeslice itt = 0; itt <bp; itt++)
 						//Output.at (iF,idt, itt) = State.at (2*iF   , midt, itt) + State.at (2*iF +1, idt-midtl, itt+midtl);
 					{
-						Output [idt       +alpha*iF             +beta*itt]                =
-							State  [midt      +2*salpha*iF          +sbeta*itt]               +
-							State  [idt-midtl +2*salpha*iF  +salpha +sbeta*itt +sbeta*midtl]  ;
+						Output [itt       +alpha*idt                +beta*iF]              =
+						State  [itt       +salpha*midt              +sbeta*2*iF]           +
+						State  [itt+midtl +salpha*idt -salpha*midtl +sbeta*2*iF +sbeta]    ;
 					}
 				}
 			}
 
-			State  = std::move (Output);
+			State = std::move(Output);
 			salpha = alpha;
 			sbeta  = beta;
+			//std::cout << "FDMT::Iteration end="<< i << std::endl;
 		}
 
 		void Initialization (const std::vector<T>& Image) {
@@ -154,27 +169,39 @@ class FDMT {
 					dff (fmin, fmax)
 					);
 
-			State.clear ();
-			std::vector<float> Output (Image.size() * (deltaT+2));
-			timeslice alpha = deltaT+2;
-			timeslice beta  = alpha*nchans;
-			for (unsigned isamp = 0; isamp < nsamps; isamp++)
-				for (unsigned ichan = 0; ichan < nchans; ichan++)
-					// Output.at (isamp, ichan, 0) = Image.at (isamp, ichan)
-					Output [alpha*ichan +beta*isamp] =
-						Image  [ichan +nchans*isamp];
+			State.resize (Image.size()* (deltaT+2), 0.0f);
+			salpha = nsamps;
+			sbeta  = salpha*(deltaT+2);
 
-			for (timeslice idt = 1; idt <= deltaT; idt++) 
-				for (unsigned isamp = idt; isamp < nsamps; isamp++)
-					for (unsigned ichan = 0; ichan < nchans; ichan++)
+#ifdef TIMING
+			Timer ii ("FDMT::Initialization::Transpose");
+			ii.Start ();
+#endif
+			// This is a transpose operation
+			for (unsigned ichan = 0; ichan < nchans; ichan++)
+				for (unsigned isamp = 0; isamp < nsamps; isamp++)
+					// Output.at (ichan, 0, isamp) = Image.at (ichan, isamp)
+					State [isamp + sbeta*ichan] = Image [ichan + nchans*isamp];
+
+#ifdef TIMING
+			ii.StopPrint (std::cout);
+#endif
+
+#ifdef TIMING
+			Timer jj ("FDMT::Initialization::Linear");
+			jj.Start ();
+#endif
+			for (unsigned ichan = 0; ichan < nchans; ichan++)
+				for (timeslice idt = 1; idt <= deltaT; idt++) 
+					for (unsigned isamp = idt; isamp < nsamps; isamp++)
 						//Output.at (isamp, ichan, idt) = Output.at (isamp, ichan, idt-1) + Image.at  (nsamps-isamp+1, ichan);
-						Output [idt   +alpha*ichan +beta*isamp] =
-							Output [idt-1 +alpha*ichan +beta*isamp] +
-							Image  [ichan +nchans*(nsamps-isamp)];
+						State [isamp +salpha*idt     +sbeta*ichan]    =
+						State [isamp +salpha*(idt-1) +sbeta*ichan]    +
+						Image  [ichan +nchans*(nsamps-isamp)];
 
-			State  = std::move (Output);
-			salpha = alpha;
-			sbeta  = beta;
+#ifdef TIMING
+			jj.StopPrint (std::cout);
+#endif
 		}
 
 		void Execute (
@@ -183,10 +210,27 @@ class FDMT {
 				std::vector<float>& out) {
 			nsamps = _nsamps;
 
+#ifdef TIMING
+			Timer ini("Initialization");
+			Timer step("Iteration");
+#endif
+
 			// FDMT start
+#ifdef TIMING
+			ini.Start ();
+#endif
 			Initialization (in);
+#ifdef TIMING
+			ini.StopPrint (std::cout);
+#endif
 			for (unsigned i = 1; i <= l2nch; i++) {
+#ifdef TIMING
+			step.Start ();
+#endif
 				Iteration (i);
+#ifdef TIMING
+			step.StopPrint (std::cout);
+#endif
 			}
 			// FDMT end
 
@@ -201,7 +245,7 @@ class FDMT {
 			out.resize (idelays.size() * ddnsamps);
 			for (timeslice idt = 0  ; idt<idelays.size(); idt++)
 				for (timeslice isamp = 0; isamp <ddnsamps	 ; isamp++)
-					out [isamp +ddnsamps*idt] =  State [idelays[idt] +sbeta*isamp];
+					out [isamp +ddnsamps*idt] =  State [isamp +salpha*idelays[idt]];
 			//
 #else
 			out = State;
