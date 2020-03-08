@@ -39,6 +39,9 @@ int main(int ac, char * av[]) {
     // actual start
 		key_t dadakey;
 		std::string s_dadakey, d_dadakey("60"), odir, d_odir("/mnt/ssd/dumps/");
+    key_t hkey, dkey;
+    std::string s_hkey,s_dkey;
+    std::string d_hkey("70"), d_dkey("72");
 		unsigned int nbits, nbufs;
 		uint64_t bufsz, nchans, nsamps;
 		// po
@@ -48,6 +51,8 @@ int main(int ac, char * av[]) {
 		opt.add_options()
 ("help,h", "Prints help")
 ("key,k",  po::value<std::string>(&s_dadakey)->default_value(d_dadakey), "Input DADA key[def=0x60]")
+("hkey,m",  po::value<std::string>(&s_hkey)->default_value(d_hkey), "Header DADA key[def=0x72]")
+("dkey,l",  po::value<std::string>(&s_dkey)->default_value(d_dkey), "Data DADA key[def=0x72]")
 ("nbufs,N",   po::value<unsigned int>(&nbufs)->default_value(12), "nbufs[def=12]")
 ("nbits,b",   po::value<unsigned int>(&nbits)->default_value(2), "nbits[def=2]")
 ("nchans,c",  po::value<uint64_t>(&nchans)->default_value(4096), "nchans[def=4096]")
@@ -82,14 +87,15 @@ int main(int ac, char * av[]) {
 		}
 		// key 0d to 0x
 		dadakey = dx(s_dadakey);
-		auto tkey = 70;
+    hkey = dx(s_hkey);
+    dkey = dx(s_dkey);
 		// trigger channel
 		bool ctrig = vm.count("trigcoadd");
 		TriggerHook th(
 		  dadakey, nbufs,
 		  nsamps, nchans, nbits,
 		  ctrig,
-		  0x70
+		  hkey,dkey
 		);
   th.Work ();
   return 0;

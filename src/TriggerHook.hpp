@@ -7,7 +7,7 @@ using std::endl;
 #include <mutex>
 
 #include "PsrDADA.hpp"
-//#include "TrigDADA.hpp"
+#include "TrigDADA.hpp"
 #include "Operations.hpp"
 #include "FilterbankJSON.hpp"
 #include "Timer.hpp"
@@ -317,7 +317,7 @@ class TriggerHook {
     // trigger
     // dada
     key_t dkey;
-    key_t tdkey;
+    key_t thkey, tdkey;
     timeslice nsamps;
     int nchans, nbits;
     timeslice buffsz;
@@ -334,11 +334,11 @@ class TriggerHook {
     TriggerHook (
       key_t key_, unsigned int nbufs_,  
       timeslice nsamps_, int nchans_, int nbits_,
-      bool _ctrig, key_t tkey_
+      bool _ctrig, key_t hkey_, key_t dkey_
     ) :
       numobs(0),
       dkey(key_), nbufs(nbufs_),
-      tdkey(tkey_),
+      thkey(hkey_),tdkey(dkey_),
       nsamps(nsamps_), nchans(nchans_), nbits(nbits_),
       rindex(0),
       mc_socket (2, 0), fds (2, 0)
@@ -427,20 +427,18 @@ class TriggerHook {
       }
       cout.precision(6);
     }
-#if 0
-    void Dumper(const trigger_t& trig, int bstart, int bstop) {
+    void DumperDADA (trigger_t& trig, int bstart, int bstop) {
       timeslice start, offs; 
       double this_start, this_end;
-      TrigDADA tdada (tdkey);
+      TrigDADA tdada (thkey, tdkey);
       tdada.WriteLock (true);
       if (trig.i0 >= oldheader.epoch && trig.i0 < header.epoch)
-        tdada.SetHeader (oldheader);
+        tdada.WriteHeader (oldheader, trig);
       else
-        tdada.SetHeader (header);
-      tdada.SetTrigger (trig);
-      tdada.WriteHeader ();
-      timeslice tstride = nchans * nbits / 8 / header.tsamp * 1E6;
-      timeslice size = fbson.nsamps;
+        tdada.WriteHeader (header, trig);
+      timeslice tstride = header.nchans * header.nbits / 8 / header.tsamp * 1E6;
+      float dur = std::ceil(trig.i1 - trig.i0);
+      timeslice size = trig.i1 >= trig.i0 ? dur*tstride : 0L;
       timeslice fullsize = size;
       for(unsigned int ibuf = bstart; ibuf <= bstop; ibuf++) {
           this_start = epoch_cb[ibuf];
@@ -463,7 +461,6 @@ class TriggerHook {
       DiagPrint ();
       tdada.WriteLock (false);
     }
-#endif
     void DumperFBSON(const trigger_t& trig, int bstart, int bstop) {
       timeslice start, offs; 
       double this_start, this_end;
@@ -572,7 +569,7 @@ class TriggerHook {
       while (true) {
         if (TriggerCheck(trigs)) {
           alltrigtime.Start ();
-          for(const auto& trig : trigs) {
+          for(auto& trig : trigs) {
             // timer
             trigtime.Start ();
             numtrigs++;
@@ -614,8 +611,8 @@ class TriggerHook {
               cout << "TriggerHook::b bstart=" << bstart;
               cout << " bstop=" << bstop << endl;
               // dump logic
-#if 0
-              DumperFBSON(trig, bstart, bstop);
+#if 1
+              DumperDADA (trig, bstart, bstop);
 #else
               timeslice start, offs; 
               double this_start, this_end;
