@@ -80,13 +80,13 @@ class FDMT {
 		}
 		~FDMT () {
 			std::cout << "FDMT::dtor called." << std::endl;
-			std::cout << "FDMT::dtor State.size=" << State.size () << std::endl;
 		}
 
 		// please don't call this before initialization
 		// i beg of you
+		// XXX This is manually matched to maxDT
 		timeslice MaxSampDelay () noexcept {
-			return maxDT;
+			return bDT+1;
 		}
 
 		void SetDM (const float a, const float b, const unsigned n) noexcept { 
@@ -104,7 +104,7 @@ class FDMT {
 			}
 			aDT   =  idelays.front ();
 			bDT   =  idelays.back  ();
-			std::cout << "maxdelay=" << bDT << std::endl;
+			//std::cout << "maxdelay=" << bDT << std::endl;
 		}
 
 

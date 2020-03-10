@@ -73,7 +73,7 @@ class TriggerJSON {
       strftime (group, sizeof(group), "%Y%m%d_%H%M%S", &utc_time);
       j["parameters"]["group"] = std::string(group);
       snprintf(filename, sizeof(filename),
-          "%s_muos_ea%02d_sn%05.2f_dm%05.2f_wd%05.2f.dbson", group, th.stationid,th.sn,th.dm,th.width*1e3f
+          "%s_muos_ea%02d_dm%05.2f_sn%05.2f_wd%05.2f.dbson", group, th.stationid,th.dm,th.sn,th.width*1e3f
       );
     }
     // it is assumed that
