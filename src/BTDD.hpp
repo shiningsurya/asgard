@@ -67,6 +67,7 @@ class BTDD {
 		void Execute (const vc& in, timeslice nsamps, vf& bt, vc& dd) {
 			vc fdd;
 			timeslice fddnsamps = nsamps-fmaxd;
+			timeslice sddnsamps = fddnsamps-smaxd;
 #ifdef TIMING
 			Timer btdd("BTDD");
 			Timer fin("FirstIncoh");
@@ -75,7 +76,7 @@ class BTDD {
 			btdd.Start ();
 			fin.Start ();
 #endif
-			first_incoh.Execute (in,nsamps, fdd);
+			first_incoh.Execute (in,fddnsamps, fdd);
 #ifdef TIMING
 			fin.StopPrint (std::cout);
 			btme.Start ();
@@ -85,7 +86,7 @@ class BTDD {
 			btme.StopPrint (std::cout);
 			sin.Start ();
 #endif
-			sec_incoh.Execute (fdd, fddnsamps, dd);
+			sec_incoh.Execute (fdd, sddnsamps, dd);
 #ifdef TIMING
 			sin.StopPrint (std::cout);
 			btdd.StopPrint (std::cout);
