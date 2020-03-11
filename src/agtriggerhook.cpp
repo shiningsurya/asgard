@@ -5,6 +5,8 @@
 #include <csignal>
 void d_signal_handle (int sig) {
   std::cout << "received signal=" << sig << std::endl;
+  // cause a core dump
+  // core.pattern?
   exit (1);
 }
 
