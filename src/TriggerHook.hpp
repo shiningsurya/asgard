@@ -301,6 +301,7 @@ public:
   std::size_t SizeRead() { return fds.size(); }
 };
 
+// going single threaded again
 class TriggerHook {
   private:
     unsigned char trig_buf[MC_MAXRECV +1]; 
@@ -329,7 +330,10 @@ class TriggerHook {
     // running index
     unsigned int rindex;
     // mutex
-    std::mutex mutex_cb;
+    std::mutex   mutex_rl;
+    std::mutex   mutex_cb;
+    // trigDADA
+    TrigDADA     tdada;
   public:
     TriggerHook (
       key_t key_, unsigned int nbufs_,  
@@ -340,6 +344,7 @@ class TriggerHook {
       dkey(key_), nbufs(nbufs_),
       thkey(hkey_),tdkey(dkey_),
       nsamps(nsamps_), nchans(nchans_), nbits(nbits_),
+      tdada (thkey, tdkey),
       rindex(0),
       mc_socket (2, 0), fds (2, 0)
       {
@@ -366,12 +371,107 @@ class TriggerHook {
     }
     // WORK function
     void Work () {
-      std::thread trig_thread (&TriggerHook::FollowTrig, this);
-      trig_thread.detach();
-      // for some reason the followdada call which is a while(1) loop is ending.
-      // I am trying the most basic method 
-      FollowDADA ();
-      std::cout << "TriggerHook::Work completed numobs=" << numobs << std::endl;
+      std::cout << "TriggerHook::Work starting" << std::endl;
+      std::cout << "TriggerHook::Work connected to trigDADA" << std::endl;
+      std::vector<trigger_t> trigs;
+      Timer alltrigtime ("AllTime");
+      Timer trigtime ("TriggerTime");
+      while(++numobs || true) {
+        std::cout << "TriggerHook::FollowDADA numobs=" << numobs << std::endl;
+        PsrDADA dadain(dkey,nsamps,nchans, nbits, "/home/vlite-master/surya/logs/tthhooookk.log");  
+        auto bytes_chunk = dadain.GetByteChunkSize();
+        dadain.ReadLock(true);
+        unsigned int going = 0;
+        // read loop
+        while (going || dadain.ReadHeader()) {
+          if(!going) {
+            // first epoch
+            dadain.PrintHeader();
+            bufflen = nsamps * header.tsamp / 1e6;
+            oldheader = header;
+            header = dadain.GetHeader();
+          }
+          readret = dadain.ZeroReadData();
+          if (readret == -1) {
+            std::cout << "TriggerHook::FollowDADA bad ZeroRead" << std::endl;
+            going = 0;
+            // eod
+          }
+          else {
+            // push_back current epoch
+            epoch_cb.push_back ( 
+                header.epoch + 
+                (going * bufflen) 
+            );
+            // push_back data block
+            buffs_cb.push_back (
+                dadain.GetBufPtr()
+            );
+            //rindex = ( (rindex+1) % nbufs );
+            // push_back going
+            tmjd_cb.push_back ( 
+                header.tstart + 
+                (going * bufflen / 86400.0f) 
+            );
+            going++;
+          }
+          if (readret < bytes_chunk) going = 0;
+          std::cout << "TriggerHook::FollowDADA going merry=" << going << " epoch=" << ((going*bufflen)+header.epoch) << std::endl;
+          // trigger action here
+          if (TriggerCheck(trigs)) {
+            alltrigtime.Start ();
+            for(auto& trig : trigs) {
+              // timer
+              trigtime.Start ();
+              numtrigs++;
+              PrintTriggerAction (trig);
+              DiagPrint();
+              // iterate over cb to find triggers
+              int bstart = -1;
+              int bstop  = -1;
+              for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
+                if ( 
+                    trig.i0 >= epoch_cb[ibuf-1] && 
+                    trig.i0 < (epoch_cb[ibuf-1]+bufflen) 
+                   ) {
+                  bstart = ibuf-1;
+                  break;
+                }
+              }
+              if(bstart == -1 && trig.i0 >= epoch_cb.back()) bstart = epoch_cb.size()-1;
+              for(int ibuf = 1; ibuf < epoch_cb.size(); ibuf++) {
+                if ( 
+                    trig.i1 >= epoch_cb[ibuf-1] && 
+                    trig.i1 < (epoch_cb[ibuf-1]+bufflen) 
+                   ) {
+                  bstop = ibuf-1;
+                  break;
+                }
+              }
+              if(bstop == -1 && trig.i1 <= (epoch_cb.back() + bufflen)) bstop = epoch_cb.size()-1;
+              // dumper
+              if (bstart < 0 || bstart >= nbufs) 
+                cout << "TriggerHook::start unclear bstart=" << bstart << endl;
+              else if (bstop < 0 || bstop >= nbufs) 
+                cout << "TriggerHook::stop unclear bstop=" << bstop << endl;
+              else {
+                // valid bstart, bstop
+                cout << "TriggerHook::b bstart=" << bstart;
+                cout << " bstop=" << bstop << endl;
+                // dump logic
+                DumperDADA (trig, bstart, bstop);
+              }
+            // Timer
+            trigtime.StopPrint (std::cout);
+          }
+          alltrigtime.StopPrint (std::cout);
+          }
+          // exit condition
+          if (!going) break;
+        }
+        dadain.ReadLock(false);
+      }
+      std::cout << "TriggerHook::Work stopping" << std::endl;
     }
     // checks for trigger
     bool TriggerCheck (trigger_t& tt) {
@@ -430,7 +530,6 @@ class TriggerHook {
     void DumperDADA (trigger_t& trig, int bstart, int bstop) {
       timeslice start, offs; 
       double this_start, this_end;
-      TrigDADA tdada (thkey, tdkey);
       tdada.WriteLock (true);
       if (trig.i0 >= oldheader.epoch && trig.i0 < header.epoch)
         tdada.WriteHeader (oldheader, trig);
@@ -443,8 +542,7 @@ class TriggerHook {
       for(unsigned int ibuf = bstart; ibuf <= bstop; ibuf++) {
           this_start = epoch_cb[ibuf];
           // logic time
-          if ( trig.i0 <= this_start ) start = 0; 
-          else start = (trig.i0 - this_start) * tstride;
+          start = std::max (trig.i0 - this_start, static_cast<double>(0)) * tstride;
           offs  = std::min( (buffsz - start), size);
           std::cout << "TriggerHook::Dumper start=" << start << " offs=" << offs << std::endl;
           // sanity-check time
@@ -502,11 +600,13 @@ class TriggerHook {
     // dada interface
     void FollowDADA () {
       std::cout << "TriggerHook::FollowDADA starting" << std::endl;
+      std::unique_lock<std::mutex> rldada_lock(mutex_rl);
       while(++numobs || true) {
         std::cout << "TriggerHook::FollowDADA numobs=" << numobs << std::endl;
         PsrDADA dadain(dkey,nsamps,nchans, nbits, "/home/vlite-master/surya/logs/tthhooookk.log");  
         auto bytes_chunk = dadain.GetByteChunkSize();
         dadain.ReadLock(true);
+        rldada_lock.unlock ();
         unsigned int going = 0;
         // read loop
         while (going || dadain.ReadHeader()) {
@@ -554,6 +654,7 @@ class TriggerHook {
           // exit condition
           if (!going) break;
         }
+        rldada_lock.lock ();
         dadain.ReadLock(false);
       }
       std::cout << "TriggerHook::FollowDADA stopping" << std::endl;
@@ -568,6 +669,10 @@ class TriggerHook {
       // trigger
       while (true) {
         if (TriggerCheck(trigs)) {
+          // this lock to stop
+          // read_lock release 
+          // before triggers are handled
+          const std::lock_guard<std::mutex> rl_lock (mutex_rl);
           alltrigtime.Start ();
           for(auto& trig : trigs) {
             // timer
@@ -661,7 +766,7 @@ class TriggerHook {
         }
         else {
           // sleep 4s
-          std::this_thread::sleep_for (std::chrono::seconds(4));
+          std::this_thread::sleep_for (std::chrono::seconds(2));
         }
       }
     }

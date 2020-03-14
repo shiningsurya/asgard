@@ -317,9 +317,11 @@ class TriggerMaster {
         // blocking code vvv
         td.ReadHeader (head, trig);
         // blocking code ^^^
+        std::cout << "TriggerMaster::FollowDADA sn=" << trig.sn << " dm=" << trig.dm << " wd=" << 1e3f*trig.width << std::endl;
         reqsamps  = std::ceil (trig.i1 - trig.i0) / head.tsamp * 1E6;
         reqsamps  *= head.nchans * head.nbits / 8;
         datasamps = td.ReadData (bdata.data(), reqsamps);
+        std::cout << "TriggerMaster::FollowDADA reqsamps=" << reqsamps << " maxdatasamps=" << maxdatasamps << std::endl;
         if (datasamps == -1) {
           // this is weird
           std::cout << "TriggerMaster::FollowDADA read EOD" << std::endl;

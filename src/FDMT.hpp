@@ -78,9 +78,7 @@ class FDMT {
 			freq_off = _freq_off;
 			fmin     = fmax - (( nchans-1 )*freq_off);
 		}
-		~FDMT () {
-			std::cout << "FDMT::dtor called." << std::endl;
-		}
+		~FDMT ()   = default;
 
 		// please don't call this before initialization
 		// i beg of you
