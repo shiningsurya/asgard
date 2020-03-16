@@ -127,7 +127,7 @@ if __name__ == "__main__":
         onts = ONDUR.total_seconds()
         ofts = OFFDUR.total_seconds()
         print ("UPTIME[%]=    {0:4.2f}".format(100*onts/(onts+ofts)) )
-        print ("rate     =    {0:4.2f}".format(NFBSON/onts) )
+        print ("rate     =    {0:4.2f}".format(NFBSON/onts * 3600) )
 
     if args.k:
         print ("----------------------------")
