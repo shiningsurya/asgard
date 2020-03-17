@@ -4,6 +4,8 @@
 
 #define FMAX
 //#define FLIP
+constexpr float RAD2DEG = 57.2957795;
+constexpr float DEG2HRS = 0.0667;
 
 class TriggerPlot  {
 	using vf = std::vector<float>;
@@ -17,6 +19,15 @@ class TriggerPlot  {
 		vf   axdm;
 		vf   tsn;
 		vf   dsn;
+		// for position
+		int hh;
+		int mm;
+		void ra2hm (const float& ra, int& hh, int& mm) {
+			float rad = ra * RAD2DEG * DEG2HRS;
+			hh        = static_cast<int>(rad);
+			rad      -= hh;
+			mm        = static_cast<int>(rad * 60);
+		}
 		// for pgplot
 		static constexpr float contrast = 1.0f; 
 		static constexpr float brightness = 0.5f;
@@ -158,9 +169,10 @@ class TriggerPlot  {
 			cpgmtxt ("B", 2.5, 0.5, 0.5, "DM [pc/cc]");
 			// source-name
 			snprintf (txt, sizeof (txt), "Source=%s", th.name);
-			cpgmtxt ("T",0.0f, 1.0, 1.0f, txt);
+			cpgmtxt ("T",0.4f, 1.0, 1.0f, txt);
 			// ra-dec
-			snprintf (txt, sizeof(txt), "RA=%3.2f DEC=%3.2f",th.ra, th.dec);
+			ra2hm (th.ra, hh, mm);
+			snprintf (txt, sizeof(txt), "RA=%02d\\uh\\d%02d\\um\\d DEC=%3.2f%c",hh, mm, th.dec*RAD2DEG, (char)176);
 			cpgmtxt ("T",-1.3*charh, 1.0, 1.0f, txt);
 			// tSN
 			cpgsvp (0.55, 0.9, 0.55, 0.9);
