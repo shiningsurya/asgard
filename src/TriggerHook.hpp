@@ -5,6 +5,9 @@ using std::endl;
 #include <chrono>
 #include <thread>
 #include <mutex>
+#include <deque>
+#define PER_TRIG 70
+#define TRIG_MUL 4
 
 #include "PsrDADA.hpp"
 #include "TrigDADA.hpp"
@@ -373,7 +376,7 @@ class TriggerHook {
     void Work () {
       std::cout << "TriggerHook::Work starting" << std::endl;
       std::cout << "TriggerHook::Work connected to trigDADA" << std::endl;
-      std::vector<trigger_t> trigs;
+      std::deque<trigger_t> trigs (PER_TRIG*TRIG_MUL);
       Timer alltrigtime ("AllTime");
       Timer trigtime ("TriggerTime");
       while(++numobs || true) {
@@ -416,11 +419,13 @@ class TriggerHook {
             going++;
           }
           if (readret < bytes_chunk) going = 0;
-          std::cout << "TriggerHook::FollowDADA going merry=" << going << " epoch=" << ((going*bufflen)+header.epoch) << std::endl;
+          std::cout << "TriggerHook::FollowDADA going merry=" << going << " epoch=" << std::setprecision(12) << ((going*bufflen)+header.epoch) << std::setprecision (6) << std::endl;
           // trigger action here
+          alltrigtime.Start ();
           if (TriggerCheck(trigs)) {
-            alltrigtime.Start ();
-            for(auto& trig : trigs) {
+            int iter = std::min (PER_TRIG, static_cast<int>(trigs.size()));
+            for(int iii=0; iii< iter;iii++) {
+              auto trig = trigs.back ();
               // timer
               trigtime.Start ();
               numtrigs++;
@@ -463,6 +468,10 @@ class TriggerHook {
               }
             // Timer
             trigtime.StopPrint (std::cout);
+            // pop back after done
+            trigs.pop_back ();
+            // if empty break
+            if (trigs.empty()) break;
           }
           alltrigtime.StopPrint (std::cout);
           }
@@ -488,6 +497,25 @@ class TriggerHook {
         return true;
       }
       return false;
+    }
+    bool TriggerCheck (std::deque<trigger_t>& tt) {
+      bool ret = false;
+      int numtrigs = 0;
+      fds.Select ( ifds );
+      while ( ifds.size() >= 1) {
+        std::size_t mcrsz = mc_socket.recv (trig_buf);
+        // trigger interception
+        numtrigs += mcrsz / sizeof(trigger_t);
+        trigger_t * mctrig = reinterpret_cast<trigger_t*>(trig_buf);
+        std::copy(mctrig, mctrig + numtrigs, std::front_inserter(tt));
+        // resetting
+        ifds.clear();
+        fds.Select ( ifds );
+        ret = true;
+      }
+      if (ret)
+        std::cout << "TriggerHook::TriggerCheck numtrig=" << numtrigs << std::endl;
+      return ret;
     }
     bool TriggerCheck (std::vector<trigger_t>& tt) {
       bool ret = false;
