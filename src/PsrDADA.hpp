@@ -453,6 +453,18 @@ class PsrDADA {
    multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x d_writetimes=%" PRIu64 "nant=%d\n",dada_key,d_writetimes++, numants);
    return bytes_written;
  }
+ timeslice WriteData(PtrByte packout, timeslice bchunk) {
+   // NOT SURE ABOUT EOD while WRITING?
+   //if(ipcbuf_eod((ipcbuf_t*)hdu->data_block)) return -1;
+   // PACK and WRITE
+   timeslice bytes_written = ipcio_write(hdu->data_block, (char*)packout, bchunk);
+   if(bytes_written < 0) {
+     multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x ipcio_write failed\n",dada_key);
+     return false;
+   }
+   multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x d_writetimes=%" PRIu64 "",dada_key,d_writetimes++);
+   return bytes_written;
+ }
  void PrintHeader() {
    // positions
    std::cout << "RA     " << ra  << std::endl;
