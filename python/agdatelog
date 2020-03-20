@@ -3,6 +3,7 @@ import datetime as dt
 DATEFMT = "%Y%m%d_%H%M%S"
 import os
 import numpy as np
+import matplotlib.pyplot as plt
 # 20191219_043911_muos_ea99_dm224.75_sn8.50.fbson
 # 0-------1------2----3----4--------5
 # 20200120_080541_muos_ea99_dm203.69_sn8.71_wd76.56.fbson
@@ -40,6 +41,8 @@ def ParseArgs():
     add('--gap', help = 'Maximum gap between fbsons (in minutes).', default=150, dest='gap', type=int)
     # summary
     add('-s', help = 'Summary statistics', default=False, action='store_true', dest='summary')
+    # plot scatter
+    add('-p', help = 'Plot scatter of S/N, DM and width.', default=None, dest='plotscat')
     # last k
     add('-k', help = 'Last k max candidates.', default=None, dest='k', type=int)
     # o
@@ -134,4 +137,49 @@ if __name__ == "__main__":
         ac  = np.argsort (cdm)
         for ii in ac[-args.k:]:
             print ("DM={0:3.2f} Count={1:04d}".format(udm[ii], cdm[ii]))
+
+    if args.plotscat:
+        fig, ax = plt.subplots(2,2)
+        scad = dict()
+        scad['marker'] = 'x'
+        scad['s']      = 5
+        scad['alpha']  = 0.6
+        #  dm v/s wd
+        xa = ax[0,0]
+        xa.set_xlabel ("DM [pc/cc]")
+        xa.set_xscale ('log')
+        xa.set_xlim (20, 1100)
+        xa.set_ylabel ("Width [ms]")
+        xa.set_ylim (1, 100)
+        xa.set_yscale ('log')
+        xa.scatter (DM, WD, **scad)
+        #  dm v/s s/n
+        xa = ax[1,0]
+        xa.set_xlabel ("DM [pc/cc]")
+        xa.set_xscale ('log')
+        xa.set_xlim (20, 1100)
+        xa.set_ylabel ("S/N")
+        xa.set_yscale ('log')
+        xa.set_ylim (6, 100)
+        xa.scatter (DM, SN, **scad)
+        #  wd v/s sn
+        xa = ax[1,1]
+        xa.set_xlabel ("Width [ms]")
+        xa.set_xlim (1, 100)
+        xa.set_xscale ('log')
+        xa.set_ylabel ("S/N")
+        xa.set_yscale ('log')
+        xa.set_ylim (6, 100)
+        xa.scatter (WD, SN, **scad)
+        # 
+        xa = ax[0,1]
+        xa.axis('off')
+        sf = "{0} [{3}] -> $\mu={1:3.2f}$ $\sigma={2:4.2f}"
+        # share axes
+        ax[0,0].get_shared_x_axes().join (ax[0,0], ax[1,0])
+        ax[1,0].get_shared_y_axes().join (ax[1,0], ax[1,1])
+        #
+        fig.suptitle (" ".join(args.dir))
+        fig.tight_layout()
+        plt.savefig (args.plotscat)
 
