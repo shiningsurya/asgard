@@ -92,7 +92,7 @@ int main(int ac, char * av[]) {
     hkey = dx(s_hkey);
     dkey = dx(s_dkey);
 		// trigger channel
-		bool ctrig = vm.count("trigcoadd");
+		bool ctrig = vm["trigcoadd"].as<bool>();
 		TriggerHook th(
 		  dadakey, nbufs,
 		  nsamps, nchans, nbits,

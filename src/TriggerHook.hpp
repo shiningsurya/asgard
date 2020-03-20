@@ -559,6 +559,7 @@ class TriggerHook {
       DiagPrint ();
       tdada.WriteLock (false);
     }
+#if 0
     void DumperFBSON(const trigger_t& trig, int bstart, int bstop) {
       timeslice start, offs; 
       double this_start, this_end;
