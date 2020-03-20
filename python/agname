@@ -14,8 +14,11 @@ def ParseArgs():
     add('dumps', help = 'dump list', type=str)
     # sn
     add('--sn', help = 'S/N minimum. default min s/n.', default=0, dest='sn', type=float)
+    add('--SN', help = 'S/N maximum.', default=100000.0, dest='SN', type=float)
     add('--dm', help = 'DM minimum. default min DM', default=0, dest='dm', type=float)
+    add('--DM', help = 'DM maximum.', default=1200.0, dest='DM', type=float)
     add('--wd', help = 'Width(ms) minimum. default min width', default=0, dest='wd', type=float)
+    add('--WD', help = 'Width(ms) maximum.', default=1000.0, dest='WD', type=float)
     # o
     add('-o', help = 'List the matched in a file', dest = 'list', default=None)
     add('-v', help='Verbosity switch.', action='store_true')
@@ -42,7 +45,14 @@ if __name__ == "__main__":
         SN[ii] = float( ll[3] )
         WD[ii] = float( ll[4] )
     #
-    IDX = np.logical_and (SN >= args.sn, DM >= args.dm, WD >= args.wd)
+    IDX = np.logical_and (
+            np.logical_and ( SN >= args.sn, SN <= args.SN ),
+            np.logical_and ( DM >= args.dm, DM <= args.DM )
+    )
+    IDX = np.logical_and (
+            IDX,
+            np.logical_and ( WD >= args.wd, WD <= args.WD )
+    )
     if args.v:
         print ("Asgard::Namelyzer filtered {0} dumps.".format(IDX.sum()))
     #
