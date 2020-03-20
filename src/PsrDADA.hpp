@@ -462,7 +462,7 @@ class PsrDADA {
      multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x ipcio_write failed\n",dada_key);
      return false;
    }
-   multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x d_writetimes=%" PRIu64 "",dada_key,d_writetimes++);
+   multilog(log,LOG_INFO,"PsrDADA::WriteData key=%x d_writetimes=%" PRIu64 "\n",dada_key,d_writetimes++);
    return bytes_written;
  }
  void PrintHeader() {

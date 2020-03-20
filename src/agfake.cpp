@@ -1,6 +1,8 @@
 #include "asgard.hpp"
 #include "FilterbankFake.hpp"
 #include "PsrDADA.hpp"
+#include <thread>
+#include <chrono>
 
 // signal handling
 #include <csignal>
@@ -44,6 +46,8 @@ int main(int ac, char * av[]) {
 	std::string s_dadakey, d_dadakey("20"), odir, d_odir("/mnt/ssd/dumps/");
 	std::string pfile;
 	float rms;
+	float warm_time;
+	int   nwarm;
 	// po
 	po::variables_map vm;
 	po::options_description opt("Options");
@@ -51,7 +55,9 @@ int main(int ac, char * av[]) {
 	opt.add_options()
 ("help,h", "Prints help")
 ("file,f",  po::value<std::string>(&pfile), "S/N DM Width file")
-("rms,--rms",  po::value<float>(&rms)->default_value(4.0f), "RMS value")
+("rms",  po::value<float>(&rms)->default_value(4.0f), "RMS value")
+("wtime,w",  po::value<float>(&warm_time)->default_value(8.0f), "Warm up time.")
+("nwtime,n",  po::value<int>(&nwarm)->default_value(6), "# of warm ups.")
 ("key,k",  po::value<std::string>(&s_dadakey)->default_value(d_dadakey), "Output DADA key[def=0x20]");
 	// parsing
 	try {
@@ -82,27 +88,46 @@ int main(int ac, char * av[]) {
 	hfake.bandwidth    = -41.936330;
 	hfake.tsamp        = 781.25;
 	hfake.tstart       = 54321.12;
-	hfake.epoch        = 0;
+	hfake.epoch        = time(NULL);
 	hfake.nbits        = 8;
 	hfake.nchans       = 4096;
 	hfake.nifs         = 1;
 	hfake.npol         = 1;
-	strcpy ("FAKEFAKE", hfake.name)
-	strcpy ("/tmp/fakefakefakefake.fil", hfake.sigproc_file)
-	strcpy ("1900-01-01-00:00:00", hfake.utc_start_str)
+	strcpy (hfake.name, "FAKEFAKE");
+	strcpy (hfake.sigproc_file, "/tmp/fakefakefakefake.fil");
+	struct tm t;
+	time_t hep = static_cast<time_t>(hfake.epoch);
+	gmtime_r (&hep, &t);
+  strftime (hfake.utc_start_str, sizeof(hfake.utc_start_str), "%Y-%m-%d-%H:%M:%S", &t);
+	//strcpy (hfake.utc_start_str, "1900-01-01-00:00:00");
 	// 
 	FilterbankFake  ffake (hfake.tsamp/1E6, hfake.nchans, hfake.fch1, hfake.foff, rms);
 	PsrDADA dada (dadakey, 0,0,0, "/home/vlite-master/surya/faketriggers/dadadada.log");
-	dada.WriteLock (true);
-	dada.SetHeader (hfake);
-	dada.WriteHeader ();
+	for (int i = 0; i < nwarm; i++) {
+    dada.WriteLock (true);
+    dada.SetHeader (hfake);
+    dada.WriteHeader ();
+    auto fb = ffake.WhiteNoise (warm_time);
+		dada.WriteData (fb.data(), fb.size());
+		hfake.epoch += warm_time;
+		unsigned int tt = static_cast<int> (warm_time);
+    dada.WriteLock (false);
+	}
 	// Create Write loop
 	float sn, dm, wd;
 	std::ifstream pf (pfile);
+	dada.WriteLock (true);
+  dada.SetHeader (hfake);
+  dada.WriteHeader ();
 	while (pf >> sn >> dm >> wd) {
 		// only 0.1s guards
-		auto fb = ffake.Signal (sn, dm, wd, 0.1, 0.1);
+		std::cout << "SN=" << sn << " DM=" << dm << " wd=" << wd*1e3 << std::endl;
+		auto fb = ffake.Signal (sn, dm, wd, 1.0, 1.0);
 		dada.WriteData (fb.data(), fb.size());
+		unsigned int tt = (fb.size()*hfake.tsamp/1E6/4096);
+		std::cout << ".. sleeping for .. " << tt << "s" << std::endl;
+		std::this_thread::sleep_for (std::chrono::seconds(tt));
+
 	}
 	//
 	dada.WriteLock (false);

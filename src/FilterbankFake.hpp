@@ -28,7 +28,7 @@ private:
 		delays[0]   = 0;
 		for (unsigned int i = 1; i < nchans; i++) {
 			float fi02 = 1.0 / freqs[i] / freqs[i];
-			delay[i]   = static_cast<timeslice> (fac * (fi02 - if02)); 
+			delays[i]   = static_cast<timeslice> (fac * (fi02 - if02)); 
 		}
 	}
 public:
@@ -68,23 +68,30 @@ public:
 		timeslice tsize = iit + wit + maxd + ijt;
 		timeslice bsize = tsize * nchans;
 		// noise floor
-		std::normal_distribution<Byte> norm (noiseamp, rms);
+		std::normal_distribution<float> norm (
+      static_cast<float>(noiseamp), 
+      static_cast<float>(rms)
+		);
 		vb  fb (bsize, 0);
 		for (timeslice i = 0; i < bsize; i++) {
-			fb[i]  = norm (mt);
+		  auto x = norm (mt);
+		  if (x < 0) fb[i] = 0;
+		  else if (x >= 255) fb[i] = 255;
+		  else fb[i]  = static_cast<Byte>(x);
 		}
 		// add signal
 		for (unsigned int ichan = 0; ichan < nchans; ichan++) {
 			timeslice iwt = delays[ichan] + iit;
 			timeslice jwt = iwt + wit;
 			for (timeslice ii = iwt; ii < jwt; ii++) {
-				fb [ichan + nchans*ii] += sigamp;
+				auto x = fb [ichan + nchans*ii];
+				fb [ichan + nchans*ii] = static_cast<Byte>(std::min (255, static_cast<int>(x+sigamp)));
 			}
 		}
 		// return
 		return fb;
 	}
-	vb AddWhiteNoise (float it = 0.2, Byte irms = 0) {
+	vb WhiteNoise (float it = 0.2, Byte irms = 0) {
 		// amplitudes
 		if (irms == 0) irms = rms;
 		Byte noiseamp  = 128 * (1 - (irms/100));
@@ -92,10 +99,16 @@ public:
 		timeslice tsize = it / tsamp;
 		timeslice bsize = tsize * nchans;
 		// noise floor
-		std::normal_distribution<Byte> norm (noiseamp, irms);
+		std::normal_distribution<float> norm (
+      static_cast<float>(noiseamp), 
+      static_cast<float>(irms)
+		);
 		vb  fb (bsize, 0);
 		for (timeslice i = 0; i < bsize; i++) {
-			fb[i]  = norm (mt);
+		  auto x = norm (mt);
+		  if (x < 0) fb[i] = 0;
+		  else if (x >= 255) fb[i] = 255;
+		  else fb[i]  = static_cast<Byte>(x);
 		}
 		// return
 		return fb;
