@@ -26,7 +26,7 @@ def parseArgs():
     pap = argparse.ArgumentParser(prog='agcands', description='Command line to tool to visualize, vet candidates.', epilog='Part of Asgard', add_help=True)
     add = pap.add_argument
     add('cands', help='Candidates files', nargs='*')
-    add('-o,ofile', help='Plot output file', dest='ofile')
+    add('-o,ofile', help='Plot output file', dest='ofile', default=None)
     add('-p,plot', help='Plot type', choices=PlotTypes)
     add('--ant', help='Antenna', default='ea99', dest='ant')
     add('--snmax', help='S/N Max', default=100, dest='snmax', type=int)
