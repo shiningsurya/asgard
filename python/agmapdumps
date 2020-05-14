@@ -13,6 +13,7 @@ def ParseArgs ():
     add ("vdiflist", help="VDIF list", type=str)
     add ("-u", help="Print UTC epoch as well", action="store_true", default=False, dest='pu')
     add ("-v", help="Verbosity", action="store_true", default=False, dest='v')
+    add ("-m", help="Meta", action="store_true", default=False, dest='meta')
     #
     return ap.parse_args ()
 
@@ -29,6 +30,9 @@ if __name__ == "__main__":
     VDIF_LIST  = args.vdiflist
     PRINT_U    = args.pu
     V          = args.v
+    META       = args.meta
+    # meta gives i0, i1, dm, width (s), ra, dec
+    smeta      = "{0}\t{1}\t{2}\t{3}\t{4}\t{5}"
     # need to clear duplicates
     # 
     if V:
@@ -49,6 +53,8 @@ if __name__ == "__main__":
     if V:
         print ("Asgard::MapDumps Found {0} VDIFs with {1} unique VDIFs.".format(len(vdifs), vdif_i.size))
     #
+    if META:
+        print (smeta.format("I0", "I1", "DM", "Width(s)", "RA", "DEC"))
     COUNT=0
     for i,iv in enumerate(vdif_i):
         keys, = np.where (np.logical_and(iv >= i0, iv <= i1))
@@ -61,6 +67,9 @@ if __name__ == "__main__":
         print (vdifs[idx[i]].strip())
         for k in keys:
             print (os.path.basename(fl[k]))
+            if META:
+                with tdb.DBSON (fl[k]) as df:
+                    print (smeta.format(df.i0, df.i1, df.dm, df.width, df.ra, df.dec))
     if V:
         print ("Asgard::MapDumps Found {0} mappings.".format(COUNT))
 
