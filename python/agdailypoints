@@ -1,0 +1,110 @@
+#!/usr/bin/env python
+from itertools import cycle
+import re
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.cm as mcm
+import matplotlib.gridspec as gds
+import matplotlib.colors as mc
+import pickle as pkl
+from datetime import datetime as dt
+from astropy.time import Time
+import astropy.coordinates as asc
+## CONSTANTS
+PATTERN = "{date}\_(?P<hms>\d{{6}})\_muos\_ea99\_kur\.cand\s(?P<rad>[+-]*\d*\.*\d*)\s(?P<ded>[+-]*\d*\.*\d*)\n"
+DATEF  = "%Y%m%d"
+HMS    = "HHMMSS"
+VLALAT = asc.Latitude  ( "34d04m43.497s" )  # north
+VLALON = asc.Longitude ( "107d37m03.819s" ) # west
+VLAELV = 2124.0
+VLAEL  = asc.EarthLocation (VLALON, VLALAT, VLAELV)
+KNOWN  = {
+        'psr-crab'    : [83.63, 22.014],
+        'psr-dm50'    : [268.244540,   -28.11036],
+        'psr-b0329'   : [53.24, 54.57],
+        'sgr-j1939'   : [293.735, 21.895],
+}
+MARKCYCLE = cycle (['x', '*', '+', '^'])
+## CONSTANTS
+
+def ParseArgs ():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='agdailypoints', description='Asgard tool for daily pointings.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('tfile', help = 'Candidate pointings filelist', type=str)
+    add('date', help = 'Date in YYYYMMDD format', type=str)
+    # optionals
+    # o
+    add('-o', help = 'Output file', dest = 'ofile', default=None)
+    add('-v', help = 'Verbose', dest = 'v', action='store_true')
+    return ap.parse_args()
+
+if __name__ == "__main__":
+    args = ParseArgs ()
+    print ("")
+    dd = dt.strptime (args.date, DATEF)
+    rp = re.compile (PATTERN.format(date = args.date))
+    with open(args.tfile,'r') as f:
+        rem = rp.findall (f.read())
+    lrem = len (rem)
+    if args.v:
+        print ("Date=", dd)
+        print ("Found {0} matches".format(lrem))
+    # matches are 
+    # hms, dm, sn
+    hh    = np.zeros (lrem)
+    ra    = np.zeros (lrem)
+    de    = np.zeros (lrem)
+    for i,r in enumerate (rem):
+        # sn, dm are straightforward
+        ra[i] = float (r[1])
+        de[i] = float (r[2])
+        # hms
+        shms  = r[0]
+        hh[i] = float (shms[0:2]) + (float (shms[2:4])/60) + (float (shms[4:])/3600)
+    # that adjustment
+    ra -= np.pi
+    # plotting
+    norm = mc.Normalize (0, 24, clip=True)
+    fig = plt.figure ()
+    spec = gds.GridSpec (20,20, figure=fig, hspace=0.18, bottom=0.125, right=0.900, top=0.850, left=0.090)
+    sky = fig.add_subplot (spec[:19,:], projection='mollweide')      # sky
+    cb  = fig.add_subplot (spec[19,:])
+    # la.axis ('off')
+
+    sdict = {'marker':'o', 'cmap':plt.cm.jet, 'norm':norm, 'edgecolors':'k', 's':60}
+    sky.scatter (ra, de, c=hh, **sdict)
+    sky.set_xlabel ("RA [deg]")
+    sky.set_ylabel ("DEC [deg]")
+    sky.grid (1)
+    fig.colorbar (
+        mcm.ScalarMappable(norm=norm, cmap=plt.cm.jet), 
+        cax=cb,
+        orientation='horizontal',
+        ticks=np.arange(24),
+        label="UTC [Hr]"
+    )
+    for l, rd in KNOWN.items ():
+        MARK = next(MARKCYCLE)
+        rr,dd = np.deg2rad (rd)
+        print ("{0} RA={1:4.3f} DEC={2:4.3f}".format(l, rr,dd))
+        # adjustment
+        rr -= np.pi
+        sky.scatter (rr, dd, label=l, marker=MARK, color='k', s=90, alpha=0.8)
+    sky.legend (
+        loc='upper right', 
+        bbox_to_anchor = (1.12, 1.3),
+        fancybox=True, 
+        title="Known sources"
+    )
+
+
+    # fig.tight_layout ()
+    fig.suptitle ("{0} Pointings".format(args.date), fontweight='bold')
+    if args.ofile:
+        plt.savefig (args.ofile)
+    else:
+        # plt.show ()
+        plt.savefig ("{0}_pointings.png".format(args.date), dpi=300)
+

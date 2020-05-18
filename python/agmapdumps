@@ -9,7 +9,7 @@ def ParseArgs ():
     import argparse
     ap = argparse.ArgumentParser (prog='agmapdumps', description='Asgard tool for mapping vdif dumps and *son dumps.', epilog='Part of Asgard')
     add = ap.add_argument
-    add ("dbsondir", help="Directory of dbsons.", type=str)
+    add ("dbsondir", help="Directory of dbsons or list.", type=str)
     add ("vdiflist", help="VDIF list", type=str)
     add ("-u", help="Print UTC epoch as well", action="store_true", default=False, dest='pu')
     add ("-v", help="Verbosity", action="store_true", default=False, dest='v')
@@ -19,8 +19,14 @@ def ParseArgs ():
 
 if __name__ == "__main__":
     args = ParseArgs ()
-    DBSON_DIR  = args.dbsondir
-    DBSON_GLOB = DBSON_DIR + "/*.dbson"
+    if args.dbsondir.endswith ("list"):
+        with open (args.dbsondir, "r") as f:
+            sfl = f.readlines ()
+        fl = [s.strip() for s in sfl] 
+    else:
+        DBSON_DIR  = args.dbsondir
+        DBSON_GLOB = DBSON_DIR + "/*.dbson"
+        fl = glob.glob( DBSON_GLOB )
     VDIF_LIST  = args.vdiflist
     PRINT_U    = args.pu
     V          = args.v
@@ -29,7 +35,6 @@ if __name__ == "__main__":
     smeta      = "{0}\t{1}\t{2}\t{3}\t{4}\t{5}"
     # need to clear duplicates
     # 
-    fl = glob.glob( DBSON_GLOB )
     if V:
         print ("Asgard::MapDumps Found {0} DBSONs.".format(len(fl)))
     i0 = np.zeros (len(fl), dtype=np.uint64)

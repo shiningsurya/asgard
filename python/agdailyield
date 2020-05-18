@@ -1,0 +1,170 @@
+#!/usr/bin/env python
+import re
+import numpy as np
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gds
+import pickle as pkl
+from datetime import datetime as dt
+from astropy.time import Time
+import astropy.coordinates as asc
+## CONSTANTS
+TSIZE  = 180
+DMSIZE = 512
+SNSIZE = 512
+MINDM  = 50
+MINSN  = 6
+MAXSN  = 150
+MAXDM  = 1000
+PATTERN = "{date}\_(?P<hms>\d{{6}})\_muos\_ea99\_dm(?P<dm>\d*\.\d*)\_sn(?P<sn>\d*\.\d*)\_.*\n"
+DATEF  = "%Y%m%d"
+HMS    = "HHMMSS"
+VLALAT = asc.Latitude  ( "34d04m43.497s" )  # north
+VLALON = asc.Longitude ( "107d37m03.819s" ) # west
+VLAELV = 2124.0
+VLAEL  = asc.EarthLocation (VLALON, VLALAT, VLAELV)
+## CONSTANTS
+
+def ParseArgs ():
+    import argparse
+    '''For argument parsing'''
+    ap = argparse.ArgumentParser(prog='agdailyield', description='Asgard tool for Trigger health plots.', epilog='Part of Asgard')
+    add = ap.add_argument
+    add('tfile', help = 'Trigger filelist', type=str)
+    add('date', help = 'Date in YYYYMMDD format', type=str)
+    # optionals
+    # o
+    add('-o', help = 'Output file', dest = 'ofile', default=None)
+    add('-v', help = 'Verbose', dest = 'v', action='store_true')
+    return ap.parse_args()
+
+if __name__ == "__main__":
+    args = ParseArgs ()
+    print ("")
+    dd = dt.strptime (args.date, DATEF)
+    rp = re.compile (PATTERN.format(date = args.date))
+    with open(args.tfile,'r') as f:
+        rem = rp.findall (f.read())
+    lrem = len (rem)
+    if args.v:
+        print ("Date=", dd)
+        print ("Found {0} matches".format(lrem))
+    # matches are 
+    # hms, dm, sn
+    hh    = np.zeros (lrem)
+    sn    = np.zeros (lrem)
+    dm    = np.zeros (lrem)
+    for i,r in enumerate (rem):
+        # sn, dm are straightforward
+        dm[i] = float (r[1])
+        sn[i] = float (r[2])
+        # hms
+        shms  = r[0]
+        hh[i] = float (shms[0:2]) + (float (shms[2:4])/60) + (float (shms[4:])/3600)
+
+    # wd = np.array (dd['wd'])
+    MAXSN = min (MAXSN, sn.max())
+    # bins    
+    bh = np.linspace (0, 24, TSIZE)
+    bd = np.linspace (MINDM, MAXDM, DMSIZE)
+    bs6 = np.linspace (6, 8,  TSIZE)
+    bs = np.linspace (8, MAXSN,  SNSIZE)
+    # bw = np.linspace (MINWD, MAXWD,WDSIZE)
+    # histogram 
+    Hdm, _, _ = np.histogram2d (hh, dm, bins=(bh, bd))
+    Hsn, _, _ = np.histogram2d (hh, sn, bins=(bh, bs))
+    Hsn6, _, _ = np.histogram2d (hh, sn, bins=(bh, bs6))
+    # Hwd, _, _ = np.histogram2d (hh, wd, bins=(bh, bw))
+    # none zeros
+    # Hdm[Hdm == 0] = None 
+    # Hsn[Hsn == 0] = None 
+    # plotting
+    fig = plt.figure ()
+    spec = gds.GridSpec (20,1, figure=fig, hspace=0.18, bottom=0.125, right=0.900, top=0.850, left=0.090)
+    on= fig.add_subplot (spec[0])      # if on sky
+    a = fig.add_subplot (spec[1:16])    # dm
+    b = fig.add_subplot (spec[16:18])    # high sn count
+    c = fig.add_subplot (spec[18:])    # low sn distribution
+
+    # share x axes
+    a.get_shared_x_axes ().join (a, b)
+    a.get_shared_x_axes ().join (a, c)
+    a.get_shared_x_axes ().join (a, on)
+
+    imdict = {'aspect':'auto', 'cmap':plt.cm.jet, 'origin':'lower'}
+
+    a.imshow (Hdm.T, extent=[ bh[0], bh[-1], bd[0], bd[-1] ], **imdict)
+    a.set_ylabel ('DM [pc/cc]')
+    a.set_yscale ('log')
+
+    # b.imshow (Hsn.T, extent=[ bh[0], bh[-1], bs[0], bs[-1] ], **imdict)
+    bX, bY = [],[]
+    for ix in range (TSIZE-1):
+        for iy in range (SNSIZE-1):
+            if Hsn[ix,iy] >= 1:
+                bX.append (bh[ix])
+                bY.append (bs[iy])
+    b.scatter (bX, bY, marker='x', color='blue')
+    b.set_xlim (bh[0], bh[-1])
+    b.set_ylim (bs[0], bs[-1])
+    b.set_ylabel ('SN')
+    b.set_yscale ('log')
+
+    c.imshow (Hsn6.T, extent=[ bh[0], bh[-1], bs6[0], bs6[-1] ], **imdict)
+    c.set_ylabel ('SN')
+    c.set_yscale ('log')
+    c.set_xlabel ('UTC Hour [Hr]')
+    c.yaxis.set_label_position ('right')
+
+    tH = Hdm.sum (1)
+    for ix in range (TSIZE-1):
+        if tH[ix] >= 1:
+            on.axvspan (bh[ix], bh[ix+1], color='g')
+
+    # xticks
+    tticks = np.arange (24, dtype=np.int)
+    a.set_xticks (tticks)
+    a.set_xticklabels ([])
+    b.set_xticks (tticks)
+    b.set_xticklabels ([])
+    c.set_xticks (tticks)
+    c.set_xticklabels (tticks)
+    # xticks lst hr
+    on.xaxis.tick_top ()
+    on.xaxis.set_label_position ('top')
+    on.set_xticks (tticks)
+    otime = Time (dd, scale='utc', location=VLAEL)
+    lst   = otime.sidereal_time ('mean')
+    lhms  = lst.hms
+    olst  = lhms.h + (lhms.m/60) + (lhms.s/3600)
+    LSTLAB = []
+    for it in tticks:
+        itlst = int(it + olst)
+        if itlst >= 24:
+            itlst = itlst - 24
+        LSTLAB.append ("{0:02d}".format(itlst))
+    on.set_xlabel ('LST [Hr]', color='red')
+    on.set_xticklabels (LSTLAB, rotation="45", color='red')
+    on.set_yticklabels ([])
+    # ytics
+    dmticks = np.arange (MINDM, MAXDM, 100)
+    a.set_yticks (dmticks)
+    a.set_yticklabels (dmticks)
+    snticks = np.arange (8, MAXSN, 10)
+    b.yaxis.tick_right ()
+    # b.set_yticks (snticks)
+    # b.set_yticklabels (snticks)
+    # grids
+    grdict = {'linestyle':':', 'linewidth':0.7, 'which':'both'}
+    b.grid (True, color='k', **grdict)
+    a.grid (True, color='w', **grdict)
+    c.grid (True, color='w', **grdict)
+    on.grid (True, color='k', **grdict)
+
+    # fig.tight_layout ()
+    fig.suptitle ("{0} Triggers".format(args.date), fontweight='bold')
+    if args.ofile:
+        plt.savefig (args.ofile)
+    else:
+        # plt.show ()
+        plt.savefig ("{0}_TriggerYield.png".format(args.date), dpi=300)
+

@@ -36,7 +36,8 @@ if __name__ == "__main__":
     #
     n = len(DUMPS)
     if args.v:
-        print ("Asgard::Namelyzer found {0} dumps from {1} lines.".format(n, len(ENTRY)))
+        print ("Asgard::Namelyzer read  {0} lines.".format(len(ENTRY)))
+        print ("Asgard::Namelyzer found {0} dumps.".format(n))
     SN  = np.zeros (n, dtype=np.float32)
     DM  = np.zeros (n, dtype=np.float32)
     WD  = np.zeros (n, dtype=np.float32)
