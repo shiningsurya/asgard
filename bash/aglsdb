@@ -1,0 +1,3 @@
+#!/bin/bash
+#set -x
+find /mnt/ssd/triggers -type f -name "*.dbson" -mtime -4 -print
