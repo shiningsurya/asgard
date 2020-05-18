@@ -1,7 +1,7 @@
 #!/usr/bin/env python2.7
 from __future__ import print_function
 import datetime as dt
-DATEFMT = "%Y%m%d_%H%M%S"
+DATEFMT = "./%Y%m%d_%H%M%S"
 import os
 import numpy as np
 import matplotlib.pyplot as plt
