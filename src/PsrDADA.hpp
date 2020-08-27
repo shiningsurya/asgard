@@ -59,14 +59,18 @@ class PsrDADA {
 	timeslice sample_chunk;
 	// PACK/UNPACK
 	float alpha, beta, gamma, delta;
+	long lalpha;
  void pack(PtrFloat ret, int numants, timeslice nsamps, PtrByte dd) {
    timeslice ii = 0;
    float rmean = 0.0f, rstd = 0.0f;
    float bmax = pow(2,nbits) -1; 
-   rmean = 0.5 * bmax * numants;
-   rstd  = sqrt(numants);
-   if (nbits == 8)      rstd *= 33.818;
-   else if (nbits == 4) rstd *= 3.137;
+   float snant = sqrt(numants);
+   //rmean = 0.5 * bmax * numants;
+   //rstd  = sqrt(numants);
+   rmean = 0.5 * bmax;
+   rstd  = 33.318;
+   //if (nbits == 8)      rstd *= 33.818;
+   //else if (nbits == 4) rstd *= 3.137;
 #ifdef AG_RUNNING
    // the running mean idea
    // two pass mean, std estimate
@@ -76,7 +80,8 @@ class PsrDADA {
    rmean /= nsamps;
    std::for_each(ret, ret + nsamps, [&rstd, &rmean](const float& xx) { rstd += pow(xx - rmean, 2); });
    rstd = sqrt(rstd / (nsamps - 1)); // Bessel correction
-   //std::cout << " rmean=" << rmean << " rstd=" << rstd << std::endl;
+   std::cout << " rmean=" << rmean << " rstd=" << rstd << std::endl;
+   multilog (log, LOG_INFO, "PsrDADA::Running redigitization mean=%f std.dev.=%f\n", rmean, rstd);
 #endif
    if(nbits == 2) {
      for(it = 0; it < nsamps;) {
@@ -96,8 +101,16 @@ class PsrDADA {
    }
    else if(nbits == 8) {
      for(it = 0; it < nsamps;) {
-       alpha = (ret[it++] - rmean) / rstd;
-       dd[ii++] = dig8bit(alpha);
+      // the division by numants is required here for
+      // the mean computation
+       alpha = snant * ((ret[it++]/numants) - rmean) / rstd;
+       //dd[ii++] = dig8bit(alpha);
+       // ^ produces weird ridges in the distribution
+       // going for linear-like coding
+       lalpha = std::lround((32*alpha) + 128);
+       if (lalpha < 0)    lalpha = 0;
+       if (lalpha >= 255) lalpha = 255;
+       dd[ii++] = (unsigned char) lalpha;
      }
    }
  }

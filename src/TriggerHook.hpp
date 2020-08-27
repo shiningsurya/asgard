@@ -397,6 +397,11 @@ class TriggerHook {
             going = 0;
             // eod
           }
+          else if (readret == 0) {
+            std::cout << "TriggerHook::FollowDADA ZeroRead returned zero" << std::endl;
+            going = 0;
+            // eod
+          }
           else {
             // push_back current epoch
             epoch_cb.push_back ( 
