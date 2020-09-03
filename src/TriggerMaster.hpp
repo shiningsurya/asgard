@@ -14,6 +14,11 @@
 #include "Timer.hpp"
 // fbson read
 #include "FilterbankJSON.hpp"
+// telemetry
+#include "TriggerCNN.hpp"
+#include "MulticastSend.hpp"
+static constexpr char vdif_trigger[] = "224.3.29.71";
+static constexpr int  vdif_port      = 20003;
 
 
 // There are six functions
@@ -34,6 +39,10 @@ class TriggerMaster {
 	using vf   = std::vector<float>;
 	using vb   = std::vector<Byte>;
 	private:
+	  // telemetry
+	  bool decision;
+	  MulticastSend mcs;
+	  TriggerCNN    cnner;
 		// dada interface
 		key_t       hkey;
 		key_t       dkey;
@@ -262,6 +271,19 @@ class TriggerMaster {
 		void mler () {
 		  // this is where my ml action
 		  // my telemetry
+      decision = false;
+      /* Inference */
+      decision = cnner.Inference ( bt, incoh );
+      /* Multicast send */
+      if (decision) {
+        std::cout << "TriggerMaster::ML flagged a trigger" << std::endl;
+        if (mcs.send (trig)) {
+          std::cout << "TriggerMaster::ML successfully dispatched trigger" << std::endl;
+        }
+        else {
+          std::cout << "TriggerMaster::ML failed trigger dispatch" << std::endl;
+        }
+      }
 		}
 	public:
 		TriggerMaster (
@@ -279,9 +301,11 @@ class TriggerMaster {
 		) : 
 		hkey (hkey_), dkey(dkey_), 
 		maxdatasamps(maxds),
+		/* vv - DM_COUNT, NSAMPS, NCHANS - vv */
 		dm_count (dmc), nsamps(nmc), nchans(cmc),
+		/* multicast send */
+		mcs (vdif_trigger, vdif_port),
 		td (hkey, dkey), 
-		// vv - DM_COUNT, NSAMPS, NCHANS - vv
 		tj(ddir), tp (pdir) {
 			bdata.resize (maxdatasamps, 0);
 			bt.reserve (dm_count * nsamps);
@@ -301,8 +325,10 @@ class TriggerMaster {
       unsigned cmc = 64
 		) : 
 		maxdatasamps(maxds),
-		dm_count (dmc), nsamps(nmc), nchans(cmc),
 		// vv - DM_COUNT, NSAMPS, NCHANS - vv
+		dm_count (dmc), nsamps(nmc), nchans(cmc),
+		/* multicast send */
+		mcs (vdif_trigger, vdif_port),
 		tj(ddir), tp (pdir) {
 			bdata.resize (maxdatasamps, 0);
 			bt.reserve (dm_count * nsamps);
