@@ -210,7 +210,7 @@ class DADACoadd  {
               dadaout.SetHeader(dHead);
               dadaout.WriteHeader();
               // Filterbank Initialize
-              if(filout) fbout.Initialize(dHead, fb_nbits);
+              if(filout) fbout.Initialize(dHead, nbits);
             }
             std::cerr << "DADACoadd::WRITING DATA" << " key=" << std::hex << key_out << " rank=" << std::dec << world.rank() << std::endl;
             // RFI excision -- level 2
@@ -230,12 +230,13 @@ class DADACoadd  {
             if(filout) {
               #ifdef RT_PROFILE
               rtimer.restart();
-              dadaout.Redigitize(o_data_f, o_data_b, fb_nbits, numants);
-              std::cout << "DADACoadd::Profiling::Fil_redigit " << rtimer.elapsed() << std::endl;
+              //dadaout.Redigitize(o_data_f, o_data_b, fb_nbits, numants);
+              //std::cout << "DADACoadd::Profiling::Fil_redigit " << rtimer.elapsed() << std::endl;
               #endif // RT_PROFILE
               #ifdef RT_PROFILE
               rtimer.restart();
-              fbout.Data(o_data_b, read_chunk * fb_nbits / nbits); 
+              //fbout.Data(o_data_b, read_chunk * fb_nbits / nbits); 
+              fbout.Data(o_data_b, read_chunk); 
               std::cout << "DADACoadd::Profiling::Fil_WriteData " << rtimer.elapsed() << std::endl;
               #endif // RT_PROFILE
             }
