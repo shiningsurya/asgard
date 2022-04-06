@@ -222,11 +222,11 @@ class TriggerMaster {
 			tj.DumpDD (incoh);
 		}
 		void dumper () {
-			tj.DumpHead (th);
+			tj.DumpHead (th, decision);
 			tj.WritePayload ();
 		}
 		void plotter () {
-			tp.Plot (th, btf.data(), incohf.data());
+			tp.Plot (th, btf.data(), incohf.data(), decision);
 		}
 		void slicerAndmerger () {
 		  // clear house
@@ -369,23 +369,11 @@ class TriggerMaster {
 		}
 		void Singleton () {
 		  using std::cout;
-		  Timer t("");
-		  t.Start ();
 		  slicerAndmerger ();
-		  t.StopPrint (cout << "SlicerAndMerger");
-		  t.Start ();
 		  btdder ();
-		  t.StopPrint (cout << "BTDD");
-		  t.Start ();
-		  dumper ();
-		  t.StopPrint (cout << "DumpDBSON");
-		  t.Start ();
-		  plotter ();
-		  t.StopPrint (cout << "PlotDBSON");
-		  t.Start ();
-		  plotter ();
 		  mler ();
-		  t.StopPrint (cout << "MLer");
+		  dumper ();
+		  plotter ();
 		}
 		void FollowFile (const std::string& ss) {
       FBDump fbson (ss);
