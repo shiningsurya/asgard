@@ -37,7 +37,7 @@ class TriggerJSON {
       j.clear();
       return true;
     }
-    void DumpHead (const trigHead_t& th) {
+    void DumpHead (const trigHead_t& th, const bool& decision) {
       // header
       j["sn"]    = th.sn;
       j["dm"]    = th.dm;
@@ -72,9 +72,16 @@ class TriggerJSON {
       gmtime_r (&hepoch, &utc_time);
       strftime (group, sizeof(group), "%Y%m%d_%H%M%S", &utc_time);
       j["parameters"]["group"] = std::string(group);
-      snprintf(filename, sizeof(filename),
-          "%s_muos_ea%02d_dm%05.2f_sn%05.2f_wd%05.2f.dbson", group, th.stationid,th.dm,th.sn,th.width*1e3f
-      );
+      if (decision) {
+        snprintf(filename, sizeof(filename),
+            "%s_muos_ea%02d_dm%05.2f_sn%05.2f_wd%05.2f_ml.dbson", group, th.stationid,th.dm,th.sn,th.width*1e3f
+        );
+      }
+      else {
+        snprintf(filename, sizeof(filename),
+            "%s_muos_ea%02d_dm%05.2f_sn%05.2f_wd%05.2f.dbson", group, th.stationid,th.dm,th.sn,th.width*1e3f
+        );
+      }
     }
     // it is assumed that
     // the data products 
